@@ -203,11 +203,13 @@ class RichActivity(_Activity):
     kind: Literal['rich'] = 'rich'
     concept_id: NonBlankString
     parameters: RichParameters
-    text: NonBlankString
+    text: Annotated[NonBlankString, Field(max_length=1000)]
     media: list[VideoAttachment] = Field(default_factory=list)
 
     @model_validator(mode='after')
     def media_matches_citations(self):
+        if len(self.text.split()) > 120:
+            raise ValueError('A rich activity requires a concise complete text alternative.')
         if any(attachment.reference not in self.sources for attachment in self.media):
             raise ValueError('Media attachments must resolve to activity citations.')
         return self

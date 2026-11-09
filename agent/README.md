@@ -646,3 +646,10 @@ as a playback alternative. Attachments must match activity citations, and genera
 references are resolved against the selected materials before return. The host
 owns URI resolution, authorization, clipping, and playback; the agent generates
 neither media files nor rendering code.
+
+`text_alternative(activity, capabilities)` converts an existing unsupported rich
+activity into its complete explanation without model calls, preserving identity,
+source attribution, and text. Rich generation whose parameters remain invalid
+after normal bounded retries gets one separate validated text-generation fallback.
+That fallback still uses selected-source checks; insufficient/conflicting evidence,
+refusals, cancellation, or stale state are not silently bypassed.

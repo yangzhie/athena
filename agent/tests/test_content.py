@@ -127,3 +127,28 @@ def test_rich_content_attaches_verified_video_times_and_text_excerpt(gap):
     altered['media'][0]['reference']['source_uri'] = 'invented://wrong'
     with pytest.raises(ValidationError):
         type(activity).model_validate(altered)
+
+
+def test_invalid_rich_generation_falls_back_once_to_grounded_text(gap):
+    from athena_agent.activities import ClientCapabilities
+    from athena_agent.content import ContentService
+    from athena_agent.reliable_llm import ReliableLLM, RetryPolicy
+    context, store, _ = gap
+    mock = MockLLM([{'format': 'diagram', 'rationale': 'Shows relationships.'}, {'text': 'Compare neighbours.', 'parameters': {'kind': 'diagram', 'nodes': [], 'edges': []}}, {'text': 'Compare adjacent values and swap if out of order.'}])
+    service = ContentService(store, ReliableLLM(mock, policy=RetryPolicy(max_attempts=1)))
+    asyncio.run(service.set_capabilities(context, ClientCapabilities(formats=['diagram'])))
+    before = store.read(context)
+    activity = asyncio.run(service.generate(context, 'bubble-sort'))
+    assert activity.kind == 'explanation' and len(mock.calls) == 3
+    assert store.read(context) == before
+
+
+def test_existing_rich_text_alternative_preserves_provenance_without_calls():
+    from athena_agent.activities import ClientCapabilities
+    from athena_agent.content import text_alternative
+    from athena_agent.learning import RichActivity
+    original = RichActivity(activity_id='a', concept_id='c', text='A complete description.', parameters={'kind': 'diagram', 'nodes': [{'node_id': 'n', 'label': 'Node'}]})
+    fallback = text_alternative(original, ClientCapabilities())
+    assert fallback.kind == 'explanation' and fallback.text == original.text
+    assert fallback.activity_id == original.activity_id and fallback.sources == original.sources
+    assert text_alternative(original, ClientCapabilities(formats=['diagram'])) == original
