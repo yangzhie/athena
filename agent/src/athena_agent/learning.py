@@ -5,7 +5,7 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
-from .retrieval import SourceReference
+from .retrieval import SourceAttribution
 
 __all__ = [
     'Difficulty', 'AssessmentOutcome', 'LearningPhase', 'MasteryStatus',
@@ -106,8 +106,7 @@ class TextAnswer(Contract):
 Answer = Annotated[MultipleChoiceAnswer | TextAnswer, Field(discriminator='kind')]
 
 
-class Assessment(Contract):
-    sources: list[SourceReference] = Field(default_factory=list)
+class Assessment(SourceAttribution):
     assessment_id: NonBlankString
     question_id: NonBlankString
     concept_id: NonBlankString
@@ -146,9 +145,8 @@ class LearningState(Contract):
         return self
 
 
-class _Activity(Contract):
+class _Activity(SourceAttribution):
     activity_id: NonBlankString
-    sources: list[SourceReference] = Field(default_factory=list)
 
 
 class QuestionActivity(_Activity):

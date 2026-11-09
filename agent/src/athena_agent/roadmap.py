@@ -7,7 +7,7 @@ from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
 from .learning import Difficulty, LearningState
-from .retrieval import SourceReference
+from .retrieval import SourceAttribution
 
 
 class TopicScope(Contract):
@@ -74,8 +74,7 @@ class EnrichedGraph(ConceptGraph):
     concepts: Annotated[list[EnrichedConcept], Field(min_length=1)]
 
 
-class Roadmap(Contract):
-    sources: list[SourceReference] = Field(default_factory=list)
+class Roadmap(SourceAttribution):
     goal: NonBlankString
     scope: TopicScope
     graph: EnrichedGraph

@@ -56,3 +56,13 @@ class KnowledgeService:
             session.active_topic.knowledge = validated
             self.store._save(context, session)
             return validated.model_copy(deep=True)
+
+
+    async def use_general_knowledge(self, context: RequestContext) -> None:
+        """Explicit host decision to clear selected materials; never an automatic fallback."""
+        async with self.store.interaction(context) as session:
+            if session.active_topic is None:
+                raise ConversationError('Initialize a learning goal first.')
+            if session.active_topic.knowledge is not None:
+                session.active_topic.knowledge = None
+                self.store._save(context, session)

@@ -114,3 +114,30 @@ def test_empty_selection_fails_without_model_call(gap):
     with pytest.raises(EvidenceError) as error:
         asyncio.run(teacher.explain(context, assessment.assessment_id))
     assert error.value.code == 'insufficient_evidence' and mock.calls == []
+
+
+def test_general_and_explicit_supplement_have_distinct_origins(gap):
+    context, store, assessment = gap
+    teacher, _ = teaching(store, [{'text': 'A general explanation.'}])
+    general = asyncio.run(teacher.explain(context, assessment.assessment_id))
+    assert general.knowledge_origin == 'general' and general.sources == []
+    support = select_materials(context, store)
+    teacher, _ = teaching(store, [{'text': 'Compare adjacent values.'}, support])
+    sourced = asyncio.run(teacher.explain(context, assessment.assessment_id))
+    assert sourced.knowledge_origin == 'materials'
+    teacher, mock = teaching(store, [{'text': 'Supplement: imagine neighbours exchanging positions.'}])
+    before = store.read(context)
+    supplement = asyncio.run(teacher.supplement(context, assessment.assessment_id))
+    assert supplement.knowledge_origin == 'supplement' and supplement.sources == []
+    assert len(mock.calls) == 1 and 'reference_materials' in mock.calls[0].messages[1].content
+    assert store.read(context) == before
+
+
+def test_general_knowledge_requires_explicit_selection_clear(gap):
+    from athena_agent.knowledge import KnowledgeService
+    context, store, assessment = gap
+    select_materials(context, store)
+    asyncio.run(KnowledgeService(store).use_general_knowledge(context))
+    teacher, mock = teaching(store, [{'text': 'A general explanation.'}])
+    activity = asyncio.run(teacher.explain(context, assessment.assessment_id))
+    assert activity.knowledge_origin == 'general' and len(mock.calls) == 1

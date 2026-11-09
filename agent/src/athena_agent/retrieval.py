@@ -148,3 +148,18 @@ def reference_for(item: RetrievalItem, quote: str) -> SourceReference:
         raise ValueError('Citation quote must resolve to the supplied material.')
     data = {**item.model_dump(exclude={'text', 'transcript'}), 'quote': quote}
     return DocumentReference.model_validate(data) if isinstance(item, DocumentPassage) else VideoReference.model_validate(data)
+
+
+class SourceAttribution(Contract):
+    sources: list[SourceReference] = Field(default_factory=list)
+    knowledge_origin: Literal['general', 'materials', 'supplement'] = 'general'
+
+    @model_validator(mode='after')
+    def consistent_origin(self):
+        if self.sources:
+            if self.knowledge_origin == 'supplement':
+                raise ValueError('General-knowledge supplements cannot claim material citations.')
+            self.knowledge_origin = 'materials'
+        elif self.knowledge_origin == 'materials':
+            raise ValueError('Material attribution requires verified references.')
+        return self

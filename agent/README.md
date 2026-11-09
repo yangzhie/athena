@@ -585,3 +585,12 @@ quotes in at least two selected items. These safe, nonretryable errors preserve
 learning state and ask for more relevant materials or source clarification; the
 agent never silently picks a source winner. Retrieval unavailability remains a
 separate `dependency_unavailable` failure and preserves the previous selection.
+
+Activities, assessments, and roadmaps label `knowledge_origin` as `general`,
+`materials`, or `supplement`. Verified citations imply `materials`; supplements
+cannot claim material citations. With no selection, learning uses general knowledge.
+`await teaching.supplement(context, assessment_id)` explicitly requests a bounded
+general-knowledge supplement to selected materials, keeps the selection intact,
+and labels its result without citations. It is never an automatic response to
+insufficient evidence. `await knowledge.use_general_knowledge(context)` explicitly
+clears selection when the host chooses to leave source-only learning.
