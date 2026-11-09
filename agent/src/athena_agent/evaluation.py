@@ -198,6 +198,9 @@ async def evaluate_source_safety(fixture: dict) -> dict:
 
 
 async def evaluate_fixture(fixture: dict) -> dict:
+    if fixture.get('kind') == 'api':
+        from .api_evaluation import evaluate_api_journey
+        return await evaluate_api_journey(fixture)
     if fixture.get('kind') == 'source_safety':
         return await evaluate_source_safety(fixture)
     if fixture.get('kind') == 'memory':

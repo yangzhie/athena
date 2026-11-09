@@ -763,3 +763,31 @@ Scope interpretation and teaching quality are model-dependent. Mastery threshold
 are conservative starting rules. Broad coverage is partial, local SQLite storage
 is not a distributed service, and schema migrations/account systems are outside
 this package. Offline tests and evaluation fixtures require no model credentials.
+
+## Offline API and optional live evaluations
+
+```sh
+uv run python -m athena_agent.evaluation tests/fixtures/api_journey.json
+```
+
+The repeatable API journey uses injected mock LLM/retrieval and in-memory storage
+through an in-process ASGI transport. It checks diagnosis, source selection,
+teaching, application, independent mastery, completion, replay/resume, rich content,
+text alternatives, strict contracts, malformed-output recovery, retry exhaustion,
+terminal dependencies, and learner isolation. No server or network is required.
+
+A separate live quality harness exists for synthetic scenarios:
+
+```sh
+# Optional; this command enables paid calls and is not part of offline verification.
+uv run python -m athena_agent.live_evaluation tests/fixtures/live_quality.json --live --max-scenarios 1
+```
+
+Without `--live` it exits before reading live configuration or constructing a
+provider. Explicit live runs require `OPENAI_MODEL` and `OPENAI_API_KEY`, use at
+most two provider calls per scenario (one unit plus a structured quality rubric),
+disable retries, and cap a run at three scenarios. Reports include conciseness,
+accuracy, gap targeting, focus, engagement/actionability, and judge rationale.
+Model-judged quality is indicative rather than a validated educational metric;
+review it manually. The included fixtures are synthetic. Offline tests exercise
+the live harness with mocks only; no paid model calls were run during implementation.
