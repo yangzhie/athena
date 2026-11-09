@@ -1,12 +1,7 @@
 import { NavLink, Outlet } from 'react-router'
+import { features } from './features'
 
-const nav = [
-  { to: '/', label: 'Home', end: true },
-  { to: '/learn', label: 'Learn' },
-  { to: '/review', label: 'Review' },
-  { to: '/library', label: 'Library' },
-  { to: '/progress', label: 'Progress' },
-]
+const nav = features.flatMap((f) => (f.nav ? [f.nav] : []))
 
 function navClass({ isActive }: { isActive: boolean }) {
   return [
