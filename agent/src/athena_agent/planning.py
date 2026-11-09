@@ -10,6 +10,7 @@ from .conversation import ConversationTurn, TopicContext
 from .learning import LearningState
 from .llm import LLM, Model
 from .reliable_llm import ReliableLLM
+from .roadmap import TopicScope
 
 
 class GoalInterpretation(Contract):
@@ -53,4 +54,16 @@ class PlanningService:
             'For ambiguity that changes the subject or intended outcome, ask one focused '
             'clarification question instead of guessing. Broad but clear subjects are valid goals.',
             GoalInterpretation,
+        )
+
+    async def classify_scope(self, goal: str) -> TopicScope:
+        topic = TopicContext(learning_state=LearningState(goal=goal))
+        return await self._call(
+            topic, goal,
+            'Classify the learning goal as narrow (one focused concept or technique) '
+            'or broad (a subject with multiple concept families and prerequisites). '
+            'Explain the scope briefly. Classify the requested outcome, not just the '
+            'subject name. Scope is independent of learner proficiency; do not '
+            'assume a broad goal means an advanced learner.',
+            TopicScope,
         )

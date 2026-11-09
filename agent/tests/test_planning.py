@@ -61,3 +61,35 @@ def test_invalid_interpretation_uses_shared_safe_validation():
     planner, _ = service([{'status': 'resolved'}])
     with pytest.raises(InvalidOutputError):
         asyncio.run(planner.interpret_goal('Sorting'))
+
+
+def test_scope_classification_uses_goal_without_assuming_proficiency():
+    import json
+    from pathlib import Path
+
+    fixtures = json.loads((Path(__file__).parent / 'fixtures' / 'planning_goals.json').read_text())
+    planner, mock = service([case['result'] for case in fixtures])
+    for case in fixtures:
+        result = asyncio.run(planner.classify_scope(case['goal']))
+        assert result.model_dump() == case['result']
+    for case, call in zip(fixtures, mock.calls):
+        assert call.messages[-1].content == case['goal']
+        assert 'independent of learner proficiency' in call.messages[0].content
+
+
+@pytest.mark.parametrize('values', [
+    {'scope': 'medium', 'rationale': 'Some concepts'},
+    {'scope': 'narrow', 'rationale': ' '},
+    {'scope': 'broad', 'rationale': 'Many concepts', 'proficiency': 'advanced'},
+])
+def test_scope_contract_rejects_invalid_or_unrelated_fields(values):
+    from athena_agent.roadmap import TopicScope
+    with pytest.raises(ValidationError):
+        TopicScope(**values)
+
+
+def test_blank_scope_goal_never_calls_model():
+    planner, mock = service([])
+    with pytest.raises(ValidationError):
+        asyncio.run(planner.classify_scope(' '))
+    assert mock.calls == []

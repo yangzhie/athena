@@ -268,3 +268,7 @@ When mandatory context exceeds the budget, `ContextBudgetError` reports `invalid
 `athena_agent.planning.PlanningService(llm, context_builder=...)` exposes explicit planning calls without changing `ConversationManager.send`. `await planner.interpret_goal(text, clarification_turns=())` returns a `GoalInterpretation`: either `status="resolved"` with a goal, or `status="clarification"` with one focused question. Supply prior `ConversationTurn` pairs and the latest learner message to resolve clarification across calls.
 
 Interpretation uses the existing bounded context builder and reliable LLM interface. It creates no session and changes no stored goal. The caller may initialise a session only after resolution. No proficiency, assessment, or mastery is inferred from interpreting a goal.
+
+## Topic scope (03.2)
+
+`await planner.classify_scope(goal)` returns `athena_agent.roadmap.TopicScope(scope, rationale)`, classifying the resolved goal as `narrow` or `broad`. Scope describes the requested conceptual coverage, not learner proficiency. A focused outcome within a broad field can still be narrow. This is a standalone call with no session mutations or automatic conversation integration; scope quality requires live-model evaluation beyond deterministic fixtures.
