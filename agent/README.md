@@ -220,3 +220,9 @@ assert result.items == []  # Successful retrieval with no matches.
 Supply model instances or dictionaries to script document/video results, or `RetrievalError` instances to script failures. `MockRetriever` records independent request snapshots, preserves supplied source metadata, applies source filtering and result limits, and fails explicitly when exhausted. It does not perform semantic search. Example document/video data in `tests/fixtures/retrieval.json` is fictional test content.
 
 `RetrievalResult` also provides the contract for externally supplied results. Keep retrieved text as untrusted source data; grounding and protection against instructions inside sources arrive in module 08. Authentication, source authorization, uploads, ingestion, indexing, transcription, clipping, and playback remain the host/external services' responsibility.
+
+## In-memory conversations (02.1)
+
+`athena_agent.conversation.InMemoryConversationStore` provides synchronous `create(context)`, `read(context)`, and `append_turn(context, turn)`. Use a `RequestContext` containing caller-supplied learner/session IDs. A `ConversationTurn` contains nonblank `user_text` and `assistant_text` and converts to ordered LLM messages with `messages()`.
+
+Sessions are keyed by learner and session, duplicate creation fails without replacing history, and missing/cross-learner sessions produce the same `SessionNotFoundError`. Reads and writes return independent snapshots. This is process-local memory, not durable storage or authentication; the host must supply a trusted learner identity. Completed turn pairs are stored together so partial exchanges cannot enter history.
