@@ -505,3 +505,20 @@ references and topic/goal/identity/revision compatibility atomically, while
 preserving existing conversation data. To restore both projections into an empty
 session, save conversation then learning using the updated revision. Learning
 snapshots include private keys and criteria and must remain backend-only.
+
+## Durable SQLite memory and resume
+
+Use `SQLiteLearningMemory("/path/to/agent-memory.sqlite")` as the injected store.
+It implements the same interface and reuses existing validated domain operations.
+Conversation and private learning projections occupy separate JSON columns and
+update together in one SQLite statement with a revision comparison. A composite
+learner/session primary key isolates records; independent adapter instances reject
+stale writes. No database transaction stays open during model calls. Use a context
+manager or `close()` to release the connection. Database files are host-managed
+private backend data and must not be exposed as client artifacts.
+
+`orchestrator.resume(context)` returns a copied current activity with no model
+call after reopening the database. Failed/incomplete model operations never publish
+partial evidence. Storage failures use a safe `dependency_unavailable` error.
+The schema stores version 1 records and fails closed on unsupported versions;
+a migration system is not implemented.

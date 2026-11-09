@@ -142,3 +142,10 @@ class LearningOrchestrator:
         if topic is None:
             raise ConversationError('An active learning roadmap is required.')
         return select_action(topic, assessment_id)
+
+
+    def resume(self, context: RequestContext) -> LearningActivity:
+        topic = self.store.read(context).active_topic
+        if topic is None or topic.current_activity is None:
+            raise ConversationError('The session has no current learning activity.')
+        return topic.current_activity.model_copy(deep=True)
