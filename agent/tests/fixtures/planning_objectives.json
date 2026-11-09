@@ -1,0 +1,6 @@
+{
+  "concepts": [
+    {"concept_id": "comparison", "objectives": ["Identify an out-of-order adjacent pair."], "difficulty": "beginner"},
+    {"concept_id": "bubble-sort", "objectives": ["Trace a complete sorting pass.", "Explain why repeated passes sort the values."], "difficulty": "intermediate"}
+  ]
+}

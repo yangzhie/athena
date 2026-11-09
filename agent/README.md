@@ -278,3 +278,9 @@ Interpretation uses the existing bounded context builder and reliable LLM interf
 `await planner.identify_graph(goal, scope)` returns `ConceptGraph(concepts, partial_coverage)`. Concepts have stable IDs, titles, descriptions, and prerequisite IDs referring to concepts in the same graph. Empty graphs, duplicate IDs, duplicate prerequisites, and missing references are rejected. Stable IDs are model-proposed identifiers, not display titles; later revisions must preserve retained identities.
 
 `PlanningPolicy(initial_concept_limit=12)` bounds initial generation in both the response schema and validation. Broad subjects must return an initial foundation marked `partial_coverage=true`; full coverage is not claimed. Additional planning inputs are included in the context budget through `ContextBuilder.build(..., additional_context=...)`. Graph generation remains independent of sessions; cycle validation is added with complete roadmaps in 03.5.
+
+## Objectives and difficulty (03.4)
+
+`await planner.enrich_graph(graph, goal=goal, learner_state=None)` returns an `EnrichedGraph` with one or more learning objectives and an existing difficulty level per concept. Optional learner state must match the goal. Supplied mastery/evidence is context only and is never changed.
+
+The model returns an `ObjectiveBatch` containing IDs, objectives, and difficulty only. The service requires exactly the original ID set and merges results into the unchanged graph, preserving titles, descriptions, ordering, and prerequisites. Unexpected IDs or attempts to return changed edges are rejected; empty/blank objectives and unknown difficulty levels are invalid.

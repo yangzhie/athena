@@ -5,6 +5,7 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
+from .learning import Difficulty
 
 
 class TopicScope(Contract):
@@ -35,3 +36,29 @@ class ConceptGraph(Contract):
             if not set(concept.prerequisite_ids) <= known:
                 raise ValueError('Prerequisites must reference concepts in the graph.')
         return self
+
+
+class ConceptObjectives(Contract):
+    concept_id: NonBlankString
+    objectives: Annotated[list[NonBlankString], Field(min_length=1)]
+    difficulty: Difficulty
+
+
+class ObjectiveBatch(Contract):
+    concepts: Annotated[list[ConceptObjectives], Field(min_length=1)]
+
+    @model_validator(mode='after')
+    def unique_concepts(self) -> Self:
+        ids = [concept.concept_id for concept in self.concepts]
+        if len(set(ids)) != len(ids):
+            raise ValueError('Objective concept IDs must be unique.')
+        return self
+
+
+class EnrichedConcept(Concept):
+    objectives: Annotated[list[NonBlankString], Field(min_length=1)]
+    difficulty: Difficulty
+
+
+class EnrichedGraph(ConceptGraph):
+    concepts: Annotated[list[EnrichedConcept], Field(min_length=1)]

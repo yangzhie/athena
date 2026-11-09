@@ -6,11 +6,11 @@ from pydantic import Field, create_model, model_validator
 
 from ._schema import Contract, NonBlankString
 from .context import ContextBuilder
-from .conversation import ConversationTurn, TopicContext
+from .conversation import ConversationError, ConversationTurn, TopicContext
 from .learning import LearningState
 from .llm import LLM, Model, InvalidOutputError
 from .reliable_llm import ReliableLLM
-from .roadmap import Concept, ConceptGraph, TopicScope
+from .roadmap import Concept, ConceptGraph, EnrichedConcept, EnrichedGraph, ObjectiveBatch, TopicScope
 
 
 class GoalInterpretation(Contract):
@@ -96,3 +96,30 @@ class PlanningService:
         if scope.scope == 'broad' and not result.partial_coverage:
             raise InvalidOutputError()
         return ConceptGraph.model_validate(result.model_dump())
+
+    async def enrich_graph(
+        self, graph: ConceptGraph, *, goal: str, learner_state: LearningState | None = None,
+    ) -> EnrichedGraph:
+        graph = ConceptGraph.model_validate(graph.model_dump())
+        state = LearningState.model_validate(learner_state.model_dump()) if learner_state else LearningState(goal=goal)
+        if state.goal != goal:
+            raise ConversationError('Learner evidence must belong to the requested goal.')
+        objectives = await self._call(
+            TopicContext(learning_state=state), goal,
+            'For every supplied concept, return its existing ID, one or more concise '
+            'observable learning objectives, and beginner/intermediate/advanced difficulty. '
+            'Use supplied learner evidence where available, without inventing proficiency. '
+            'Return each ID exactly once; do not add concepts or change their meanings.',
+            ObjectiveBatch, inputs={'graph': graph.model_dump()},
+        )
+        by_id = {item.concept_id: item for item in objectives.concepts}
+        if set(by_id) != {concept.concept_id for concept in graph.concepts}:
+            raise InvalidOutputError()
+        return EnrichedGraph(
+            concepts=[EnrichedConcept(
+                **concept.model_dump(),
+                objectives=by_id[concept.concept_id].objectives,
+                difficulty=by_id[concept.concept_id].difficulty,
+            ) for concept in graph.concepts],
+            partial_coverage=graph.partial_coverage,
+        )
