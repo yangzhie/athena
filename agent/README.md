@@ -428,3 +428,9 @@ for bundled offline scenarios checking partial/incorrect reasoning after a corre
 selection, misconception evidence, conversation continuity, topic isolation, and
 budgeted history selection. Mock grades exercise evidence-handling behavior;
 they do not measure real-model grading accuracy.
+
+`orchestrator.next_action(context, assessment_id)` exposes a read-only
+`LearningDecision` (`teach`, `verify`, `diagnose`, or `progress`) with a concept and
+reason. Answer submission uses the same deterministic selector. Missing
+prerequisites take priority over dependent-concept verification; new concepts
+must be eligible under the roadmap's evidence-based prerequisite checks.

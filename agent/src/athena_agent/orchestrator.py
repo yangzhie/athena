@@ -8,6 +8,7 @@ from .assessment import AssessmentService
 from .assessment_models import AnswerSubmission
 from .context import ContextBuilder
 from .contracts import RequestContext
+from .decisions import LearningDecision, select_action
 from .conversation import ConversationError, ConversationSession, ConversationTurn, InMemoryConversationStore
 from .learning import Answer, CompletionActivity, Difficulty, ExplanationActivity, LearningActivity, QuestionActivity
 from .llm import LLM
@@ -78,24 +79,20 @@ class LearningOrchestrator:
             staged = self._stage(context, original)
             assessor = AssessmentService(staged, self.llm, context_builder=self.context_builder)
             assessment = await assessor.evaluate(context, submission.answer, hint_used=hint_used)
-            state = staged.read(context).active_topic.learning_state
-            mastered = any(item.concept_id == assessment.concept_id and item.status == 'mastered' for item in state.mastery)
-            if assessment.outcome != 'correct':
+            decision = select_action(staged.read(context).active_topic, assessment.assessment_id)
+            if decision.action == 'teach':
                 await assessor.diagnose(context, assessment.assessment_id)
                 activity = await TeachingService(staged, self.llm, context_builder=self.context_builder).explain(context, assessment.assessment_id)
                 phase = 'teach'
-            elif not mastered:
+            elif decision.action == 'verify':
                 activity = await assessor.generate_followup(context, assessment.assessment_id)
                 phase = 'reinforce'
+            elif decision.action == 'diagnose':
+                activity = await assessor.generate_multiple_choice(context, decision.concept_id)
+                phase = 'diagnose'
             else:
-                roadmap = staged.read(context).active_topic.roadmap
-                eligible = roadmap.eligible_concept_ids(state)
-                if eligible:
-                    activity = await assessor.generate_multiple_choice(context, eligible[0])
-                    phase = 'diagnose'
-                else:
-                    activity = CompletionActivity(activity_id=str(uuid4()), text='The current roadmap is mastered. Review the next learning goal.')
-                    phase = 'progress'
+                activity = CompletionActivity(activity_id=str(uuid4()), text='The current roadmap is mastered. Review the next learning goal.')
+                phase = 'progress'
             self._set_activity(context, staged, activity, phase)
             session = staged.read(context)
             record = next(item for item in session.active_topic.assessment_records if item.assessment.assessment_id == assessment.assessment_id)
@@ -121,3 +118,10 @@ class LearningOrchestrator:
             self._set_activity(context, staged, activity, 'reinforce')
             self._publish(context, original, staged)
             return activity.model_copy(deep=True)
+
+
+    def next_action(self, context: RequestContext, assessment_id: str) -> LearningDecision:
+        topic = self.store.read(context).active_topic
+        if topic is None:
+            raise ConversationError('An active learning roadmap is required.')
+        return select_action(topic, assessment_id)
