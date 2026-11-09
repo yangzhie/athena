@@ -104,3 +104,11 @@ class SimulationParameters(Contract):
 
 
 RichParameters = Annotated[DiagramParameters | AnimationParameters | SimulationParameters, Field(discriminator='kind')]
+
+
+from .retrieval import VideoReference
+
+
+class VideoAttachment(Contract):
+    reference: VideoReference
+    text_alternative: NonBlankString

@@ -4,8 +4,10 @@ from uuid import uuid4
 
 from pydantic import create_model
 
-from .activities import ActivitySelection, ClientCapabilities, DiagramParameters, AnimationParameters, SimulationParameters
+from .activities import ActivitySelection, ClientCapabilities, DiagramParameters, AnimationParameters, SimulationParameters, VideoAttachment
 from .grounding import generate_grounded
+from .retrieval import DocumentPassage, VideoReference, reference_for
+from .llm import InvalidOutputError
 from .learning import ExplanationActivity, RichActivity, TeachingContent
 from .reliable_llm import ReliableLLM
 from .context import ContextBuilder
@@ -71,4 +73,14 @@ class ContentService:
             common = dict(activity_id=str(uuid4()), concept_id=concept_id, text=draft.text, sources=draft._source_references)
             if selection.format == 'text':
                 return ExplanationActivity(**common, content=draft.content or TeachingContent(summary=draft.text))
-            return RichActivity(**common, parameters=draft.parameters)
+            # Resolve every reference against the selected material before attaching media.
+            if topic.knowledge is not None:
+                for reference in draft._source_references:
+                    matches = [item for item in topic.knowledge.items if item.kind == reference.kind and item.source_id == reference.source_id and
+                               (item.passage_id if isinstance(item, DocumentPassage) else item.segment_id) ==
+                               (reference.passage_id if reference.kind == 'document' else reference.segment_id)]
+                    if len(matches) != 1 or reference_for(matches[0], reference.quote) != reference:
+                        raise InvalidOutputError()
+            media = [VideoAttachment(reference=reference, text_alternative=reference.quote)
+                     for reference in draft._source_references if isinstance(reference, VideoReference)]
+            return RichActivity(**common, parameters=draft.parameters, media=media)

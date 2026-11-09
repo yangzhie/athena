@@ -639,3 +639,10 @@ ranges and a plain-language relationship/observation prompt. All outputs include
 a complete bounded text alternative. Parameters contain no executable UI or formula
 language, and invalid references/ranges fail before return. Generation is read-only
 and uses existing source support checks when materials are selected.
+
+Rich activities expose `media` attachments for verified video citations, carrying
+the supplied segment ID/URI/start/end timestamps and an exact cited text excerpt
+as a playback alternative. Attachments must match activity citations, and generated
+references are resolved against the selected materials before return. The host
+owns URI resolution, authorization, clipping, and playback; the agent generates
+neither media files nor rendering code.

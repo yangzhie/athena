@@ -103,3 +103,27 @@ def test_generate_supported_animation_and_simulation(gap, format, parameters):
     asyncio.run(service.set_capabilities(context, ClientCapabilities(formats=[format])))
     activity = asyncio.run(service.generate(context, 'bubble-sort'))
     assert activity.parameters.kind == format and activity.text
+
+
+def test_rich_content_attaches_verified_video_times_and_text_excerpt(gap):
+    from athena_agent.activities import ClientCapabilities
+    from athena_agent.content import ContentService
+    from .test_grounding import select_materials
+    from .test_knowledge import material
+    context, store, _ = gap
+    select_materials(context, store)
+    video = material().items[1]
+    support = {'supported': True, 'evidence': [{'source_index': 1, 'quote': video.transcript}]}
+    mock = MockLLM([{'format': 'diagram', 'rationale': 'Shows comparison.'}, support, {'text': 'Compare adjacent values.', 'parameters': {'kind': 'diagram', 'nodes': [{'node_id': 'a', 'label': 'Compare'}]}}, support])
+    service = ContentService(store, mock)
+    asyncio.run(service.set_capabilities(context, ClientCapabilities(formats=['diagram'])))
+    activity = asyncio.run(service.generate(context, 'bubble-sort'))
+    attachment = activity.media[0]
+    assert attachment.reference.start_seconds == video.start_seconds
+    assert attachment.reference.end_seconds == video.end_seconds
+    assert attachment.text_alternative == video.transcript
+    assert attachment.reference in activity.sources
+    altered = activity.model_dump()
+    altered['media'][0]['reference']['source_uri'] = 'invented://wrong'
+    with pytest.raises(ValidationError):
+        type(activity).model_validate(altered)

@@ -6,7 +6,7 @@ from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
 from .retrieval import SourceAttribution
-from .activities import RichParameters
+from .activities import RichParameters, VideoAttachment
 
 __all__ = [
     'Difficulty', 'AssessmentOutcome', 'LearningPhase', 'MasteryStatus',
@@ -204,6 +204,13 @@ class RichActivity(_Activity):
     concept_id: NonBlankString
     parameters: RichParameters
     text: NonBlankString
+    media: list[VideoAttachment] = Field(default_factory=list)
+
+    @model_validator(mode='after')
+    def media_matches_citations(self):
+        if any(attachment.reference not in self.sources for attachment in self.media):
+            raise ValueError('Media attachments must resolve to activity citations.')
+        return self
 
 
 LearningActivity = Annotated[
