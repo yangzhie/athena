@@ -7,6 +7,7 @@ from uuid import uuid4
 from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
+from .activities import ClientCapabilities
 from .contracts import RequestContext
 from .llm import Message
 from .learning import LearningState, LearningActivity
@@ -82,6 +83,7 @@ class TopicContext(Contract):
 
 
 class ConversationSession(Contract):
+    capabilities: ClientCapabilities = Field(default_factory=ClientCapabilities)
     learner_id: NonBlankString
     session_id: NonBlankString
     history: list[ConversationTurn] = Field(default_factory=list)
@@ -179,6 +181,7 @@ class InMemoryConversationStore:
                                      discussion_focus=topic.discussion_focus,
                                      history=[turn.model_dump() for turn in topic.history])
         return ConversationMemory(
+            capabilities=session.capabilities,
             learner_id=session.learner_id, session_id=session.session_id,
             history=[turn.model_dump() for turn in session.history],
             active_topic=project(session.active_topic) if session.active_topic else None,
@@ -206,6 +209,7 @@ class InMemoryConversationStore:
             topic.history = [ConversationTurn.model_validate(turn.model_dump()) for turn in data.history]
             topic.discussion_focus = data.discussion_focus
             return topic
+        session.capabilities = memory.capabilities.model_copy(deep=True)
         session.history = [ConversationTurn.model_validate(turn.model_dump()) for turn in memory.history]
         session.active_topic = restore(memory.active_topic) if memory.active_topic else None
         session.archived_topics = [restore(topic) for topic in memory.archived_topics]

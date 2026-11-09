@@ -623,3 +623,10 @@ concept IDs, phase, coverage, and `next_step` (`answer`, `continue`, `plan`, `ex
 or `complete`). Completion requires the actual narrow full-coverage mastery rule;
 broad partial coverage is never reported complete. The projection makes no model
 calls or state changes and excludes private question/assessment records.
+
+`ContentService.set_capabilities(context, ClientCapabilities(formats=[...]))` saves
+client format support as session conversation context, including durable resume.
+`choose(context, concept_id)` combines the existing pedagogical recommendation
+with declared support; unsupported recommendations become text. Text is always
+available, including empty/default capability declarations, without a model call
+when no richer formats are supported. Descriptions contain no rendering code.

@@ -46,3 +46,21 @@ def test_text_only_explanation_at_character_boundary_keeps_valid_fallback(gap):
     teacher, _ = teaching(store, [{'text': text}])
     activity = asyncio.run(teacher.explain(context, assessment.assessment_id))
     assert activity.text == activity.content.summary == text
+
+
+def test_client_capabilities_gate_recommendations_and_default_to_text(gap):
+    from athena_agent.activities import ClientCapabilities
+    from athena_agent.content import ContentService
+    context, store, _ = gap
+    mock = MockLLM([{'format': 'animation', 'rationale': 'Shows adjacent swaps over time.'}, {'format': 'simulation', 'rationale': 'Explore swaps.'}])
+    service = ContentService(store, mock)
+    assert asyncio.run(service.choose(context, 'bubble-sort')).format == 'text'
+    assert mock.calls == []
+    asyncio.run(service.set_capabilities(context, ClientCapabilities(formats=['animation'])))
+    assert asyncio.run(service.choose(context, 'bubble-sort')).format == 'animation'
+    assert asyncio.run(service.choose(context, 'bubble-sort')).format == 'text'
+    before = store.read(context)
+    asyncio.run(service.set_capabilities(context, ClientCapabilities(formats=['animation'])))
+    assert store.read(context) == before
+    with pytest.raises(ValidationError):
+        ClientCapabilities(formats=['html'])

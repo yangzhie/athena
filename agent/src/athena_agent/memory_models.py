@@ -3,6 +3,7 @@
 from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
+from .activities import ClientCapabilities
 
 
 class StoredTurn(Contract):
@@ -18,6 +19,7 @@ class TopicConversation(Contract):
 
 
 class ConversationMemory(Contract):
+    capabilities: ClientCapabilities = Field(default_factory=ClientCapabilities)
     learner_id: NonBlankString
     session_id: NonBlankString
     history: list[StoredTurn] = Field(default_factory=list)
