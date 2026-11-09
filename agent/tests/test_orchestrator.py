@@ -249,3 +249,16 @@ def test_failed_broad_expansion_rolls_back_last_answer():
     with pytest.raises(LLMError):
         asyncio.run(orchestrator.answer(context, TextAnswer(question_id=followup.question.question_id, text='Compare values and swap neighbours.')))
     assert store.read(context) == before
+
+
+def test_automatic_expansion_cannot_narrow_a_broad_subject():
+    from athena_agent.learning import TextAnswer
+    expansion = broad_expansion()
+    expansion[0]['scope']['scope'] = 'narrow'
+    expansion[0]['graph']['partial_coverage'] = False
+    context, store, _, orchestrator, followup = reach_reasoning([*one_concept_responses('broad'), OPEN, successful_reasoning(), *expansion])
+    before = store.read(context)
+    with pytest.raises(LLMError):
+        asyncio.run(orchestrator.answer(context, TextAnswer(question_id=followup.question.question_id, text='Compare values and swap neighbours.')))
+    assert store.read(context) == before
+    assert store.read(context).active_topic.roadmap.scope.scope == 'broad'

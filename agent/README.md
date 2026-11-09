@@ -458,3 +458,7 @@ proactively diagnose a new eligible concept. Broad coverage remains explicitly
 partial. An expansion that produces no eligible learning target is invalid;
 dependency failures or invalid revisions roll back the pending answer, allowing
 retry without false completion or lost evidence.
+
+Automatic expansion preserves the existing topic scope; a model cannot silently
+narrow a broad subject into a fully covered topic. Scope changes require an
+explicit planning operation rather than implicit progression.

@@ -102,6 +102,8 @@ class LearningOrchestrator:
                     phase = 'complete'
                 else:
                     revised = await PlanningService(self.llm, store=staged, context_builder=self.context_builder).revise(context)
+                    if revised.scope.scope != roadmap.scope.scope or (roadmap.scope.scope == 'broad' and not revised.graph.partial_coverage):
+                        raise InvalidOutputError()
                     eligible = revised.eligible_concept_ids(staged.read(context).active_topic.learning_state)
                     if not eligible:
                         raise InvalidOutputError()
