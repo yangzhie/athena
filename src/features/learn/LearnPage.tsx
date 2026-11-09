@@ -3,7 +3,7 @@ import { Link, useLoaderData } from 'react-router'
 import { Card, MasteryBar } from '../../components/ui'
 import type { ChatMessage } from '../../types'
 import { MessageBubble } from './components/MessageBubble'
-import { QuestionCard } from './components/QuestionCard'
+import { QuestionCard } from '../../components/quiz'
 import { ReplyBox } from './components/ReplyBox'
 import type { learnSessionLoader } from './loader'
 
@@ -56,7 +56,7 @@ function LearnSession({ data }: { data: SessionData }) {
           <MessageBubble key={m.id} message={m} materialTitles={materialTitles} />
         ))}
 
-        {question && <QuestionCard key={question.id} item={question} />}
+        {question && <QuestionCard key={question.id} item={question} allowRetry />}
 
         <ReplyBox
           onSend={(text) =>

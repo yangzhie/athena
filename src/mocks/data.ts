@@ -87,10 +87,14 @@ export const quizItems: QuizItem[] = [
   },
 ]
 
+/** ISO date offset from now, so "due today" works whenever the mock is loaded. */
+const daysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString()
+
 export const reviewStates: ReviewState[] = [
-  { itemId: 'q1', dueAt: '2026-11-09T09:00:00Z', stability: 2.1, difficulty: 4.2 },
-  { itemId: 'q2', dueAt: '2026-11-12T09:00:00Z', stability: 6.5, difficulty: 2.8 },
-  { itemId: 'q3', dueAt: '2026-11-09T09:00:00Z', stability: 1.2, difficulty: 5.1 },
+  { itemId: 'q1', dueAt: daysFromNow(-1), stability: 2.1, difficulty: 4.2 },
+  { itemId: 'q2', dueAt: daysFromNow(3), stability: 6.5, difficulty: 2.8 },
+  { itemId: 'q3', dueAt: daysFromNow(-0.5), stability: 1.2, difficulty: 5.1 },
+  { itemId: 'q4', dueAt: daysFromNow(-2), stability: 0.8, difficulty: 6.0 },
 ]
 
 export const materials: Material[] = [

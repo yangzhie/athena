@@ -29,7 +29,7 @@ export async function learnSessionLoader({ params }: LoaderFunctionArgs) {
       .filter((c) => topic.conceptIds.includes(c.id))
       .map((c) => ({ ...c, mastery: estimate.get(c.id) ?? 0 })),
     materialTitles: Object.fromEntries(materials.map((m) => [m.id, m.title])),
-    // The diagnose step: the first multiple-choice item for this topic.
-    question: items.find((q) => q.format === 'mcq') ?? null,
+    // The diagnose step: the first question for this topic, in any format.
+    question: items[0] ?? null,
   }
 }
