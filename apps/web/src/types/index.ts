@@ -1,3 +1,6 @@
 export * from './learning'
 export * from './quiz'
 export * from './library'
+export * from './spaces'
+export * from './sandbox'
+export * from './lectures'

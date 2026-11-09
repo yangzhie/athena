@@ -1,4 +1,4 @@
-import type { ChatMessage, Concept, LectureClip, Mastery, Material, QuizItem, ReviewState, Topic } from '../types'
+import type { ChatMessage, Concept, Mastery, Material, QuizItem, ReviewState, Topic } from '../types'
 
 export const concepts: Concept[] = [
   { id: 'arrays', name: 'Arrays', prerequisiteIds: [] },
@@ -121,27 +121,6 @@ export const materials: Material[] = [
     status: 'processing',
     uploadedAt: '2026-11-09T08:00:00Z',
     topicIds: [],
-  },
-]
-
-export const lectureClips: LectureClip[] = [
-  {
-    id: 'clip1',
-    materialId: 'ml-lecture-3',
-    topicId: 'machine-learning',
-    title: 'Why training accuracy lies',
-    summary: 'Overfitting explained with a polynomial fit example.',
-    startS: 312,
-    endS: 545,
-  },
-  {
-    id: 'clip2',
-    materialId: 'ml-lecture-3',
-    topicId: 'machine-learning',
-    title: 'k-fold cross-validation walkthrough',
-    summary: 'Splitting data into k folds and averaging the scores.',
-    startS: 1210,
-    endS: 1580,
   },
 ]
 

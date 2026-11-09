@@ -10,14 +10,3 @@ export interface Material {
   uploadedAt: string
   topicIds: string[]
 }
-
-/** A topic-labelled time range in a recording. Not a separate file. */
-export interface LectureClip {
-  id: string
-  materialId: string
-  topicId: string
-  title: string
-  summary: string
-  startS: number
-  endS: number
-}
