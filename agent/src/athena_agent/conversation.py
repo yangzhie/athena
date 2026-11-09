@@ -1,5 +1,7 @@
 """In-memory conversation sessions; no persistence or transport dependency."""
 
+import asyncio
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from pydantic import Field
@@ -41,6 +43,7 @@ class ConversationSession(Contract):
     session_id: NonBlankString
     history: list[ConversationTurn] = Field(default_factory=list)
     active_topic: TopicContext | None = None
+    revision: int = Field(default=0, ge=0)
 
 
 class InMemoryConversationStore:
@@ -48,6 +51,7 @@ class InMemoryConversationStore:
 
     def __init__(self):
         self._sessions: dict[tuple[str, str], ConversationSession] = {}
+        self._locks: dict[tuple[str, str], asyncio.Lock] = {}
 
     def _key(self, context: RequestContext) -> tuple[str, str]:
         if context.session_id is None:
@@ -77,7 +81,13 @@ class InMemoryConversationStore:
         return self._save(context, session)
 
     def _save(self, context: RequestContext, session: ConversationSession) -> ConversationSession:
+        current = self.read(context)
+        if (session.learner_id, session.session_id) != self._key(context):
+            raise ConversationError('Conversation identity cannot change.')
+        if current.revision != session.revision:
+            raise ConversationError('The session changed; retry this interaction.')
         validated = ConversationSession.model_validate(session.model_dump())
+        validated.revision += 1
         self._sessions[self._key(context)] = validated
         return validated.model_copy(deep=True)
 
@@ -94,3 +104,12 @@ class InMemoryConversationStore:
             raise ConversationError('Initialize a learning goal first.')
         session.active_topic.discussion_focus = focus
         return self._save(context, session)
+
+    @asynccontextmanager
+    async def interaction(self, context: RequestContext):
+        """Serialise async interactions across managers sharing this store."""
+        self.read(context)
+        key = self._key(context)
+        lock = self._locks.setdefault(key, asyncio.Lock())
+        async with lock:
+            yield self.read(context)

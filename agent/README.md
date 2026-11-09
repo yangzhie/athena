@@ -232,3 +232,11 @@ Sessions are keyed by learner and session, duplicate creation fails without repl
 Use `store.initialize_goal(context, goal)` once to start a `TopicContext` with a generated topic ID and fresh `LearningState`. The goal is stored only in `learning_state.goal`. `store.update_focus(context, focus)` updates or clears the discussion focus without changing mastery or phase. Invalid changes leave stored state untouched.
 
 An active topic tracks its own turn history; `session.history` retains the full chronological conversation, including turns before goal initialisation. `append_turn` updates both histories when a topic is active. Returned topic state is independently copied. Goal changes are handled by the later topic-switch operation, not by repeated initialisation.
+
+## Contextual conversations (02.3)
+
+Construct `ConversationManager(store, llm)` from `athena_agent.conversation_manager` and call `await manager.send(context, text)` after creating a session and initialising its goal. It returns `ConversationReply(text, discussion_focus)`. Inject `MockLLM` for deterministic conversations; providers are wrapped in `ReliableLLM` unless already wrapped.
+
+A structured intent call distinguishes continuations, requests for clarification, explicit topic changes, and ambiguous intent. Continuations/clarifications get a second call for a contextual reply. Ambiguous requests return a clarifying question without changing the goal or focus. Topic switching is connected in 02.4. Replies do not assess mastery or advance learning phases.
+
+Each successful interaction atomically appends its user/assistant pair and updates focus. Failures and cancellation do not append partial turns. A store-owned per-session async lock serialises managers sharing that store; revision checks reject stale writes caused by synchronous out-of-band changes. This is a single-process, single-event-loop service boundary; it is not distributed locking or durable persistence.
