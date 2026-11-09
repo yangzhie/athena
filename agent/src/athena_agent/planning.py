@@ -120,7 +120,7 @@ class PlanningService:
         by_id = {item.concept_id: item for item in objectives.concepts}
         if set(by_id) != {concept.concept_id for concept in graph.concepts}:
             raise InvalidOutputError()
-        return EnrichedGraph(
+        enriched = EnrichedGraph(
             concepts=[EnrichedConcept(
                 **concept.model_dump(),
                 objectives=by_id[concept.concept_id].objectives,
@@ -128,6 +128,8 @@ class PlanningService:
             ) for concept in graph.concepts],
             partial_coverage=graph.partial_coverage,
         )
+        enriched._source_references = objectives._source_references
+        return enriched
 
     def _store(self) -> LearningMemoryStore:
         if self.store is None:
@@ -146,7 +148,7 @@ class PlanningService:
             scope = await self.classify_scope(goal, knowledge=topic.knowledge)
             graph = await self.identify_graph(goal, scope, knowledge=topic.knowledge)
             enriched = await self.enrich_graph(graph, goal=goal, learner_state=topic.learning_state, knowledge=topic.knowledge)
-            roadmap = Roadmap(goal=goal, scope=scope, graph=enriched)
+            roadmap = Roadmap(goal=goal, scope=TopicScope.model_validate(scope.model_dump()), graph=EnrichedGraph.model_validate(enriched.model_dump()), sources=enriched._source_references)
             topic.roadmap = roadmap
             store._save(context, session)
             return roadmap.model_copy(deep=True)
@@ -211,7 +213,7 @@ class PlanningService:
             if state.current_concept_id is not None and state.current_concept_id not in proposed:
                 state.current_concept_id = None
             enriched = await self.enrich_graph(proposal.graph, goal=state.goal, learner_state=state, knowledge=topic.knowledge)
-            revised = Roadmap(goal=state.goal, scope=proposal.scope, graph=enriched)
+            revised = Roadmap(goal=state.goal, scope=TopicScope.model_validate(proposal.scope.model_dump()), graph=EnrichedGraph.model_validate(enriched.model_dump()), sources=enriched._source_references)
             topic.learning_state = state
             topic.roadmap = revised
             store._save(context, session)

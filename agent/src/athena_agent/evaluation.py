@@ -95,7 +95,10 @@ async def evaluate_continuity(fixture: dict) -> dict:
     store.append_turn(context, ConversationTurn(user_text='old ' * 1000, assistant_text='Earlier explanation'))
     store.append_turn(context, ConversationTurn(user_text='Recent question', assistant_text='Recent reply'))
     before = store.read(context)
-    builder = ContextBuilder(ContextBudget(context_window=2500, output_reserve=256, framing_allowance=128))
+    builder = ContextBuilder(ContextBudget(output_reserve=256, framing_allowance=128))
+    mandatory = builder.build(before.active_topic.model_copy(update={'history': []}), 'Clarify that', 'Explain concisely.', CompletionActivity)
+    # Reserve enough for the current schema and one small recent turn, but not the old oversized turn.
+    builder = ContextBuilder(builder.budget.model_copy(update={'context_window': builder.estimated_tokens(mandatory, CompletionActivity) + 512}))
     messages = builder.build(before.active_topic, 'Clarify that', 'Explain concisely.', CompletionActivity)
     encoded = ' '.join(message.content for message in messages)
     mock = MockLLM(fixture['responses'])

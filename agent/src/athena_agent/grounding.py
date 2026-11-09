@@ -8,7 +8,7 @@ from ._schema import Contract, NonBlankString
 from .context import ContextBuilder
 from .conversation import TopicContext
 from .llm import LLM, InvalidOutputError, Message, Model
-from .retrieval import DocumentPassage
+from .retrieval import DocumentPassage, reference_for
 
 
 class SourceEvidence(Contract):
@@ -40,6 +40,7 @@ async def generate_grounded(llm: LLM, builder: ContextBuilder, topic: TopicConte
     check = await llm.generate(verification, GroundingCheck)
     if not check.supported or not check.evidence:
         raise InvalidOutputError()
+    references = []
     for evidence in check.evidence:
         if evidence.source_index >= len(topic.knowledge.items):
             raise InvalidOutputError()
@@ -47,4 +48,8 @@ async def generate_grounded(llm: LLM, builder: ContextBuilder, topic: TopicConte
         text = item.text if isinstance(item, DocumentPassage) else item.transcript
         if evidence.quote not in text:
             raise InvalidOutputError()
+        reference = reference_for(item, evidence.quote)
+        if reference not in references:
+            references.append(reference)
+    result._source_references = references
     return result

@@ -107,3 +107,43 @@ class MockRetriever:
             if request.source_ids is None or item.source_id in request.source_ids
         ]
         return RetrievalResult(items=scoped[:request.max_results])
+
+
+class DocumentReference(Contract):
+    kind: Literal['document'] = 'document'
+    source_id: NonBlankString
+    passage_id: NonBlankString
+    title: NonBlankString
+    quote: NonBlankString
+    source_uri: NonBlankString | None = None
+    page: Annotated[int, Field(ge=1)] | None = None
+    section: NonBlankString | None = None
+
+
+class VideoReference(Contract):
+    kind: Literal['video'] = 'video'
+    source_id: NonBlankString
+    segment_id: NonBlankString
+    title: NonBlankString
+    quote: NonBlankString
+    source_uri: NonBlankString | None = None
+    start_seconds: Annotated[float, Field(ge=0, allow_inf_nan=False)]
+    end_seconds: Annotated[float, Field(gt=0, allow_inf_nan=False)]
+
+    @model_validator(mode='after')
+    def valid_time_range(self):
+        if self.end_seconds <= self.start_seconds:
+            raise ValueError('Video reference end must follow its start.')
+        return self
+
+
+SourceReference = Annotated[DocumentReference | VideoReference, Field(discriminator='kind')]
+
+
+def reference_for(item: RetrievalItem, quote: str) -> SourceReference:
+    """Copy metadata from supplied evidence; never let a model invent a URI."""
+    text = item.text if isinstance(item, DocumentPassage) else item.transcript
+    if not quote.strip() or quote not in text:
+        raise ValueError('Citation quote must resolve to the supplied material.')
+    data = {**item.model_dump(exclude={'text', 'transcript'}), 'quote': quote}
+    return DocumentReference.model_validate(data) if isinstance(item, DocumentPassage) else VideoReference.model_validate(data)

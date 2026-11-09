@@ -570,3 +570,10 @@ content. Semantic support still depends on model judgement, while quote/referenc
 integrity is deterministic. General-knowledge calls keep their original call path.
 `orchestrator.start(..., materials=retrieval_result)` can select materials before
 planning a new session. Selection and private criteria remain backend data.
+
+Grounded activities, assessments, and roadmaps return typed `sources`. Each
+citation copies identifiers, title, URI, page/section or exact supplied video
+start/end times from verified evidence, plus its exact quote. Models select
+source indices and quotes; they cannot generate citation metadata. Question
+citations are retained with private records for replay and deterministic grading.
+Internal generation provenance is excluded from schemas and serialization.

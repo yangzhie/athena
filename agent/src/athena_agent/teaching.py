@@ -110,7 +110,7 @@ class TeachingService:
             draft = await generate_grounded(self._llm, self.context_builder, topic, messages, ExplanationDraft)
             if self.store.read(context).revision != session.revision:
                 raise ConversationError('The session changed; retry this interaction.')
-            return ExplanationActivity(activity_id=str(uuid4()), concept_id=concept.concept_id, text=draft.text)
+            return ExplanationActivity(activity_id=str(uuid4()), concept_id=concept.concept_id, text=draft.text, sources=draft._source_references)
 
 
     async def hint(self, context: RequestContext, question_id: str) -> HintActivity:
@@ -138,7 +138,7 @@ class TeachingService:
             draft = await generate_grounded(self._llm, self.context_builder, topic, messages, ExplanationDraft)
             if self.store.read(context).revision != session.revision:
                 raise ConversationError('The session changed; retry this interaction.')
-            return HintActivity(activity_id=str(uuid4()), question_id=question_id, text=draft.text)
+            return HintActivity(activity_id=str(uuid4()), question_id=question_id, text=draft.text, sources=draft._source_references)
 
 
     async def recommend_format(self, context: RequestContext, concept_id: str) -> FormatRecommendation:

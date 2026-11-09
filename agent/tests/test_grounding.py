@@ -53,4 +53,33 @@ def test_planning_selected_sources_reach_each_planning_stage(planning_data):
     mock = MockLLM([planning_data[0], support, planning_data[1], support, planning_data[2], support])
     roadmap = asyncio.run(PlanningService(mock, store=store).plan(context))
     assert roadmap.goal == 'Bubble Sort' and len(mock.calls) == 6
+    assert roadmap == store.read(context).active_topic.roadmap
+    assert len(roadmap.sources) == 1
     assert all('selected_materials' in call.messages[1].content for call in mock.calls)
+
+
+def test_returned_document_and_video_citations_copy_supplied_metadata(gap):
+    context, store, assessment = gap
+    support = select_materials(context, store)
+    video = material().items[1]
+    support['evidence'].append({'source_index': 1, 'quote': video.transcript})
+    teacher, _ = teaching(store, [{'text': 'Compare adjacent values.'}, support])
+    activity = asyncio.run(teacher.explain(context, assessment.assessment_id))
+    document_ref, video_ref = activity.sources
+    assert document_ref.passage_id == material().items[0].passage_id
+    assert document_ref.page == material().items[0].page
+    assert video_ref.start_seconds == video.start_seconds and video_ref.end_seconds == video.end_seconds
+    assert video_ref.source_uri == video.source_uri and video_ref.quote in video.transcript
+    assert '_source_references' not in activity.model_dump_json()
+
+
+def test_question_citations_survive_saved_record_and_grading(assessed_topic):
+    from athena_agent.learning import MultipleChoiceAnswer
+    context, store = assessed_topic
+    support = select_materials(context, store)
+    assessor, _ = service(store, [MC, support])
+    question = asyncio.run(assessor.generate_multiple_choice(context, 'bubble-sort'))
+    record = store.read(context).active_topic.question_records[-1]
+    assert question.sources == record.sources and len(question.sources) == 1
+    grade = asyncio.run(assessor.evaluate(context, MultipleChoiceAnswer(question_id=question.question.question_id, selected_choice_id='a')))
+    assert grade.sources == question.sources

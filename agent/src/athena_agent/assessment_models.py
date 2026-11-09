@@ -5,6 +5,7 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
+from .retrieval import SourceReference
 from .learning import Answer, Assessment, AssessmentOutcome, Choice, Confidence, QuestionWithCriteria, LearningActivity
 
 
@@ -32,6 +33,7 @@ class QuestionRecord(Contract):
     bundle: QuestionWithCriteria
     parent_assessment_id: NonBlankString | None = None
     followup_purpose: FollowupPurpose = 'verification'
+    sources: list[SourceReference] = Field(default_factory=list)
 
 
 class OpenEndedDraft(Contract):

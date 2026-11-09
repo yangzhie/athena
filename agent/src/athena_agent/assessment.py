@@ -50,8 +50,8 @@ class AssessmentService:
 
     def _record_question(self, topic: TopicContext, bundle: QuestionWithCriteria, *, parent_assessment_id: str | None = None, followup_purpose: FollowupPurpose = 'verification') -> QuestionActivity:
         activity_id = str(uuid4())
-        topic.question_records.append(QuestionRecord(activity_id=activity_id, bundle=bundle, parent_assessment_id=parent_assessment_id, followup_purpose=followup_purpose))
-        return QuestionActivity(activity_id=activity_id, question=bundle.question.model_copy(deep=True))
+        topic.question_records.append(QuestionRecord(activity_id=activity_id, bundle=bundle, parent_assessment_id=parent_assessment_id, followup_purpose=followup_purpose, sources=bundle._source_references))
+        return QuestionActivity(activity_id=activity_id, question=bundle.question.model_copy(deep=True), sources=bundle._source_references)
 
     async def _draft_question(
         self, topic: TopicContext, concept: EnrichedConcept, difficulty: Difficulty,
@@ -69,13 +69,15 @@ class AssessmentService:
                 'Keep the answer key and rationale in dedicated fields, not in the prompt or choice labels.',
                 MultipleChoiceDraft, inputs=inputs,
             )
-            return QuestionWithCriteria(
+            bundle = QuestionWithCriteria(
                 question=MultipleChoiceQuestion(
                     question_id=str(uuid4()), concept_id=concept.concept_id,
                     prompt=draft.prompt, difficulty=difficulty, choices=draft.choices,
                 ),
                 criteria=MultipleChoiceCriteria(correct_choice_id=draft.correct_choice_id, rationale=draft.rationale),
             )
+            bundle._source_references = draft._source_references
+            return bundle
         draft = await self._call(
             topic,
             'Generate one focused open-ended question targeting a supplied concept objective at '
@@ -92,13 +94,15 @@ class AssessmentService:
                if followup_context is not None else ''),
             OpenEndedDraft, inputs=inputs,
         )
-        return QuestionWithCriteria(
+        bundle = QuestionWithCriteria(
             question=OpenEndedQuestion(
                 question_id=str(uuid4()), concept_id=concept.concept_id,
                 prompt=draft.prompt, difficulty=difficulty,
             ),
             criteria=OpenEndedCriteria(expected_reasoning=draft.expected_reasoning),
         )
+        bundle._source_references = draft._source_references
+        return bundle
 
     async def _generate(
         self, context: RequestContext, concept_id: str,
@@ -158,7 +162,7 @@ class AssessmentService:
                     assessment_id=str(uuid4()), question_id=question.question_id,
                     concept_id=question.concept_id, outcome='correct' if correct else 'incorrect',
                     feedback=('That choice is correct. ' if correct else 'That choice is incorrect. ') + criteria.rationale,
-                    confidence=1.0,
+                    confidence=1.0, sources=question_record.sources,
                 )
                 quotes = [choices[answer.selected_choice_id]]
             else:
@@ -183,7 +187,7 @@ class AssessmentService:
                 assessment = Assessment(
                     assessment_id=str(uuid4()), question_id=question.question_id,
                     concept_id=question.concept_id, outcome=outcome,
-                    feedback=draft.feedback, confidence=draft.confidence,
+                    feedback=draft.feedback, confidence=draft.confidence, sources=draft._source_references,
                 )
                 quotes = draft.evidence_quotes
             topic.assessment_records.append(AssessmentRecord(
@@ -299,7 +303,7 @@ class AssessmentService:
                 if record.parent_assessment_id == assessment_id and record.followup_purpose == purpose:
                     if difficulty is not None and record.bundle.question.difficulty != difficulty:
                         raise ConversationError('This follow-up already exists at a different difficulty.')
-                    return QuestionActivity(activity_id=record.activity_id, question=record.bundle.question.model_copy(deep=True))
+                    return QuestionActivity(activity_id=record.activity_id, question=record.bundle.question.model_copy(deep=True), sources=record.sources)
             concept = self._concept(topic, parent.assessment.concept_id)
             original = self._question(topic, parent.assessment.question_id)
             failures = 0
