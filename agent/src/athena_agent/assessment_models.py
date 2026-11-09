@@ -27,6 +27,7 @@ class QuestionRecord(Contract):
 
     activity_id: NonBlankString
     bundle: QuestionWithCriteria
+    parent_assessment_id: NonBlankString | None = None
 
 
 class OpenEndedDraft(Contract):

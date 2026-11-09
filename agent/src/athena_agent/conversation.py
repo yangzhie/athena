@@ -60,6 +60,20 @@ class TopicContext(Contract):
                 raise ValueError('Questions and assessment IDs cannot be assessed twice.')
             assessed_questions.add(assessment.question_id)
             assessment_ids.add(assessment.assessment_id)
+        assessments_by_id = {record.assessment.assessment_id: record for record in self.assessment_records}
+        followup_parents = set()
+        for question in self.question_records:
+            parent_id = question.parent_assessment_id
+            if parent_id is None:
+                continue
+            parent = assessments_by_id.get(parent_id)
+            if parent is None or parent_id in followup_parents:
+                raise ValueError('Follow-ups require one unique recorded parent assessment.')
+            if parent.assessment.concept_id != question.bundle.question.concept_id or parent.assessment.question_id == question.bundle.question.question_id:
+                raise ValueError('Follow-ups must be fresh questions targeting the parent concept.')
+            if question.bundle.question.kind != 'open_ended':
+                raise ValueError('Verification follow-ups must ask for written reasoning.')
+            followup_parents.add(parent_id)
         return self
 
 

@@ -46,16 +46,19 @@ class AssessmentService:
         )
         return await self._llm.generate(messages, model)
 
-    def _record_question(self, topic: TopicContext, bundle: QuestionWithCriteria) -> QuestionActivity:
+    def _record_question(self, topic: TopicContext, bundle: QuestionWithCriteria, *, parent_assessment_id: str | None = None) -> QuestionActivity:
         activity_id = str(uuid4())
-        topic.question_records.append(QuestionRecord(activity_id=activity_id, bundle=bundle))
+        topic.question_records.append(QuestionRecord(activity_id=activity_id, bundle=bundle, parent_assessment_id=parent_assessment_id))
         return QuestionActivity(activity_id=activity_id, question=bundle.question.model_copy(deep=True))
 
     async def _draft_question(
         self, topic: TopicContext, concept: EnrichedConcept, difficulty: Difficulty,
         kind: Literal['multiple_choice', 'open_ended'],
+        *, followup_context: dict[str, object] | None = None,
     ) -> QuestionWithCriteria:
         inputs = {'concept': concept.model_dump(), 'requested_difficulty': difficulty}
+        if followup_context is not None:
+            inputs['followup'] = followup_context
         if kind == 'multiple_choice':
             draft = await self._call(
                 topic,
@@ -76,7 +79,11 @@ class AssessmentService:
             'Generate one focused open-ended question targeting a supplied concept objective at '
             'the requested difficulty. Ask for reasoning, explanation, or application rather than '
             'a lucky factual guess. Put expected reasoning and assessment criteria only in '
-            'expected_reasoning, not in the learner-facing prompt.',
+            'expected_reasoning, not in the learner-facing prompt. '
+            + ('This is a verification follow-up: use a fresh example, transfer, or application task, '
+               'not repetition of earlier prompts. Use the previous answer and assessment to target '
+               'the uncertainty. Do not claim to know whether an earlier selection was a guess.'
+               if followup_context is not None else ''),
             OpenEndedDraft, inputs=inputs,
         )
         return QuestionWithCriteria(
@@ -158,7 +165,8 @@ class AssessmentService:
                     'and confidence in the evaluation, not confidence in learner mastery. '
                     'Quote exact substrings of the answer supporting a decisive judgement. '
                     'Use uncertain when the answer cannot be reliably interpreted. Do not grade '
-                    'writing style or invent reasoning that was not expressed.',
+                    'writing style or invent reasoning that was not expressed. Do not claim certainty '
+                    'that a learner guessed based on a previous correct selection.',
                     EvaluationDraft, inputs={'question': question.model_dump(), 'criteria': criteria.model_dump(), 'answer': answer.model_dump()},
                 )
                 if any(quote not in answer.text for quote in draft.evidence_quotes):
@@ -274,3 +282,31 @@ class AssessmentService:
             if topic.learning_state.model_dump() != before:
                 self.store._save(context, session)
             return topic.learning_state.model_copy(deep=True)
+
+    async def generate_followup(self, context: RequestContext, assessment_id: str) -> QuestionActivity:
+        async with self.store.interaction(context) as session:
+            topic = session.active_topic
+            parent = self._assessment(topic, assessment_id)
+            for record in topic.question_records:
+                if record.parent_assessment_id == assessment_id:
+                    return QuestionActivity(activity_id=record.activity_id, question=record.bundle.question.model_copy(deep=True))
+            concept = self._concept(topic, parent.assessment.concept_id)
+            original = self._question(topic, parent.assessment.question_id)
+            bundle = await self._draft_question(
+                topic, concept, original.bundle.question.difficulty, 'open_ended',
+                followup_context={
+                    'question': original.bundle.question.model_dump(),
+                    'answer': parent.answer.model_dump(),
+                    'assessment': parent.assessment.model_dump(),
+                },
+            )
+            signature = ' '.join(bundle.question.prompt.split()).casefold()
+            if any(
+                record.bundle.question.concept_id == concept.concept_id
+                and ' '.join(record.bundle.question.prompt.split()).casefold() == signature
+                for record in topic.question_records
+            ):
+                raise InvalidOutputError()
+            activity = self._record_question(topic, bundle, parent_assessment_id=assessment_id)
+            self.store._save(context, session)
+            return activity
