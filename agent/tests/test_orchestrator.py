@@ -79,3 +79,76 @@ def test_start_evaluation_scenarios_are_repeatable():
     first = asyncio.run(evaluate_fixture(fixture))
     assert first['passed'] and len(first['results']) == 4
     assert first == asyncio.run(evaluate_fixture(fixture))
+
+
+OPEN = {'prompt': 'Apply adjacent comparisons to [5, 2] and explain.', 'expected_reasoning': 'Compare 5 and 2 and swap neighbours.'}
+
+
+def started(planning_data, responses):
+    context, store, mock, orchestrator = setup([*planning_data, MC, *responses])
+    question = asyncio.run(orchestrator.start(context, 'Bubble Sort'))
+    return context, store, mock, orchestrator, question
+
+
+def test_wrong_diagnostic_teaches_then_reinforces_atomically(planning_data):
+    from athena_agent.learning import MultipleChoiceAnswer
+    context, store, mock, orchestrator, question = started(planning_data, [
+        {'misconceptions': [], 'prerequisite_gaps': []}, {'text': 'Compare neighbours rather than random pairs.'}, OPEN,
+    ])
+    answer = MultipleChoiceAnswer(question_id=question.question.question_id, selected_choice_id='b')
+    teaching = asyncio.run(orchestrator.answer(context, answer))
+    topic = store.read(context).active_topic
+    assert teaching.kind == 'explanation' and topic.learning_state.phase == 'teach'
+    assert topic.learning_state.mastery[0].status == 'developing'
+    before = store.read(context)
+    assert asyncio.run(orchestrator.answer(context, answer)) == teaching
+    assert store.read(context) == before
+    reinforcement = asyncio.run(orchestrator.continue_learning(context, teaching.activity_id))
+    assert reinforcement.kind == 'question'
+    assert store.read(context).active_topic.learning_state.phase == 'reinforce'
+    assert len(store.read(context).history) == 1
+
+
+def test_correct_selection_requires_reasoning_before_progress(planning_data):
+    from athena_agent.learning import MultipleChoiceAnswer, TextAnswer
+    context, store, _, orchestrator, question = started(planning_data, [OPEN, {
+        'outcome': 'correct', 'feedback': 'Good reasoning.', 'confidence': 0.95, 'evidence_quotes': ['swap neighbours'],
+    }, MC])
+    followup = asyncio.run(orchestrator.answer(context, MultipleChoiceAnswer(question_id=question.question.question_id, selected_choice_id='a')))
+    assert store.read(context).active_topic.learning_state.mastery[0].status == 'developing'
+    next_question = asyncio.run(orchestrator.answer(context, TextAnswer(question_id=followup.question.question_id, text='Compare 5 and 2 and swap neighbours.')))
+    assert next_question.question.concept_id == 'bubble-sort'
+    assert store.read(context).active_topic.learning_state.mastery[0].status == 'mastered'
+    assert len(store.read(context).history) == 2
+
+
+def test_downstream_failure_rolls_back_answer_and_mastery(planning_data):
+    from athena_agent.learning import MultipleChoiceAnswer
+    context, store, _, orchestrator, question = started(planning_data, [DependencyError('Unavailable')])
+    before = store.read(context)
+    with pytest.raises(LLMError):
+        asyncio.run(orchestrator.answer(context, MultipleChoiceAnswer(question_id=question.question.question_id, selected_choice_id='a')))
+    assert store.read(context) == before
+
+
+def test_answer_cancellation_and_wrong_question_preserve_state(planning_data):
+    from athena_agent.learning import MultipleChoiceAnswer
+    context, store, _, _, question = started(planning_data, [])
+    provider = AsyncMock()
+    provider.generate.side_effect = asyncio.CancelledError()
+    orchestrator = LearningOrchestrator(store, provider)
+    before = store.read(context)
+    with pytest.raises(ConversationError, match='current question'):
+        asyncio.run(orchestrator.answer(context, MultipleChoiceAnswer(question_id='other', selected_choice_id='a')))
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(orchestrator.answer(context, MultipleChoiceAnswer(question_id=question.question.question_id, selected_choice_id='a')))
+    assert store.read(context) == before
+
+
+def test_learning_loop_behavior_evaluations():
+    import json
+    from pathlib import Path
+    from athena_agent.evaluation import evaluate_fixture
+    fixture = json.loads((Path(__file__).parent / 'fixtures/learning_loop.json').read_text())
+    result = asyncio.run(evaluate_fixture(fixture))
+    assert result['passed'] and len(result['results']) == 3

@@ -412,3 +412,19 @@ The offline runner also accepts `tests/fixtures/session_start.json`, covering
 narrow/broad goals at beginner/advanced diagnostic levels with independent mock
 scripts. These scenarios check scope contracts and proactive behavior without
 assuming that declared proficiency proves understanding.
+
+`await orchestrator.answer(context, answer, hint_used=False)` evaluates the current
+question, teaches an assessed gap, requests independent reasoning after a correct
+selection, or diagnoses the next eligible concept after demonstrated mastery.
+`await orchestrator.continue_learning(context, explanation.activity_id)` follows a
+teaching unit with an application question. Each turn stages all downstream calls
+before committing evidence, mastery, current activity, and the conversation pair
+together. Failures and cancellation roll back the turn. Identical answer retries
+return the original resulting activity; changed answers are rejected. A fully
+mastered current roadmap enters `progress`; broader completion policy is separate.
+
+Run `uv run python -m athena_agent.evaluation tests/fixtures/learning_loop.json`
+for bundled offline scenarios checking partial/incorrect reasoning after a correct
+selection, misconception evidence, conversation continuity, topic isolation, and
+budgeted history selection. Mock grades exercise evidence-handling behavior;
+they do not measure real-model grading accuracy.

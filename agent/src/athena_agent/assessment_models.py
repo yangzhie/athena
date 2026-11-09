@@ -5,7 +5,7 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
-from .learning import Answer, Assessment, AssessmentOutcome, Choice, Confidence, QuestionWithCriteria
+from .learning import Answer, Assessment, AssessmentOutcome, Choice, Confidence, QuestionWithCriteria, LearningActivity
 
 
 class MultipleChoiceDraft(Contract):
@@ -84,6 +84,7 @@ class AssessmentRecord(Contract):
     hint_used: bool = False
     evidence_quotes: list[NonBlankString] = Field(default_factory=list)
     diagnosis: Diagnosis | None = None
+    next_activity: LearningActivity | None = None
 
     @model_validator(mode='after')
     def matching_question(self) -> Self:
