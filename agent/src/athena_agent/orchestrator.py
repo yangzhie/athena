@@ -12,7 +12,7 @@ from .contracts import RequestContext
 from .decisions import LearningDecision, select_action
 from .conversation import ConversationError, ConversationSession, ConversationTurn, InMemoryConversationStore
 from .learning import Answer, CompletionActivity, Difficulty, ExplanationActivity, LearningActivity, QuestionActivity
-from .llm import LLM
+from .llm import LLM, InvalidOutputError
 from .planning import PlanningService
 from .reliable_llm import ReliableLLM
 from .teaching import TeachingService
@@ -62,6 +62,8 @@ class LearningOrchestrator:
         topic.learning_state.phase = phase
         if isinstance(activity, QuestionActivity):
             topic.learning_state.current_concept_id = activity.question.concept_id
+        elif phase == 'complete':
+            topic.learning_state.current_concept_id = None
         staged._save(context, session)
 
     async def answer(self, context: RequestContext, answer: Answer, *, hint_used: bool = False) -> LearningActivity:
@@ -94,8 +96,17 @@ class LearningOrchestrator:
                 activity = await assessor.generate_multiple_choice(context, decision.concept_id, difficulty=decision.difficulty)
                 phase = 'diagnose'
             else:
-                activity = CompletionActivity(activity_id=str(uuid4()), text='The current roadmap is mastered. Review the next learning goal.')
-                phase = 'progress'
+                roadmap = staged.read(context).active_topic.roadmap
+                if roadmap.scope.scope == 'narrow' and not roadmap.graph.partial_coverage:
+                    activity = CompletionActivity(activity_id=str(uuid4()), text='You have demonstrated understanding of this topic through independent assessment evidence.')
+                    phase = 'complete'
+                else:
+                    revised = await PlanningService(self.llm, store=staged, context_builder=self.context_builder).revise(context)
+                    eligible = revised.eligible_concept_ids(staged.read(context).active_topic.learning_state)
+                    if not eligible:
+                        raise InvalidOutputError()
+                    activity = await assessor.generate_multiple_choice(context, eligible[0])
+                    phase = 'diagnose'
             self._set_activity(context, staged, activity, phase)
             session = staged.read(context)
             record = next(item for item in session.active_topic.assessment_records if item.assessment.assessment_id == assessment.assessment_id)

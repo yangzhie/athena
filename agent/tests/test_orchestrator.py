@@ -186,3 +186,66 @@ def test_recovery_continuation_requests_a_single_step(planning_data):
     asyncio.run(orchestrator.continue_learning(context, teaching.activity_id))
     assert '"recovery": true' in mock.calls[2].messages[1].content
     assert 'just one reasoning step' in mock.calls[2].messages[0].content
+
+
+def one_concept_responses(scope='narrow'):
+    return [
+        {'scope': scope, 'rationale': 'One initial concept'},
+        {'concepts': [{'concept_id': 'comparison', 'title': 'Comparison', 'description': 'Compare values'}], 'partial_coverage': scope == 'broad'},
+        {'concepts': [{'concept_id': 'comparison', 'objectives': ['Compare two values'], 'difficulty': 'beginner'}]}, MC,
+    ]
+
+
+def successful_reasoning():
+    return {'outcome': 'correct', 'feedback': 'Good reasoning.', 'confidence': 0.95, 'evidence_quotes': ['swap neighbours']}
+
+
+def reach_reasoning(responses):
+    from athena_agent.learning import MultipleChoiceAnswer
+    context, store, mock, orchestrator = setup(responses)
+    first = asyncio.run(orchestrator.start(context, 'Comparisons'))
+    followup = asyncio.run(orchestrator.answer(context, MultipleChoiceAnswer(question_id=first.question.question_id, selected_choice_id='a')))
+    return context, store, mock, orchestrator, followup
+
+
+def test_narrow_topic_completes_only_after_independent_mastery():
+    from athena_agent.learning import TextAnswer
+    context, store, mock, orchestrator, followup = reach_reasoning([*one_concept_responses(), OPEN, successful_reasoning()])
+    before = store.read(context)
+    assert before.active_topic.learning_state.phase != 'complete'
+    completion = asyncio.run(orchestrator.answer(context, TextAnswer(question_id=followup.question.question_id, text='Compare values and swap neighbours.')))
+    topic = store.read(context).active_topic
+    assert completion.kind == 'completion'
+    assert topic.learning_state.phase == 'complete' and topic.learning_state.current_concept_id is None
+    assert topic.learning_state.mastery[0].status == 'mastered'
+    assert len(mock.calls) == 6
+
+
+def broad_expansion():
+    concepts = [
+        {'concept_id': 'comparison', 'title': 'Comparison', 'description': 'Compare values'},
+        {'concept_id': 'ordering', 'title': 'Ordering', 'description': 'Order values', 'prerequisite_ids': ['comparison']},
+    ]
+    return [
+        {'relation': 'same_topic', 'goal': 'Comparisons', 'scope': {'scope': 'broad', 'rationale': 'More concepts'}, 'graph': {'concepts': concepts, 'partial_coverage': True}},
+        {'concepts': [{'concept_id': item['concept_id'], 'objectives': ['Apply ' + item['title']], 'difficulty': 'beginner'} for item in concepts]}, MC,
+    ]
+
+
+def test_broad_subject_expands_instead_of_claiming_completion():
+    from athena_agent.learning import TextAnswer
+    context, store, _, orchestrator, followup = reach_reasoning([*one_concept_responses('broad'), OPEN, successful_reasoning(), *broad_expansion()])
+    next_question = asyncio.run(orchestrator.answer(context, TextAnswer(question_id=followup.question.question_id, text='Compare values and swap neighbours.')))
+    topic = store.read(context).active_topic
+    assert next_question.question.concept_id == 'ordering'
+    assert topic.learning_state.phase == 'diagnose' and topic.roadmap.graph.partial_coverage
+    assert topic.learning_state.mastery[0].status == 'mastered'
+
+
+def test_failed_broad_expansion_rolls_back_last_answer():
+    from athena_agent.learning import TextAnswer
+    context, store, _, orchestrator, followup = reach_reasoning([*one_concept_responses('broad'), OPEN, successful_reasoning(), DependencyError('Unavailable')])
+    before = store.read(context)
+    with pytest.raises(LLMError):
+        asyncio.run(orchestrator.answer(context, TextAnswer(question_id=followup.question.question_id, text='Compare values and swap neighbours.')))
+    assert store.read(context) == before

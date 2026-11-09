@@ -450,3 +450,11 @@ alone never demotes prerequisite mastery. Four decisive unsuccessful concept
 attempts select `recover`: a smaller worked example followed by a single-step
 application task, with existing difficulty/depth adaptation. Suspected findings
 remain hypotheses and do not alone trigger prerequisite rechecks.
+
+A narrow roadmap with full coverage finishes only after all concepts have mastery
+evidence, sets phase `complete`, and clears the current concept. Broad subjects
+and partial roadmaps instead revise their roadmap from accumulated evidence and
+proactively diagnose a new eligible concept. Broad coverage remains explicitly
+partial. An expansion that produces no eligible learning target is invalid;
+dependency failures or invalid revisions roll back the pending answer, allowing
+retry without false completion or lost evidence.
