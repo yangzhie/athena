@@ -522,3 +522,11 @@ call after reopening the database. Failed/incomplete model operations never publ
 partial evidence. Storage failures use a safe `dependency_unavailable` error.
 The schema stores version 1 records and fails closed on unsupported versions;
 a migration system is not implemented.
+
+Answer idempotency survives database reopen and races between independent SQLite
+adapters. If a revision conflict reveals that the identical question answer and
+hint metadata already committed, the orchestrator returns that accepted activity,
+never its losing generated draft. Evidence, mastery, history, and revision advance
+once. Changed answers or hint metadata remain conflicts; unrelated stale writes
+still fail rather than overwriting newer context. Concurrent callers may each
+perform model generation, but only one learning-state transaction is accepted.

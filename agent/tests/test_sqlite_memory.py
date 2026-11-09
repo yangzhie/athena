@@ -75,3 +75,39 @@ def test_failed_answer_reopens_at_unchanged_question(tmp_path):
     with SQLiteLearningMemory(path) as store:
         assert store.read(context()) == before
         assert LearningOrchestrator(store, MockLLM([])).resume(context()) == question
+
+
+def test_concurrent_identical_answers_across_connections_commit_once(tmp_path):
+    path = tmp_path / 'memory.sqlite'
+    with SQLiteLearningMemory(path) as first, SQLiteLearningMemory(path) as second:
+        question = asyncio.run(LearningOrchestrator(first, MockLLM(one_concept_responses())).start(context(), 'Comparisons'))
+        answer = MultipleChoiceAnswer(question_id=question.question.question_id, selected_choice_id='a')
+        original_revision = first.read(context()).revision
+        async def run():
+            entered = 0
+            both = asyncio.Event()
+            class Provider:
+                async def generate(self, messages, model):
+                    nonlocal entered
+                    entered += 1
+                    if entered == 2:
+                        both.set()
+                    await both.wait()
+                    return model.model_validate(OPEN)
+            return await asyncio.gather(LearningOrchestrator(first, Provider()).answer(context(), answer), LearningOrchestrator(second, Provider()).answer(context(), answer))
+        activities = asyncio.run(run())
+        assert activities[0] == activities[1]
+        saved = first.read(context())
+        assert saved.revision == original_revision + 1
+        assert len(saved.active_topic.assessment_records) == len(saved.history) == 1
+        assert len(saved.active_topic.question_records) == 2
+    with SQLiteLearningMemory(path) as reopened:
+        mock = MockLLM([])
+        replay = asyncio.run(LearningOrchestrator(reopened, mock).answer(context(), answer))
+        assert replay == activities[0] and mock.calls == []
+        assert reopened.read(context()) == saved
+        with pytest.raises(ConversationError, match='already has an answer'):
+            asyncio.run(LearningOrchestrator(reopened, mock).answer(context(), answer.model_copy(update={'selected_choice_id': 'b'})))
+        with pytest.raises(ConversationError, match='already has an answer'):
+            asyncio.run(LearningOrchestrator(reopened, mock).answer(context(), answer, hint_used=True))
+        assert reopened.read(context()) == saved

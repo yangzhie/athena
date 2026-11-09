@@ -118,7 +118,19 @@ class LearningOrchestrator:
             user_text = submission.answer.text if submission.answer.kind == 'text' else submission.answer.selected_choice_id
             assistant_text = activity.question.prompt if isinstance(activity, QuestionActivity) else activity.text
             staged.append_turn(context, ConversationTurn(user_text=user_text, assistant_text=assistant_text))
-            self._publish(context, original, staged)
+            try:
+                self._publish(context, original, staged)
+            except ConversationError as error:
+                if error.code != 'invalid_request':
+                    raise
+                # Another adapter may have committed the identical answer while
+                # this one generated. Return its accepted result, never our draft.
+                latest = self.store.read(context).active_topic
+                if latest is not None and latest.topic_id == topic.topic_id:
+                    accepted = next((item for item in latest.assessment_records if item.answer == submission.answer and item.hint_used == submission.hint_used and item.next_activity is not None), None)
+                    if accepted is not None:
+                        return accepted.next_activity.model_copy(deep=True)
+                raise
             return activity.model_copy(deep=True)
 
     async def continue_learning(self, context: RequestContext, activity_id: str) -> QuestionActivity:
