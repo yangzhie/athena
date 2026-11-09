@@ -370,3 +370,12 @@ questions are rejected. These explicit calls change no evidence or state. The ho
 must pass `hint_used=True` when submitting a hint-assisted answer to assessment;
 requesting a hint does not itself submit or grade an answer. Whether a model hint
 reveals too much remains a pedagogical evaluation concern.
+
+Follow-up generation also accepts `purpose="application"` or `purpose="retention"`.
+Application requests transfer to a new concrete situation; retention requests
+unaided recall and explanation. The default remains `verification`. Each parent
+assessment has one cached follow-up per purpose, and all purposes reject reused
+concept prompts. Assess these questions through the existing evaluation service;
+generation alone never proves retention or changes mastery. Delayed delivery and
+scheduling belong to the host, so an immediate recall check makes no claim about
+long-term retention.

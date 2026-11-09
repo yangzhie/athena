@@ -163,3 +163,35 @@ def test_concurrent_followup_generation_records_only_one_question(assessed_topic
 
     asyncio.run(run())
     assert len(store.read(context).active_topic.question_records) == 2
+
+
+def test_application_and_retention_are_distinct_cached_followups(assessed_topic):
+    context, store = assessed_topic
+    parent = assessed_selection(context, store)
+    assessor, mock = service(store, [
+        {'prompt': 'Apply adjacent swaps to [4, 2, 3] and justify the first swap.', 'expected_reasoning': 'Compare neighbours and swap 4 and 2.'},
+        {'prompt': 'From memory, explain when Bubble Sort swaps a pair.', 'expected_reasoning': 'Adjacent out-of-order values are swapped.'},
+    ])
+    before = store.read(context)
+    application = asyncio.run(assessor.generate_followup(context, parent.assessment_id, purpose='application'))
+    retention = asyncio.run(assessor.generate_followup(context, parent.assessment_id, purpose='retention'))
+    assert application.question.question_id != retention.question.question_id
+    assert application.question.concept_id == retention.question.concept_id == parent.concept_id
+    for purpose, expected in [('application', application), ('retention', retention)]:
+        assert asyncio.run(assessor.generate_followup(context, parent.assessment_id, purpose=purpose)) == expected
+    assert len(mock.calls) == 2
+    assert '"purpose": "application"' in mock.calls[0].messages[1].content
+    assert '"purpose": "retention"' in mock.calls[1].messages[1].content
+    assert 'unaided recall' in mock.calls[1].messages[0].content
+    assert store.read(context).active_topic.learning_state == before.active_topic.learning_state
+    assert 'expected_reasoning' not in retention.model_dump_json()
+
+
+def test_invalid_followup_purpose_does_not_call_or_write(assessed_topic):
+    context, store = assessed_topic
+    parent = assessed_selection(context, store)
+    assessor, mock = service(store, [])
+    before = store.read(context)
+    with pytest.raises(ValidationError):
+        asyncio.run(assessor.generate_followup(context, parent.assessment_id, purpose='lecture'))
+    assert mock.calls == [] and store.read(context) == before

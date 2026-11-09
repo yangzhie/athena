@@ -22,12 +22,16 @@ class MultipleChoiceDraft(Contract):
         return self
 
 
+FollowupPurpose = Literal['verification', 'application', 'retention']
+
+
 class QuestionRecord(Contract):
     """Private bundle; expose only its question through QuestionActivity."""
 
     activity_id: NonBlankString
     bundle: QuestionWithCriteria
     parent_assessment_id: NonBlankString | None = None
+    followup_purpose: FollowupPurpose = 'verification'
 
 
 class OpenEndedDraft(Contract):

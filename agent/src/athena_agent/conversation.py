@@ -67,13 +67,13 @@ class TopicContext(Contract):
             if parent_id is None:
                 continue
             parent = assessments_by_id.get(parent_id)
-            if parent is None or parent_id in followup_parents:
-                raise ValueError('Follow-ups require one unique recorded parent assessment.')
+            if parent is None or (parent_id, question.followup_purpose) in followup_parents:
+                raise ValueError('Follow-ups require a unique recorded parent and purpose.')
             if parent.assessment.concept_id != question.bundle.question.concept_id or parent.assessment.question_id == question.bundle.question.question_id:
                 raise ValueError('Follow-ups must be fresh questions targeting the parent concept.')
             if question.bundle.question.kind != 'open_ended':
                 raise ValueError('Verification follow-ups must ask for written reasoning.')
-            followup_parents.add(parent_id)
+            followup_parents.add((parent_id, question.followup_purpose))
         return self
 
 

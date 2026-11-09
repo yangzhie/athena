@@ -6,7 +6,7 @@ from uuid import uuid4
 from pydantic import TypeAdapter
 
 from .assessment_models import (
-    AnswerSubmission, AssessmentPolicy, AssessmentRecord, Diagnosis, EvaluationDraft,
+    AnswerSubmission, AssessmentPolicy, AssessmentRecord, Diagnosis, EvaluationDraft, FollowupPurpose,
     MultipleChoiceDraft, OpenEndedDraft, QuestionRecord,
 )
 from .context import ContextBuilder
@@ -46,9 +46,9 @@ class AssessmentService:
         )
         return await self._llm.generate(messages, model)
 
-    def _record_question(self, topic: TopicContext, bundle: QuestionWithCriteria, *, parent_assessment_id: str | None = None) -> QuestionActivity:
+    def _record_question(self, topic: TopicContext, bundle: QuestionWithCriteria, *, parent_assessment_id: str | None = None, followup_purpose: FollowupPurpose = 'verification') -> QuestionActivity:
         activity_id = str(uuid4())
-        topic.question_records.append(QuestionRecord(activity_id=activity_id, bundle=bundle, parent_assessment_id=parent_assessment_id))
+        topic.question_records.append(QuestionRecord(activity_id=activity_id, bundle=bundle, parent_assessment_id=parent_assessment_id, followup_purpose=followup_purpose))
         return QuestionActivity(activity_id=activity_id, question=bundle.question.model_copy(deep=True))
 
     async def _draft_question(
@@ -81,8 +81,10 @@ class AssessmentService:
             'a lucky factual guess. Put expected reasoning and assessment criteria only in '
             'expected_reasoning, not in the learner-facing prompt. '
             + ('This is a verification follow-up: use a fresh example, transfer, or application task, '
-               'not repetition of earlier prompts. Use the previous answer and assessment to target '
-               'the uncertainty. Do not claim to know whether an earlier selection was a guess.'
+               'not repetition of earlier prompts. For purpose application, require transfer to a new '
+               'concrete situation with reasoning. For purpose retention, ask for unaided recall and '
+               'explanation without showing the previous solution or answer in the prompt. For verification, '
+               'target uncertainty. Do not claim to know whether an earlier selection was a guess.'
                if followup_context is not None else ''),
             OpenEndedDraft, inputs=inputs,
         )
@@ -283,18 +285,20 @@ class AssessmentService:
                 self.store._save(context, session)
             return topic.learning_state.model_copy(deep=True)
 
-    async def generate_followup(self, context: RequestContext, assessment_id: str) -> QuestionActivity:
+    async def generate_followup(self, context: RequestContext, assessment_id: str, *, purpose: FollowupPurpose = 'verification') -> QuestionActivity:
+        purpose = TypeAdapter(FollowupPurpose).validate_python(purpose)
         async with self.store.interaction(context) as session:
             topic = session.active_topic
             parent = self._assessment(topic, assessment_id)
             for record in topic.question_records:
-                if record.parent_assessment_id == assessment_id:
+                if record.parent_assessment_id == assessment_id and record.followup_purpose == purpose:
                     return QuestionActivity(activity_id=record.activity_id, question=record.bundle.question.model_copy(deep=True))
             concept = self._concept(topic, parent.assessment.concept_id)
             original = self._question(topic, parent.assessment.question_id)
             bundle = await self._draft_question(
                 topic, concept, original.bundle.question.difficulty, 'open_ended',
                 followup_context={
+                    'purpose': purpose,
                     'question': original.bundle.question.model_dump(),
                     'answer': parent.answer.model_dump(),
                     'assessment': parent.assessment.model_dump(),
@@ -307,6 +311,6 @@ class AssessmentService:
                 for record in topic.question_records
             ):
                 raise InvalidOutputError()
-            activity = self._record_question(topic, bundle, parent_assessment_id=assessment_id)
+            activity = self._record_question(topic, bundle, parent_assessment_id=assessment_id, followup_purpose=purpose)
             self.store._save(context, session)
             return activity
