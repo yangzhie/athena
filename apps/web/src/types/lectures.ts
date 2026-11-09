@@ -27,4 +27,6 @@ export interface LectureClip {
   summary: string
   startS: number
   endS: number
+  /** False until a lecturer approves it. Undefined means approved (hand-written mocks). */
+  approved?: boolean
 }

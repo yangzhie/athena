@@ -20,7 +20,8 @@ from pathlib import Path
 from .cleanup import build_clips
 from .lines import to_lines
 from .models import IndexResult, Topic
-from .segment import SegmentModel, segment_lines
+from .audio import AudioError
+from .segment import SegmentationError, SegmentModel, segment_lines
 from .transcribe import Transcriber, transcribe_recording
 
 Log = Callable[[str], None]
@@ -78,8 +79,7 @@ def main(argv: list[str] | None = None) -> None:
 
     from .env import load_dotenv
     from .lines import _clock
-    from .segment import OpenAISegmentModel, load_topics
-    from .transcribe import WhisperTranscriber
+    from .segment import load_topics
 
     p = argparse.ArgumentParser(prog="index-lecture", description="Turn a lecture recording into topic-labelled clips.")
     p.add_argument("recording", type=Path)
@@ -96,7 +96,20 @@ def main(argv: list[str] | None = None) -> None:
     load_dotenv()
     workdir = args.out or Path("data") / args.recording.stem
     topics = load_topics(args.topics)
-    result = index_lecture(
+    try:
+        result = _run(args, workdir, topics)
+    except (SegmentationError, AudioError, RuntimeError) as e:
+        raise SystemExit(f"index-lecture: {e}\nCompleted steps are cached in {workdir}; rerun to continue.") from None
+    print()
+    for c in result.clips:
+        print(f"{_clock(c.start_s)}–{_clock(c.end_s)}  {c.topic:<28} {c.title}")
+
+
+def _run(args, workdir: Path, topics: list[Topic]) -> IndexResult:
+    from .segment import OpenAISegmentModel
+    from .transcribe import WhisperTranscriber
+
+    return index_lecture(
         args.recording, workdir, topics,
         WhisperTranscriber(args.whisper_model), OpenAISegmentModel(args.llm_model),
         recording_id=args.recording_id or slug(args.recording.stem),
@@ -105,9 +118,6 @@ def main(argv: list[str] | None = None) -> None:
         week=args.week,
         log=lambda m: print(m, flush=True),
     )
-    print()
-    for c in result.clips:
-        print(f"{_clock(c.start_s)}–{_clock(c.end_s)}  {c.topic:<28} {c.title}")
 
 
 if __name__ == "__main__":

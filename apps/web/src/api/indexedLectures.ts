@@ -52,5 +52,6 @@ export const indexedLectures: LectureRecording[] = Object.values(files)
       summary: c.summary,
       startS: c.startS,
       endS: c.endS,
+      approved: c.approved,
     })),
   }))

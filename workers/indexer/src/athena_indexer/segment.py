@@ -83,13 +83,22 @@ class OpenAISegmentModel:
         self._client = OpenAI(timeout=timeout, max_retries=2)
 
     def propose(self, system: str, user: str) -> list[dict]:
-        response = self._client.responses.parse(
-            model=self.model,
-            input=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            text_format=_LLMOutput,
-            max_output_tokens=self.max_output_tokens,
-            store=False,
-        )
+        from openai import APIStatusError, OpenAIError
+
+        try:
+            response = self._client.responses.parse(
+                model=self.model,
+                input=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+                text_format=_LLMOutput,
+                max_output_tokens=self.max_output_tokens,
+                store=False,
+            )
+        except APIStatusError as e:
+            body = e.body if isinstance(e.body, dict) else {}
+            detail = body.get("message") or body.get("error", {}).get("message") or str(e)
+            raise SegmentationError(f"OpenAI API error {e.status_code}: {detail}") from None
+        except OpenAIError as e:
+            raise SegmentationError(f"OpenAI request failed: {e}") from None
         if response.status != "completed" or response.output_parsed is None:
             raise SegmentationError(f"model response did not complete ({response.status})")
         return [s.model_dump() for s in response.output_parsed.segments]

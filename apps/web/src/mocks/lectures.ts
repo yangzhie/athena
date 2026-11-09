@@ -68,9 +68,10 @@ export const lectureRecordings: LectureRecording[] = [
     week: 4,
     durationS: t('51:05'),
     status: 'ready',
+    // Pending lecturer review, to demo the review screen.
     clips: [
       clip('alg-w4', 'a', t('4:00'), t('15:20'), 'Hashing', 'Hashing and collisions', 'Hash functions, buckets, chaining and open addressing.'),
       clip('alg-w4', 'b', t('15:20'), t('24:00'), 'Hashing', 'Hash map vs balanced tree', 'O(1) average lookups against ordered keys and O(log n) guarantees.'),
-    ],
+    ].map((c) => ({ ...c, approved: false })),
   },
 ]

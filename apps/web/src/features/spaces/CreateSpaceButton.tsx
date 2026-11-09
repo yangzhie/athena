@@ -1,4 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react'
+import { useRole } from '../../app/role'
 import { Button } from '../../components/ui'
 
 const SEMESTERS = ['Semester 1', 'Semester 2', 'Summer'] as const
@@ -8,11 +9,12 @@ const field =
 
 /**
  * Lecturer action: create a study space for a unit offering (e.g. CSE5DMI, Sem 2 2026).
- * Dummy for now. Nothing is saved, and there are no roles yet, so everyone sees it.
+ * Dummy for now: nothing is saved. Shown only in the lecturer view.
  */
 export function CreateSpaceButton() {
   const dialog = useRef<HTMLDialogElement>(null)
   const [submitted, setSubmitted] = useState<string | null>(null)
+  const role = useRole()
 
   function open() {
     setSubmitted(null)
@@ -25,6 +27,8 @@ export function CreateSpaceButton() {
     setSubmitted(`${String(data.get('code')).toUpperCase()} · ${data.get('semester')} ${data.get('year')}`)
     e.currentTarget.reset()
   }
+
+  if (role !== 'lecturer') return null
 
   return (
     <>
