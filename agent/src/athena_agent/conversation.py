@@ -9,7 +9,7 @@ from pydantic import Field, model_validator
 from ._schema import Contract, NonBlankString
 from .contracts import RequestContext
 from .llm import Message
-from .learning import LearningState
+from .learning import LearningState, LearningActivity
 from .roadmap import Roadmap
 from .assessment_models import AssessmentRecord, QuestionRecord
 
@@ -41,6 +41,7 @@ class TopicContext(Contract):
     roadmap: Roadmap | None = None
     question_records: list[QuestionRecord] = Field(default_factory=list)
     assessment_records: list[AssessmentRecord] = Field(default_factory=list)
+    current_activity: LearningActivity | None = None
 
     @model_validator(mode='after')
     def matching_roadmap_goal(self):
@@ -98,11 +99,14 @@ class InMemoryConversationStore:
             raise ConversationError('A session ID is required.')
         return context.learner_id, context.session_id
 
-    def create(self, context: RequestContext) -> ConversationSession:
+    def create(self, context: RequestContext, *, snapshot: ConversationSession | None = None) -> ConversationSession:
         key = self._key(context)
         if key in self._sessions:
             raise ConversationError('The conversation session already exists.')
-        session = ConversationSession(learner_id=key[0], session_id=key[1])
+        session = (ConversationSession.model_validate(snapshot.model_dump()) if snapshot is not None
+                   else ConversationSession(learner_id=key[0], session_id=key[1]))
+        if (session.learner_id, session.session_id) != key:
+            raise ConversationError('Conversation identity cannot change.')
         self._sessions[key] = session
         return session.model_copy(deep=True)
 
@@ -153,3 +157,13 @@ class InMemoryConversationStore:
         lock = self._locks.setdefault(key, asyncio.Lock())
         async with lock:
             yield self.read(context)
+
+
+    @asynccontextmanager
+    async def creation(self, context: RequestContext):
+        """Serialize atomic new-session preparation without publishing partial state."""
+        key = self._key(context)
+        async with self._locks.setdefault(key, asyncio.Lock()):
+            if key in self._sessions:
+                raise ConversationError('The conversation session already exists.')
+            yield

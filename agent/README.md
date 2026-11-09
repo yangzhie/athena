@@ -394,3 +394,21 @@ richer format has a specific benefit. Recommendations contain no executable UI;
 client capability selection and structured activity parameters are separate
 integration concerns. This read-only operation uses the same bounded context,
 validation, retry, ownership, and stale-result checks as explanations.
+
+## Proactive session start
+
+`LearningOrchestrator(store, llm).start(context, goal, difficulty="beginner")`
+plans a resolved goal and returns the first diagnostic question for an eligible
+prerequisite concept. Use `PlanningService.interpret_goal` to clarify ambiguous
+goals before starting. The optional beginner/intermediate/advanced difficulty is
+a diagnostic starting level supplied by the host, never evidence of mastery.
+Narrow and broad goals use the existing planner; broad roadmaps remain partial.
+The current question is saved on the active topic. Preparation uses existing
+services on an isolated snapshot; only a complete roadmap and diagnostic become
+visible. Failure/cancellation leaves no partial session, and concurrent starts
+for one learner/session serialize. Duplicate existing sessions are rejected.
+
+The offline runner also accepts `tests/fixtures/session_start.json`, covering
+narrow/broad goals at beginner/advanced diagnostic levels with independent mock
+scripts. These scenarios check scope contracts and proactive behavior without
+assuming that declared proficiency proves understanding.

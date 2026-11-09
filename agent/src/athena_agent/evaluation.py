@@ -41,12 +41,38 @@ async def evaluate_teaching(fixture: dict) -> dict:
     return {'scenario': 'targeted_teaching', 'passed': all(checks.values()), 'checks': checks}
 
 
+async def evaluate_start(fixture: dict) -> dict:
+    from .orchestrator import LearningOrchestrator
+    context = RequestContext(request_id='evaluation', learner_id='fixture', session_id='fixture')
+    store = InMemoryConversationStore()
+    activity = await LearningOrchestrator(store, MockLLM(fixture['responses'])).start(
+        context, fixture['goal'], difficulty=fixture['difficulty'],
+    )
+    topic = store.read(context).active_topic
+    checks = {
+        'proactive_diagnostic': activity.kind == 'question' and topic.current_activity == activity,
+        'scope': topic.roadmap.scope.scope == fixture['scope'],
+        'difficulty': activity.question.difficulty == fixture['difficulty'],
+        'concept': activity.question.concept_id == fixture['concept_id'],
+        'no_invented_mastery': topic.learning_state.mastery == [],
+        'broad_partial': fixture['scope'] != 'broad' or topic.roadmap.graph.partial_coverage,
+    }
+    return {'scenario': fixture['name'], 'passed': all(checks.values()), 'checks': checks}
+
+
+async def evaluate_fixture(fixture: dict) -> dict:
+    if 'scenarios' not in fixture:
+        return await evaluate_teaching(fixture)
+    results = [await evaluate_start(scenario) for scenario in fixture['scenarios']]
+    return {'passed': bool(results) and all(result['passed'] for result in results), 'results': results}
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('fixture', type=Path)
     args = parser.parse_args()
-    result = asyncio.run(evaluate_teaching(json.loads(args.fixture.read_text())))
+    result = asyncio.run(evaluate_fixture(json.loads(args.fixture.read_text())))
     print(json.dumps(result, sort_keys=True))
     return 0 if result['passed'] else 1
 
