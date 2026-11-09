@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from pydantic import TypeAdapter
 
+from .adaptation import adjust_learning
 from .assessment import AssessmentService
 from .assessment_models import AnswerSubmission
 from .context import ContextBuilder
@@ -85,10 +86,10 @@ class LearningOrchestrator:
                 activity = await TeachingService(staged, self.llm, context_builder=self.context_builder).explain(context, assessment.assessment_id)
                 phase = 'teach'
             elif decision.action == 'verify':
-                activity = await assessor.generate_followup(context, assessment.assessment_id)
+                activity = await assessor.generate_followup(context, assessment.assessment_id, difficulty=decision.difficulty)
                 phase = 'reinforce'
             elif decision.action == 'diagnose':
-                activity = await assessor.generate_multiple_choice(context, decision.concept_id)
+                activity = await assessor.generate_multiple_choice(context, decision.concept_id, difficulty=decision.difficulty)
                 phase = 'diagnose'
             else:
                 activity = CompletionActivity(activity_id=str(uuid4()), text='The current roadmap is mastered. Review the next learning goal.')
@@ -114,7 +115,7 @@ class LearningOrchestrator:
             if parent is None:
                 raise ConversationError('The teaching activity has no assessment evidence.')
             staged = self._stage(context, original)
-            activity = await AssessmentService(staged, self.llm, context_builder=self.context_builder).generate_followup(context, parent.assessment.assessment_id, purpose='application')
+            activity = await AssessmentService(staged, self.llm, context_builder=self.context_builder).generate_followup(context, parent.assessment.assessment_id, purpose='application', difficulty=adjust_learning(topic, parent.assessment.concept_id).difficulty)
             self._set_activity(context, staged, activity, 'reinforce')
             self._publish(context, original, staged)
             return activity.model_copy(deep=True)

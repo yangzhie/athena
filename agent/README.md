@@ -434,3 +434,12 @@ they do not measure real-model grading accuracy.
 reason. Answer submission uses the same deterministic selector. Missing
 prerequisites take priority over dependent-concept verification; new concepts
 must be eligible under the roadmap's evidence-based prerequisite checks.
+
+The shared `adjust_learning(topic, concept_id)` policy lowers question difficulty
+one level after two decisive failures and raises it one level after two successive
+unhinted successes, within beginner–advanced bounds. Uncertain evidence is ignored.
+It requests scaffolded explanations and one-unit pacing during struggles; successes
+favor application checks. Orchestrated follow-ups and next diagnostics use these
+adjustments, and mastered strengths remain excluded from candidate selection.
+The original roadmap difficulty and mastery evidence are preserved. Explicit
+follow-up difficulty overrides cannot replace an already cached question.

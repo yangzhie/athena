@@ -6,6 +6,7 @@ from uuid import uuid4
 from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
+from .adaptation import adjust_learning
 from .context import ContextBuilder
 from .contracts import RequestContext
 from .conversation import ConversationError, InMemoryConversationStore, TopicContext
@@ -81,6 +82,7 @@ class TeachingService:
             if concept is None:
                 raise ConversationError('The concept is not in the active roadmap.')
             question = next(item.bundle.question for item in topic.question_records if item.bundle.question.question_id == record.assessment.question_id)
+            adjustment = adjust_learning(topic, concept.concept_id)
             approach = teaching_approach(topic, concept.concept_id)
             approach_instructions = {
                 'direct': 'Use a direct intuitive explanation. ',
@@ -89,7 +91,8 @@ class TeachingService:
             }[approach]
             messages = self.context_builder.build(
                 topic, 'Explain the single knowledge gap identified by this assessment.',
-                approach_instructions + ('Give one concrete practical example with worked steps showing the correction. ' if practical_example else '')
+                ('Use smaller reasoning steps and pause after this one learning unit. ' if adjustment.depth == 'scaffolded' else 'Keep the explanation brief and focused. ')
+                + approach_instructions + ('Give one concrete practical example with worked steps showing the correction. ' if practical_example else '')
                 + 'Teach only one focused gap within the supplied concept. Use the answer and feedback '
                 'to choose a single correction or clarification, rather than surveying all objectives. '
                 'For uncertain answers, clarify without claiming a proven misconception. '
@@ -99,7 +102,7 @@ class TeachingService:
                 ExplanationDraft, additional_context={
                     'concept': concept.model_dump(), 'question': question.model_dump(),
                     'answer': record.answer.model_dump(), 'assessment': record.assessment.model_dump(),
-                    'teaching_approach': approach,
+                    'teaching_approach': approach, 'adjustment': adjustment.model_dump(),
                 },
             )
             draft = await self._llm.generate(messages, ExplanationDraft)

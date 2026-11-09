@@ -3,6 +3,8 @@
 from typing import Literal
 
 from ._schema import Contract, NonBlankString
+from .adaptation import adjust_learning
+from .learning import Difficulty
 from .conversation import ConversationError, TopicContext
 
 
@@ -10,9 +12,10 @@ class LearningDecision(Contract):
     action: Literal['teach', 'verify', 'diagnose', 'progress']
     concept_id: NonBlankString | None
     reason: NonBlankString
+    difficulty: Difficulty | None = None
 
 
-def select_action(topic: TopicContext, assessment_id: str) -> LearningDecision:
+def _select_action(topic: TopicContext, assessment_id: str) -> LearningDecision:
     if topic.roadmap is None:
         raise ConversationError('An active learning roadmap is required.')
     record = next((item for item in topic.assessment_records if item.assessment.assessment_id == assessment_id), None)
@@ -45,3 +48,10 @@ def select_action(topic: TopicContext, assessment_id: str) -> LearningDecision:
     if eligible:
         return LearningDecision(action='diagnose', concept_id=eligible[0], reason='Advance to an unmastered concept with demonstrated prerequisites.')
     return LearningDecision(action='progress', concept_id=None, reason='All concepts in the current roadmap have supporting mastery evidence.')
+
+
+def select_action(topic: TopicContext, assessment_id: str) -> LearningDecision:
+    decision = _select_action(topic, assessment_id)
+    if decision.concept_id is not None:
+        decision.difficulty = adjust_learning(topic, decision.concept_id).difficulty
+    return decision

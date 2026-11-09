@@ -285,18 +285,21 @@ class AssessmentService:
                 self.store._save(context, session)
             return topic.learning_state.model_copy(deep=True)
 
-    async def generate_followup(self, context: RequestContext, assessment_id: str, *, purpose: FollowupPurpose = 'verification') -> QuestionActivity:
+    async def generate_followup(self, context: RequestContext, assessment_id: str, *, purpose: FollowupPurpose = 'verification', difficulty: Difficulty | None = None) -> QuestionActivity:
         purpose = TypeAdapter(FollowupPurpose).validate_python(purpose)
+        difficulty = TypeAdapter(Difficulty | None).validate_python(difficulty)
         async with self.store.interaction(context) as session:
             topic = session.active_topic
             parent = self._assessment(topic, assessment_id)
             for record in topic.question_records:
                 if record.parent_assessment_id == assessment_id and record.followup_purpose == purpose:
+                    if difficulty is not None and record.bundle.question.difficulty != difficulty:
+                        raise ConversationError('This follow-up already exists at a different difficulty.')
                     return QuestionActivity(activity_id=record.activity_id, question=record.bundle.question.model_copy(deep=True))
             concept = self._concept(topic, parent.assessment.concept_id)
             original = self._question(topic, parent.assessment.question_id)
             bundle = await self._draft_question(
-                topic, concept, original.bundle.question.difficulty, 'open_ended',
+                topic, concept, difficulty or original.bundle.question.difficulty, 'open_ended',
                 followup_context={
                     'purpose': purpose,
                     'question': original.bundle.question.model_dump(),
