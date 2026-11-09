@@ -262,3 +262,9 @@ builder = ContextBuilder(ContextBudget(context_window=16384, output_reserve=2048
 The total estimate includes serialized messages, the requested response model's JSON Schema, output reserve, a framing allowance (default 512), and a per-message allowance (default 32). The default counter uses UTF-8 byte length as a conservative estimate, not an exact provider tokenizer. Supply a `TokenCounter` with `count(text) -> int` for a model-specific estimator; configure the context window for your selected model and keep the output reserve at least as large as the adapter's output-token limit. Provider-specific schema/framing overhead can vary, so retain headroom.
 
 When mandatory context exceeds the budget, `ContextBudgetError` reports `invalid_request` without a model call or silent truncation. If a later reply cannot fit after routing, the entire pending interaction still rolls back. Selection never skips a newer oversized turn to insert older discussion, which would distort conversational continuity.
+
+## Goal interpretation (03.1)
+
+`athena_agent.planning.PlanningService(llm, context_builder=...)` exposes explicit planning calls without changing `ConversationManager.send`. `await planner.interpret_goal(text, clarification_turns=())` returns a `GoalInterpretation`: either `status="resolved"` with a goal, or `status="clarification"` with one focused question. Supply prior `ConversationTurn` pairs and the latest learner message to resolve clarification across calls.
+
+Interpretation uses the existing bounded context builder and reliable LLM interface. It creates no session and changes no stored goal. The caller may initialise a session only after resolution. No proficiency, assessment, or mastery is inferred from interpreting a goal.
