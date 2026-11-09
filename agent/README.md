@@ -306,3 +306,7 @@ Example integration sequence (all methods are backend calls): interpret/clarify 
 `AssessmentService(store, llm, context_builder=...)` in `athena_agent.assessment` exposes `await service.generate_multiple_choice(context, concept_id)`. It requires a concept in the active topic's roadmap, targets its objectives and difficulty, assigns application-generated question/activity IDs, and saves atomically under the existing session lock/revision checks.
 
 Only a `QuestionActivity` is returned. Its private `QuestionRecord` retains `QuestionWithCriteria` in `topic.question_records`; store snapshots are internal backend data and must never be returned wholesale to learners. Invalid generation, cancellation, context overflow, or stale writes do not append a question. Generating questions does not change mastery, phase, or conversation history.
+
+## Open-ended assessment generation (04.2)
+
+`await service.generate_open_ended(context, concept_id)` generates reasoning/application questions with private expected reasoning. Both question-generation methods accept an optional `difficulty="beginner" | "intermediate" | "advanced"` override; it changes the generated question, not the roadmap. Invalid overrides fail before any model call. All generation shares topic ownership, bounded context, atomic storage, and learner-facing question serialization. It does not evaluate an answer or update mastery.

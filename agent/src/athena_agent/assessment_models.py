@@ -27,3 +27,8 @@ class QuestionRecord(Contract):
 
     activity_id: NonBlankString
     bundle: QuestionWithCriteria
+
+
+class OpenEndedDraft(Contract):
+    prompt: NonBlankString
+    expected_reasoning: NonBlankString

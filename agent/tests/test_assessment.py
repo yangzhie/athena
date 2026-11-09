@@ -111,3 +111,47 @@ def test_stale_generation_does_not_overwrite_session(assessed_topic):
         asyncio.run(AssessmentService(store, Provider()).generate_multiple_choice(context, 'bubble-sort'))
     assert store.read(context).active_topic.question_records == []
     assert store.read(context).active_topic.discussion_focus == 'Newer focus'
+
+
+OPEN = {
+    'prompt': 'Explain why one pass moves the largest value to the end.',
+    'expected_reasoning': 'Explain each adjacent comparison and the movement of the larger value.',
+}
+
+
+def test_open_ended_generation_keeps_rubric_private(assessed_topic):
+    context, store = assessed_topic
+    assessor, mock = service(store, [OPEN])
+    before = store.read(context)
+    activity = asyncio.run(assessor.generate_open_ended(context, 'bubble-sort'))
+    assert activity.question.kind == 'open_ended'
+    assert activity.question.difficulty == 'intermediate'
+    assert 'expected_reasoning' not in activity.model_dump_json()
+    record = store.read(context).active_topic.question_records[0]
+    assert record.bundle.criteria.expected_reasoning == OPEN['expected_reasoning']
+    assert store.read(context).active_topic.learning_state == before.active_topic.learning_state
+    assert 'Trace a complete sorting pass.' in mock.calls[0].messages[1].content
+
+
+@pytest.mark.parametrize('kind,draft', [('multiple_choice', MC), ('open_ended', OPEN)])
+def test_difficulty_override_and_invalid_override(assessed_topic, kind, draft):
+    from pydantic import ValidationError
+    context, store = assessed_topic
+    assessor, mock = service(store, [draft])
+    generate = getattr(assessor, 'generate_' + kind)
+    activity = asyncio.run(generate(context, 'bubble-sort', difficulty='advanced'))
+    assert activity.question.difficulty == 'advanced'
+    assert '"requested_difficulty": "advanced"' in mock.calls[0].messages[1].content
+    assert store.read(context).active_topic.roadmap.graph.concepts[1].difficulty == 'intermediate'
+    with pytest.raises(ValidationError):
+        asyncio.run(generate(context, 'bubble-sort', difficulty='expert'))
+    assert len(mock.calls) == 1
+
+
+def test_invalid_open_ended_criteria_do_not_save(assessed_topic):
+    context, store = assessed_topic
+    assessor, _ = service(store, [{**OPEN, 'expected_reasoning': ' '}])
+    before = store.read(context)
+    with pytest.raises(InvalidOutputError):
+        asyncio.run(assessor.generate_open_ended(context, 'bubble-sort'))
+    assert store.read(context) == before
