@@ -1,3 +1,5 @@
+import type { KnowledgeOrigin, SourceReference } from './sources'
+
 /** A global idea that topics map to, e.g. "subnetting" or "overfitting". */
 export interface Concept {
   id: string
@@ -32,16 +34,12 @@ export interface Mastery {
   updatedAt: string
 }
 
-export interface Citation {
-  materialId: string
-  /** Human-readable location, e.g. "Slide 12" or "14:32". */
-  label: string
-}
-
 export interface ChatMessage {
   id: string
   role: 'tutor' | 'learner'
   content: string
-  citations?: Citation[]
+  /** Material the reply is based on. Tutor messages only. */
+  sources?: SourceReference[]
+  knowledgeOrigin?: KnowledgeOrigin
   createdAt: string
 }

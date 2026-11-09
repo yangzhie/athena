@@ -46,10 +46,15 @@ export async function sendMessage(offering: Offering, text: string) {
   const history = threads.get(id)!.messages.slice(0, -1)
 
   try {
-    for await (const chunk of streamTutorReply(offering, history, controller.signal)) {
+    for await (const event of streamTutorReply(offering, history, controller.signal)) {
       set(id, (t) => ({
         ...t,
-        messages: t.messages.map((m) => (m.id === tutor.id ? { ...m, content: m.content + chunk } : m)),
+        messages: t.messages.map((m) => {
+          if (m.id !== tutor.id) return m
+          return event.type === 'text'
+            ? { ...m, content: m.content + event.text }
+            : { ...m, sources: event.sources, knowledgeOrigin: event.knowledgeOrigin }
+        }),
       }))
     }
   } catch {

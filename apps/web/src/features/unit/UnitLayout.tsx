@@ -1,7 +1,8 @@
 import { Link, Outlet, useLoaderData } from 'react-router'
 import type { unitLoader } from './loader'
+import { SidePanel } from './panel/SidePanel'
 
-/** Shared frame for a unit's views (chat, clips). */
+/** Shared frame for a unit's views (chat, clips): the view on the left, the side panel on the right. */
 export default function UnitLayout() {
   const { offering } = useLoaderData<typeof unitLoader>()
 
@@ -17,5 +18,12 @@ export default function UnitLayout() {
     )
   }
 
-  return <Outlet />
+  return (
+    <div className="flex flex-1 gap-8">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Outlet />
+      </div>
+      <SidePanel key={offering.id} offering={offering} />
+    </div>
+  )
 }

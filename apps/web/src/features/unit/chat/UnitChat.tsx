@@ -55,7 +55,7 @@ export function UnitChat({ offering }: { offering: Offering }) {
         ) : (
           <div className="space-y-6">
             {messages.map((m) => (
-              <MessageBubble key={m.id} message={m} pending={streaming && m === last} />
+              <MessageBubble key={m.id} message={m} pending={streaming && m === last} offeringId={offering.id} />
             ))}
           </div>
         )}

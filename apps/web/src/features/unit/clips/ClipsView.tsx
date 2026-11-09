@@ -4,6 +4,7 @@ import { formatTimestamp } from '../../../lib/format'
 import type { clipsLoader } from '../loader'
 import { UnitHeader } from '../UnitHeader'
 import { useOffering } from '../useOffering'
+import { openInPanel, usePanel } from '../panel/panelStore'
 import { ClipRow } from './ClipRow'
 
 /** The unit's lecture clips: recordings split by topic by lecture indexing, newest week first. */
@@ -11,6 +12,8 @@ export default function ClipsView() {
   const offering = useOffering()
   const { lectures } = useLoaderData<typeof clipsLoader>()
   const clipCount = lectures.reduce((n, l) => n + l.clips.length, 0)
+  const panel = usePanel(offering.id)
+  const playingId = panel?.kind === 'clip' ? panel.clip.id : null
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6 pb-10">
@@ -49,7 +52,12 @@ export default function ClipsView() {
             ) : (
               <ol className="divide-y divide-line">
                 {lecture.clips.map((c) => (
-                  <ClipRow key={c.id} clip={c} />
+                  <ClipRow
+                    key={c.id}
+                    clip={c}
+                    playing={c.id === playingId}
+                    onPlay={() => openInPanel(offering.id, { kind: 'clip', clip: c, lecture })}
+                  />
                 ))}
               </ol>
             )}

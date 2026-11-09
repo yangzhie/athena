@@ -1,7 +1,16 @@
 import { cn } from '../../../lib/cn'
 import type { ChatMessage } from '../../../types'
+import { SourceList } from './SourceList'
 
-export function MessageBubble({ message, pending }: { message: ChatMessage; pending?: boolean }) {
+export function MessageBubble({
+  message,
+  pending,
+  offeringId,
+}: {
+  message: ChatMessage
+  pending?: boolean
+  offeringId: string
+}) {
   if (message.role === 'learner') {
     return (
       <div className="flex justify-end">
@@ -28,6 +37,7 @@ export function MessageBubble({ message, pending }: { message: ChatMessage; pend
           </span>
         </p>
       )}
+      <SourceList offeringId={offeringId} sources={message.sources} origin={message.knowledgeOrigin} />
     </div>
   )
 }

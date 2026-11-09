@@ -1,4 +1,4 @@
-import type { ChatMessage, Concept, Mastery, Material, QuizItem, ReviewState, Topic } from '../types'
+import type { Concept, Mastery, Material, QuizItem, ReviewState, Topic } from '../types'
 
 export const concepts: Concept[] = [
   { id: 'arrays', name: 'Arrays', prerequisiteIds: [] },
@@ -121,27 +121,5 @@ export const materials: Material[] = [
     status: 'processing',
     uploadedAt: '2026-11-09T08:00:00Z',
     topicIds: [],
-  },
-]
-
-export const sampleSession: ChatMessage[] = [
-  {
-    id: 'm1',
-    role: 'tutor',
-    content: 'Before we start: if a model does great on training data but poorly on new data, what do you think went wrong?',
-    createdAt: '2026-11-09T10:00:00Z',
-  },
-  {
-    id: 'm2',
-    role: 'learner',
-    content: 'It memorised the training data?',
-    createdAt: '2026-11-09T10:00:30Z',
-  },
-  {
-    id: 'm3',
-    role: 'tutor',
-    content: 'Exactly — that is overfitting. The model learned noise, not the pattern. Let’s see how k-fold cross-validation catches it.',
-    citations: [{ materialId: 'ml-lecture-3', label: '05:12' }, { materialId: 'ml-slides', label: 'Slide 14' }],
-    createdAt: '2026-11-09T10:00:45Z',
   },
 ]
