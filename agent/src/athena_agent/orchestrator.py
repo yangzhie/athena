@@ -15,6 +15,7 @@ from .conversation import ConversationError, ConversationSession, ConversationTu
 from .learning import Answer, CompletionActivity, Difficulty, ExplanationActivity, LearningActivity, QuestionActivity
 from .llm import LLM, InvalidOutputError
 from .planning import PlanningService
+from .retrieval import RetrievalResult
 from .reliable_llm import ReliableLLM
 from .teaching import TeachingService
 
@@ -25,13 +26,17 @@ class LearningOrchestrator:
         self.llm = llm if isinstance(llm, ReliableLLM) else ReliableLLM(llm)
         self.context_builder = context_builder if context_builder is not None else ContextBuilder()
 
-    async def start(self, context: RequestContext, goal: str, *, difficulty: Difficulty = 'beginner') -> QuestionActivity:
+    async def start(self, context: RequestContext, goal: str, *, difficulty: Difficulty = 'beginner', materials: RetrievalResult | None = None) -> QuestionActivity:
         """Start a resolved goal with a proactive diagnostic, publishing all or nothing."""
         difficulty = TypeAdapter(Difficulty).validate_python(difficulty)
         async with self.store.creation(context):
             staged = InMemoryConversationStore()
             staged.create(context)
             staged.initialize_goal(context, goal)
+            if materials is not None:
+                session = staged.read(context)
+                session.active_topic.knowledge = RetrievalResult.model_validate(materials.model_dump())
+                staged._save(context, session)
             roadmap = await PlanningService(self.llm, store=staged, context_builder=self.context_builder).plan(context)
             state = staged.read(context).active_topic.learning_state
             eligible = roadmap.eligible_concept_ids(state)

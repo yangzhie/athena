@@ -560,3 +560,13 @@ selection contract, scope validation, topic storage, and snapshot copying.
 It requires no retriever. Malformed or out-of-scope supplied data is an invalid
 request; unavailable retrieval is a dependency failure. An empty external result
 remains an explicit empty selection rather than silently enabling general knowledge.
+
+Selected materials now enter the bounded planning, teaching, and assessment
+context. Source-based generation requests only supported domain content and runs
+a second structured support check requiring exact quotes resolving to selected
+passages/transcripts. Unsupported content or fabricated evidence fails before
+state publication; empty selections cannot silently produce general-knowledge
+content. Semantic support still depends on model judgement, while quote/reference
+integrity is deterministic. General-knowledge calls keep their original call path.
+`orchestrator.start(..., materials=retrieval_result)` can select materials before
+planning a new session. Selection and private criteria remain backend data.

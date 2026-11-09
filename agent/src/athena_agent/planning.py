@@ -6,12 +6,14 @@ from pydantic import Field, create_model, model_validator
 
 from ._schema import Contract, NonBlankString
 from .context import ContextBuilder
+from .grounding import generate_grounded
 from .conversation import ConversationError, ConversationTurn, InMemoryConversationStore, TopicContext
 from .contracts import RequestContext
 from .memory import LearningMemoryStore
 from .learning import LearningState
 from .llm import LLM, Model, InvalidOutputError, Message
 from .reliable_llm import ReliableLLM
+from .retrieval import RetrievalResult
 from .roadmap import Concept, ConceptGraph, EnrichedConcept, EnrichedGraph, ObjectiveBatch, Roadmap, RoadmapRevision, TopicScope
 
 
@@ -50,7 +52,7 @@ class PlanningService:
             model,
             **({'additional_context': inputs} if inputs is not None else {}),
         )
-        return await self._llm.generate(messages, model)
+        return await generate_grounded(self._llm, self.context_builder, topic, messages, model)
 
     async def interpret_goal(
         self, text: str, clarification_turns: Sequence[ConversationTurn] = (),
@@ -68,8 +70,8 @@ class PlanningService:
             GoalInterpretation,
         )
 
-    async def classify_scope(self, goal: str) -> TopicScope:
-        topic = TopicContext(learning_state=LearningState(goal=goal))
+    async def classify_scope(self, goal: str, *, knowledge: RetrievalResult | None = None) -> TopicScope:
+        topic = TopicContext(learning_state=LearningState(goal=goal), knowledge=knowledge)
         return await self._call(
             topic, goal,
             'Classify the learning goal as narrow (one focused concept or technique) '
@@ -80,7 +82,7 @@ class PlanningService:
             TopicScope,
         )
 
-    async def identify_graph(self, goal: str, scope: TopicScope) -> ConceptGraph:
+    async def identify_graph(self, goal: str, scope: TopicScope, *, knowledge: RetrievalResult | None = None) -> ConceptGraph:
         scope = TopicScope.model_validate(scope.model_dump())
         limit = self.policy.initial_concept_limit
         bounded = create_model(
@@ -88,7 +90,7 @@ class PlanningService:
             concepts=(Annotated[list[Concept], Field(min_length=1, max_length=limit)], ...),
         )
         result = await self._call(
-            TopicContext(learning_state=LearningState(goal=goal)), goal,
+            TopicContext(learning_state=LearningState(goal=goal), knowledge=knowledge), goal,
             f'Identify at most {limit} relevant concepts and their prerequisites. '
             'Use stable, distinct concept IDs and only prerequisites included in this graph. '
             'For broad subjects generate a manageable initial foundation, not an entire course, '
@@ -101,14 +103,14 @@ class PlanningService:
         return ConceptGraph.model_validate(result.model_dump())
 
     async def enrich_graph(
-        self, graph: ConceptGraph, *, goal: str, learner_state: LearningState | None = None,
+        self, graph: ConceptGraph, *, goal: str, learner_state: LearningState | None = None, knowledge: RetrievalResult | None = None,
     ) -> EnrichedGraph:
         graph = ConceptGraph.model_validate(graph.model_dump())
         state = LearningState.model_validate(learner_state.model_dump()) if learner_state else LearningState(goal=goal)
         if state.goal != goal:
             raise ConversationError('Learner evidence must belong to the requested goal.')
         objectives = await self._call(
-            TopicContext(learning_state=state), goal,
+            TopicContext(learning_state=state, knowledge=knowledge), goal,
             'For every supplied concept, return its existing ID, one or more concise '
             'observable learning objectives, and beginner/intermediate/advanced difficulty. '
             'Use supplied learner evidence where available, without inventing proficiency. '
@@ -141,9 +143,9 @@ class PlanningService:
             if topic.roadmap is not None:
                 raise ConversationError('A roadmap already exists; use revise instead.')
             goal = topic.learning_state.goal
-            scope = await self.classify_scope(goal)
-            graph = await self.identify_graph(goal, scope)
-            enriched = await self.enrich_graph(graph, goal=goal, learner_state=topic.learning_state)
+            scope = await self.classify_scope(goal, knowledge=topic.knowledge)
+            graph = await self.identify_graph(goal, scope, knowledge=topic.knowledge)
+            enriched = await self.enrich_graph(graph, goal=goal, learner_state=topic.learning_state, knowledge=topic.knowledge)
             roadmap = Roadmap(goal=goal, scope=scope, graph=enriched)
             topic.roadmap = roadmap
             store._save(context, session)
@@ -208,7 +210,7 @@ class PlanningService:
             state.goal = proposal.goal
             if state.current_concept_id is not None and state.current_concept_id not in proposed:
                 state.current_concept_id = None
-            enriched = await self.enrich_graph(proposal.graph, goal=state.goal, learner_state=state)
+            enriched = await self.enrich_graph(proposal.graph, goal=state.goal, learner_state=state, knowledge=topic.knowledge)
             revised = Roadmap(goal=state.goal, scope=proposal.scope, graph=enriched)
             topic.learning_state = state
             topic.roadmap = revised
