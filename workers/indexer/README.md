@@ -41,5 +41,5 @@ runs locally on the CPU; the model downloads once on first use.
 - [x] 3. Local Whisper transcription (`transcribe.py`)
 - [x] 4. Transcript → numbered lines (`lines.py`)
 - [x] 5. LLM segmentation (`segment.py`)
-- [ ] 6. Boundary cleanup
+- [x] 6. Boundary cleanup (`cleanup.py`)
 - [ ] 7. `index-lecture` command

@@ -245,6 +245,7 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description="Split a transcript into topic segments with an LLM.")
     p.add_argument("transcript", type=Path)
     p.add_argument("--topics", type=Path, required=True)
+    p.add_argument("--model", help="OpenAI model id (default: OPENAI_MODEL)")
     args = p.parse_args(argv)
 
     load_dotenv()
@@ -255,7 +256,7 @@ def main(argv: list[str] | None = None) -> None:
     workdir = args.transcript.parent
 
     segments = segment_lines(
-        lines, topics, OpenAISegmentModel(),
+        lines, topics, OpenAISegmentModel(args.model),
         cache_dir=workdir / "segments",
         on_progress=lambda d, n: print(f"window {d}/{n} done", flush=True),
     )
