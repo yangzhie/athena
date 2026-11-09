@@ -1,0 +1,109 @@
+{
+  "name": "gap_to_mastery_text_journey",
+  "goal": "Bubble Sort",
+  "concept_id": "bubble-sort",
+  "responses": [
+    {
+      "scope": "narrow",
+      "rationale": "Requested coverage"
+    },
+    {
+      "partial_coverage": false,
+      "concepts": [
+        {
+          "concept_id": "bubble-sort",
+          "title": "bubble-sort",
+          "description": "Initial foundation"
+        }
+      ]
+    },
+    {
+      "concepts": [
+        {
+          "concept_id": "bubble-sort",
+          "objectives": [
+            "Explain a foundational relationship"
+          ],
+          "difficulty": "beginner"
+        }
+      ]
+    },
+    {
+      "prompt": "Which relationship underlies bubble-sort?",
+      "choices": [
+        {
+          "choice_id": "a",
+          "text": "A foundational relationship"
+        },
+        {
+          "choice_id": "b",
+          "text": "An unrelated relationship"
+        }
+      ],
+      "correct_choice_id": "a",
+      "rationale": "Foundations matter."
+    },
+    {
+      "misconceptions": [],
+      "prerequisite_gaps": []
+    },
+    {
+      "text": "Compare neighbours. Swap adjacent values only when out of order."
+    },
+    {
+      "prompt": "Apply one pass to [3, 1, 2] and explain the swaps.",
+      "expected_reasoning": "Swap neighbours to move the larger value right."
+    },
+    {
+      "outcome": "correct",
+      "feedback": "You applied adjacent comparisons.",
+      "confidence": 0.95,
+      "evidence_quotes": [
+        "swap neighbours"
+      ]
+    },
+    {
+      "prompt": "Why does the largest item reach the end of a pass on [4, 2, 1]?",
+      "expected_reasoning": "Successive swaps carry the larger value right."
+    },
+    {
+      "outcome": "correct",
+      "feedback": "Your reasoning explains the pass invariant.",
+      "confidence": 0.95,
+      "evidence_quotes": [
+        "larger value moves right"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "kind": "choice",
+      "value": "b"
+    },
+    {
+      "kind": "continue"
+    },
+    {
+      "kind": "text",
+      "value": "I compare and swap neighbours."
+    },
+    {
+      "kind": "text",
+      "value": "The larger value moves right with each adjacent comparison."
+    }
+  ],
+  "expected_phases": [
+    "diagnose",
+    "teach",
+    "reinforce",
+    "reinforce",
+    "complete"
+  ],
+  "expected_mastered": [
+    0,
+    0,
+    0,
+    0,
+    1
+  ]
+}

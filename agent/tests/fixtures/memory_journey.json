@@ -1,0 +1,56 @@
+{
+  "kind": "memory",
+  "start": {
+    "name": "narrow_beginner",
+    "goal": "Bubble Sort",
+    "scope": "narrow",
+    "difficulty": "beginner",
+    "concept_id": "bubble-sort",
+    "responses": [
+      {
+        "scope": "narrow",
+        "rationale": "Requested coverage"
+      },
+      {
+        "partial_coverage": false,
+        "concepts": [
+          {
+            "concept_id": "bubble-sort",
+            "title": "bubble-sort",
+            "description": "Initial foundation"
+          }
+        ]
+      },
+      {
+        "concepts": [
+          {
+            "concept_id": "bubble-sort",
+            "objectives": [
+              "Explain a foundational relationship"
+            ],
+            "difficulty": "beginner"
+          }
+        ]
+      },
+      {
+        "prompt": "Which relationship underlies bubble-sort?",
+        "choices": [
+          {
+            "choice_id": "a",
+            "text": "A foundational relationship"
+          },
+          {
+            "choice_id": "b",
+            "text": "An unrelated relationship"
+          }
+        ],
+        "correct_choice_id": "a",
+        "rationale": "Foundations matter."
+      }
+    ]
+  },
+  "followup": {
+    "prompt": "Explain why adjacent swaps move values.",
+    "expected_reasoning": "Compare neighbours."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "scope": {"scope": "broad", "rationale": "A subject spanning mathematical foundations and modelling techniques."},
+  "graph": {
+    "concepts": [
+      {"concept_id": "linear-algebra", "title": "Vectors and matrices", "description": "Represent data and transformations using vectors and matrices.", "prerequisite_ids": []},
+      {"concept_id": "probability", "title": "Probability foundations", "description": "Describe uncertainty using distributions and conditional probability.", "prerequisite_ids": []},
+      {"concept_id": "linear-regression", "title": "Linear regression", "description": "Fit a simple predictive model and interpret its errors.", "prerequisite_ids": ["linear-algebra", "probability"]}
+    ],
+    "partial_coverage": true
+  },
+  "objectives": {
+    "concepts": [
+      {"concept_id": "linear-algebra", "objectives": ["Represent a small dataset as a matrix."], "difficulty": "beginner"},
+      {"concept_id": "probability", "objectives": ["Explain conditional probability using a simple example."], "difficulty": "beginner"},
+      {"concept_id": "linear-regression", "objectives": ["Explain how a linear model predicts a target."], "difficulty": "intermediate"}
+    ]
+  }
+}

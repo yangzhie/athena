@@ -1,0 +1,186 @@
+{
+  "behavior_scenarios": [
+    {
+      "name": "partial_reasoning_after_correct_selection",
+      "kind": "assessment",
+      "start": {
+        "name": "narrow_beginner",
+        "goal": "Bubble Sort",
+        "scope": "narrow",
+        "difficulty": "beginner",
+        "concept_id": "bubble-sort",
+        "responses": [
+          {
+            "scope": "narrow",
+            "rationale": "Requested coverage"
+          },
+          {
+            "partial_coverage": false,
+            "concepts": [
+              {
+                "concept_id": "bubble-sort",
+                "title": "bubble-sort",
+                "description": "Initial foundation"
+              }
+            ]
+          },
+          {
+            "concepts": [
+              {
+                "concept_id": "bubble-sort",
+                "objectives": [
+                  "Explain a foundational relationship"
+                ],
+                "difficulty": "beginner"
+              }
+            ]
+          },
+          {
+            "prompt": "Which relationship underlies bubble-sort?",
+            "choices": [
+              {
+                "choice_id": "a",
+                "text": "A foundational relationship"
+              },
+              {
+                "choice_id": "b",
+                "text": "An unrelated relationship"
+              }
+            ],
+            "correct_choice_id": "a",
+            "rationale": "Foundations matter."
+          }
+        ]
+      },
+      "reasoning": "I swap random pairs until sorted.",
+      "outcome": "partial",
+      "followup": {
+        "prompt": "Explain how you choose a pair to swap.",
+        "expected_reasoning": "Select adjacent out-of-order pairs."
+      },
+      "evaluation": {
+        "outcome": "partial",
+        "feedback": "Use adjacent comparisons.",
+        "confidence": 0.95,
+        "evidence_quotes": [
+          "random pairs"
+        ]
+      },
+      "diagnosis": {
+        "misconceptions": [
+          {
+            "description": "Arbitrary pairs replace adjacent comparisons.",
+            "status": "supported",
+            "evidence_quote": "random pairs",
+            "confidence": 0.95
+          }
+        ],
+        "prerequisite_gaps": []
+      },
+      "teaching": {
+        "text": "Compare adjacent values. Swap them only if out of order."
+      }
+    },
+    {
+      "name": "incorrect_reasoning_after_correct_selection",
+      "kind": "assessment",
+      "start": {
+        "name": "narrow_beginner",
+        "goal": "Bubble Sort",
+        "scope": "narrow",
+        "difficulty": "beginner",
+        "concept_id": "bubble-sort",
+        "responses": [
+          {
+            "scope": "narrow",
+            "rationale": "Requested coverage"
+          },
+          {
+            "partial_coverage": false,
+            "concepts": [
+              {
+                "concept_id": "bubble-sort",
+                "title": "bubble-sort",
+                "description": "Initial foundation"
+              }
+            ]
+          },
+          {
+            "concepts": [
+              {
+                "concept_id": "bubble-sort",
+                "objectives": [
+                  "Explain a foundational relationship"
+                ],
+                "difficulty": "beginner"
+              }
+            ]
+          },
+          {
+            "prompt": "Which relationship underlies bubble-sort?",
+            "choices": [
+              {
+                "choice_id": "a",
+                "text": "A foundational relationship"
+              },
+              {
+                "choice_id": "b",
+                "text": "An unrelated relationship"
+              }
+            ],
+            "correct_choice_id": "a",
+            "rationale": "Foundations matter."
+          }
+        ]
+      },
+      "reasoning": "I swap random pairs until sorted.",
+      "outcome": "incorrect",
+      "followup": {
+        "prompt": "Explain how you choose a pair to swap.",
+        "expected_reasoning": "Select adjacent out-of-order pairs."
+      },
+      "evaluation": {
+        "outcome": "incorrect",
+        "feedback": "Use adjacent comparisons.",
+        "confidence": 0.95,
+        "evidence_quotes": [
+          "random pairs"
+        ]
+      },
+      "diagnosis": {
+        "misconceptions": [
+          {
+            "description": "Arbitrary pairs replace adjacent comparisons.",
+            "status": "supported",
+            "evidence_quote": "random pairs",
+            "confidence": 0.95
+          }
+        ],
+        "prerequisite_gaps": []
+      },
+      "teaching": {
+        "text": "Compare adjacent values. Swap them only if out of order."
+      }
+    },
+    {
+      "name": "continuity_topic_isolation_budget",
+      "kind": "continuity",
+      "responses": [
+        {
+          "intent": "clarification"
+        },
+        {
+          "text": "Compare neighbouring values.",
+          "discussion_focus": "adjacent comparisons"
+        },
+        {
+          "intent": "topic_change",
+          "new_goal": "Graph theory"
+        },
+        {
+          "text": "Let us study vertices and edges."
+        }
+      ]
+    }
+  ]
+}

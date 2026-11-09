@@ -1,0 +1,51 @@
+{
+  "scenarios": [
+    {
+      "name": "adjacent-comparison-gap",
+      "goal": "Bubble Sort",
+      "bootstrap_responses": [
+        {
+          "scope": "narrow",
+          "rationale": "Requested coverage"
+        },
+        {
+          "partial_coverage": false,
+          "concepts": [
+            {
+              "concept_id": "bubble-sort",
+              "title": "Bubble Sort",
+              "description": "Sort values using adjacent comparisons and swaps."
+            }
+          ]
+        },
+        {
+          "concepts": [
+            {
+              "concept_id": "bubble-sort",
+              "objectives": [
+                "Identify which adjacent pair should be swapped."
+              ],
+              "difficulty": "beginner"
+            }
+          ]
+        },
+        {
+          "prompt": "Which pair should Bubble Sort swap?",
+          "choices": [
+            {
+              "choice_id": "a",
+              "text": "An adjacent out-of-order pair"
+            },
+            {
+              "choice_id": "b",
+              "text": "Any random pair"
+            }
+          ],
+          "correct_choice_id": "a",
+          "rationale": "Compare adjacent values, swapping only when out of order."
+        }
+      ],
+      "expected_correction": "Compare adjacent out-of-order values rather than arbitrary pairs."
+    }
+  ]
+}

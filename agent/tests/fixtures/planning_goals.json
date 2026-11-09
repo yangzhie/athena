@@ -1,0 +1,10 @@
+[
+  {
+    "goal": "Understand Bubble Sort",
+    "result": {"scope": "narrow", "rationale": "One focused sorting technique."}
+  },
+  {
+    "goal": "Learn Machine Learning",
+    "result": {"scope": "broad", "rationale": "Multiple concept families with mathematical prerequisites."}
+  }
+]

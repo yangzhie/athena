@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "athena-agent"
+version = "0.1.0"
+description = "Athena's independent adaptive learning agent backend."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.12,<3",
+    "openai>=2,<3",
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3,<10"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/athena_agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
+
+[tool.hatch.build.targets.sdist]
+include = ["/src/athena_agent", "/tests", "/README.md", "/pyproject.toml", "/uv.lock"]
+exclude = ["/.gitignore", "/workflow", "/.workflow", "/MODULES.md"]

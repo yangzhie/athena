@@ -1,0 +1,300 @@
+{
+  "kind": "api",
+  "name": "mocked_api_learning_journey",
+  "goal": "Bubble Sort",
+  "responses": [
+    {
+      "scope": "narrow",
+      "rationale": "Requested coverage"
+    },
+    {
+      "partial_coverage": false,
+      "concepts": [
+        {
+          "concept_id": "bubble-sort",
+          "title": "bubble-sort",
+          "description": "Initial foundation"
+        }
+      ]
+    },
+    {
+      "concepts": [
+        {
+          "concept_id": "bubble-sort",
+          "objectives": [
+            "Explain a foundational relationship"
+          ],
+          "difficulty": "beginner"
+        }
+      ]
+    },
+    {
+      "prompt": "Which relationship underlies bubble-sort?",
+      "choices": [
+        {
+          "choice_id": "a",
+          "text": "A foundational relationship"
+        },
+        {
+          "choice_id": "b",
+          "text": "An unrelated relationship"
+        }
+      ],
+      "correct_choice_id": "a",
+      "rationale": "Foundations matter."
+    },
+    {
+      "misconceptions": [],
+      "prerequisite_gaps": []
+    },
+    {
+      "supported": true,
+      "evidence": [
+        {
+          "source_index": 0,
+          "quote": "Bubble Sort compares adjacent items and swaps them when out of order."
+        }
+      ]
+    },
+    {
+      "text": "Compare neighbours. Swap adjacent values only when out of order."
+    },
+    {
+      "supported": true,
+      "evidence": [
+        {
+          "source_index": 0,
+          "quote": "Bubble Sort compares adjacent items and swaps them when out of order."
+        }
+      ]
+    },
+    {
+      "prompt": "Apply one pass to [3, 1, 2] and explain the swaps.",
+      "expected_reasoning": "Swap neighbours to move the larger value right."
+    },
+    {
+      "supported": true,
+      "evidence": [
+        {
+          "source_index": 0,
+          "quote": "Bubble Sort compares adjacent items and swaps them when out of order."
+        }
+      ]
+    },
+    {
+      "outcome": "correct",
+      "feedback": "You applied adjacent comparisons.",
+      "confidence": 0.95,
+      "evidence_quotes": [
+        "swap neighbours"
+      ]
+    },
+    {
+      "supported": true,
+      "evidence": [
+        {
+          "source_index": 0,
+          "quote": "Bubble Sort compares adjacent items and swaps them when out of order."
+        }
+      ]
+    },
+    {
+      "prompt": "Why does the largest item reach the end of a pass on [4, 2, 1]?",
+      "expected_reasoning": "Successive swaps carry the larger value right."
+    },
+    {
+      "supported": true,
+      "evidence": [
+        {
+          "source_index": 0,
+          "quote": "Bubble Sort compares adjacent items and swaps them when out of order."
+        }
+      ]
+    },
+    {
+      "outcome": "correct",
+      "feedback": "Your reasoning explains the pass invariant.",
+      "confidence": 0.95,
+      "evidence_quotes": [
+        "larger value moves right"
+      ]
+    },
+    {
+      "supported": true,
+      "evidence": [
+        {
+          "source_index": 0,
+          "quote": "Bubble Sort compares adjacent items and swaps them when out of order."
+        }
+      ]
+    },
+    {
+      "format": "diagram",
+      "rationale": "Shows adjacent comparisons."
+    },
+    {
+      "supported": true,
+      "evidence": [
+        {
+          "source_index": 0,
+          "quote": "Bubble Sort compares adjacent items and swaps them when out of order."
+        }
+      ]
+    },
+    {
+      "text": "Compare neighbouring items.",
+      "parameters": {
+        "kind": "diagram",
+        "nodes": [
+          {
+            "node_id": "pair",
+            "label": "Adjacent pair"
+          }
+        ]
+      }
+    },
+    {
+      "supported": true,
+      "evidence": [
+        {
+          "source_index": 0,
+          "quote": "Bubble Sort compares adjacent items and swaps them when out of order."
+        }
+      ]
+    },
+    {
+      "text": "Compare neighbouring items and swap if out of order."
+    },
+    {
+      "supported": true,
+      "evidence": [
+        {
+          "source_index": 0,
+          "quote": "Bubble Sort compares adjacent items and swaps them when out of order."
+        }
+      ]
+    }
+  ],
+  "materials": {
+    "items": [
+      {
+        "kind": "document",
+        "source_id": "fixture-notes",
+        "passage_id": "sorting-page-3",
+        "title": "Example sorting notes (test fixture)",
+        "text": "Bubble Sort compares adjacent items and swaps them when out of order.",
+        "page": 3,
+        "section": "Bubble Sort"
+      },
+      {
+        "kind": "video",
+        "source_id": "fixture-lecture",
+        "segment_id": "sorting-demo",
+        "title": "Example sorting lecture (test fixture)",
+        "transcript": "One pass moves the largest remaining item towards the end.",
+        "start_seconds": 12.5,
+        "end_seconds": 29.0
+      }
+    ]
+  },
+  "turns": [
+    {
+      "kind": "choice",
+      "value": "b"
+    },
+    {
+      "kind": "continue"
+    },
+    {
+      "kind": "text",
+      "value": "I compare and swap neighbours."
+    },
+    {
+      "kind": "text",
+      "value": "The larger value moves right with each adjacent comparison."
+    }
+  ],
+  "expected_phases": [
+    "diagnose",
+    "teach",
+    "reinforce",
+    "reinforce",
+    "complete"
+  ],
+  "resilience_cases": [
+    {
+      "name": "malformed_output_then_recovery",
+      "responses": [
+        {
+          "scope": "invalid"
+        },
+        {
+          "scope": "narrow",
+          "rationale": "Requested coverage"
+        },
+        {
+          "partial_coverage": false,
+          "concepts": [
+            {
+              "concept_id": "bubble-sort",
+              "title": "bubble-sort",
+              "description": "Initial foundation"
+            }
+          ]
+        },
+        {
+          "concepts": [
+            {
+              "concept_id": "bubble-sort",
+              "objectives": [
+                "Explain a foundational relationship"
+              ],
+              "difficulty": "beginner"
+            }
+          ]
+        },
+        {
+          "prompt": "Which relationship underlies bubble-sort?",
+          "choices": [
+            {
+              "choice_id": "a",
+              "text": "A foundational relationship"
+            },
+            {
+              "choice_id": "b",
+              "text": "An unrelated relationship"
+            }
+          ],
+          "correct_choice_id": "a",
+          "rationale": "Foundations matter."
+        }
+      ],
+      "expected_status": 200,
+      "expected_calls": 5
+    },
+    {
+      "name": "terminal_dependency",
+      "responses": [
+        {
+          "__error__": "dependency_unavailable",
+          "retryable": false
+        }
+      ],
+      "expected_status": 503,
+      "expected_calls": 1
+    },
+    {
+      "name": "invalid_output_exhaustion",
+      "responses": [
+        {
+          "scope": "invalid"
+        },
+        {
+          "scope": "invalid"
+        }
+      ],
+      "expected_status": 502,
+      "expected_calls": 2
+    }
+  ]
+}

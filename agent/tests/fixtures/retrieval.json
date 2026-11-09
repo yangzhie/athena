@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "kind": "document",
+      "source_id": "fixture-notes",
+      "passage_id": "sorting-page-3",
+      "title": "Example sorting notes (test fixture)",
+      "text": "Bubble Sort compares adjacent items and swaps them when out of order.",
+      "page": 3,
+      "section": "Bubble Sort"
+    },
+    {
+      "kind": "video",
+      "source_id": "fixture-lecture",
+      "segment_id": "sorting-demo",
+      "title": "Example sorting lecture (test fixture)",
+      "transcript": "One pass moves the largest remaining item towards the end.",
+      "start_seconds": 12.5,
+      "end_seconds": 29.0
+    }
+  ]
+}
