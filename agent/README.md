@@ -605,3 +605,14 @@ content/citation checks, unsupported claims, forged evidence, malicious source
 commands, and generated state-mutation attempts. Model-based detection is a
 layer of defense; deterministic state transitions and strict contracts remain
 the state-integrity boundary.
+
+## Structured teaching and feedback
+
+`ExplanationActivity.content` optionally describes one `TeachingContent` unit with
+a summary, up to four steps, and a worked example. Generated explanations always
+populate it, deriving a summary from text-only model responses. Structured content
+is bounded to 120 words/1000 characters and retains the existing complete `text`
+alternative. `AssessmentService.feedback_activity(context, assessment_id)` returns
+structured outcome/message feedback from saved evidence without exposing criteria,
+generating another grade, or changing state. Existing text-only activity payloads
+remain valid; clients own presentation and rendering.

@@ -13,7 +13,7 @@ __all__ = [
     'MultipleChoiceCriteria', 'OpenEndedCriteria', 'AssessmentCriteria',
     'QuestionWithCriteria', 'MultipleChoiceAnswer', 'TextAnswer', 'Answer',
     'Assessment', 'ConceptMastery', 'LearningState', 'QuestionActivity',
-    'ExplanationActivity', 'HintActivity', 'FeedbackActivity',
+    'ExplanationActivity', 'TeachingContent', 'FeedbackContent', 'HintActivity', 'FeedbackActivity',
     'CompletionActivity', 'LearningActivity',
 ]
 
@@ -154,7 +154,27 @@ class QuestionActivity(_Activity):
     question: Question
 
 
+class TeachingContent(Contract):
+    summary: Annotated[NonBlankString, Field(max_length=1000)]
+    steps: Annotated[list[Annotated[NonBlankString, Field(max_length=300)]], Field(max_length=4)] = Field(default_factory=list)
+    worked_example: Annotated[NonBlankString, Field(max_length=500)] | None = None
+
+    @model_validator(mode='after')
+    def focused_unit(self):
+        combined = ' '.join([self.summary, *self.steps, self.worked_example or ''])
+        if len(combined.split()) > 120 or len(combined) > 1000:
+            raise ValueError('Structured teaching must remain one concise unit.')
+        return self
+
+
+class FeedbackContent(Contract):
+    outcome: AssessmentOutcome
+    message: NonBlankString
+    next_prompt: NonBlankString | None = None
+
+
 class ExplanationActivity(_Activity):
+    content: TeachingContent | None = None
     kind: Literal['explanation'] = 'explanation'
     concept_id: NonBlankString
     text: NonBlankString
@@ -167,6 +187,7 @@ class HintActivity(_Activity):
 
 
 class FeedbackActivity(_Activity):
+    content: FeedbackContent | None = None
     kind: Literal['feedback'] = 'feedback'
     question_id: NonBlankString
     text: NonBlankString

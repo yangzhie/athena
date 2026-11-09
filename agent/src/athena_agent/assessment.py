@@ -15,7 +15,7 @@ from .contracts import RequestContext
 from .memory import LearningMemoryStore
 from .conversation import ConversationError, InMemoryConversationStore, TopicContext
 from .learning import (
-    Answer, Assessment, Difficulty, LearningState, MultipleChoiceAnswer, TextAnswer, MultipleChoiceCriteria, MultipleChoiceQuestion, OpenEndedCriteria,
+    Answer, Assessment, FeedbackActivity, FeedbackContent, Difficulty, LearningState, MultipleChoiceAnswer, TextAnswer, MultipleChoiceCriteria, MultipleChoiceQuestion, OpenEndedCriteria,
     OpenEndedQuestion, QuestionActivity, QuestionWithCriteria,
 )
 from .llm import LLM, Model, InvalidOutputError
@@ -333,3 +333,15 @@ class AssessmentService:
             activity = self._record_question(topic, bundle, parent_assessment_id=assessment_id, followup_purpose=purpose)
             self.store._save(context, session)
             return activity
+
+
+    def feedback_activity(self, context: RequestContext, assessment_id: str) -> FeedbackActivity:
+        topic = self.store.read(context).active_topic
+        record = self._assessment(topic, assessment_id)
+        assessment = record.assessment
+        return FeedbackActivity(
+            activity_id='feedback-' + assessment.assessment_id, question_id=assessment.question_id,
+            text=assessment.feedback, sources=assessment.sources,
+            knowledge_origin=assessment.knowledge_origin,
+            content=FeedbackContent(outcome=assessment.outcome, message=assessment.feedback),
+        )
