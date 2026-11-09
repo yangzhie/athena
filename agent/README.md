@@ -541,3 +541,15 @@ from untrusted client JSON.
 The offline fixture `tests/fixtures/memory_journey.json` verifies SQLite reopen,
 current-activity resumption, duplicate replay, and learner isolation with colliding
 session IDs through `athena_agent.evaluation`.
+
+## Selected learning materials
+
+`KnowledgeService(store, retriever).retrieve(context, query, source_ids=None,
+max_results=5)` requests relevant document passages and video references through
+the established retrieval interface and saves a copied selection on the active
+topic. The host supplies an authorized retriever; source IDs do not grant access.
+Returned scope/limit violations fail, and stale writes, cancellation, or dependency
+failures preserve the prior selection. `None` means no selected materials; an
+empty result records a successful search without matches. Selection is durable
+learning memory and follows topic/learner isolation. No search infrastructure,
+ingestion, transcription, or video processing is implemented here.

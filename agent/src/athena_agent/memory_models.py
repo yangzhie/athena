@@ -35,6 +35,7 @@ class ConversationMemory(Contract):
 from .assessment_models import AssessmentRecord, QuestionRecord
 from .learning import LearningActivity, LearningState
 from .roadmap import Roadmap
+from .retrieval import RetrievalResult
 
 
 class TopicLearning(Contract):
@@ -44,6 +45,7 @@ class TopicLearning(Contract):
     question_records: list[QuestionRecord] = Field(default_factory=list)
     assessment_records: list[AssessmentRecord] = Field(default_factory=list)
     current_activity: LearningActivity | None = None
+    knowledge: RetrievalResult | None = None
 
 
 class LearningMemory(Contract):
