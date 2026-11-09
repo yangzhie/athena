@@ -95,3 +95,25 @@ def test_message_clarification_preserves_current_question_and_topic_switch_repla
     session = store.read(RequestContext(request_id='check', learner_id='trusted', session_id='s'))
     assert session.active_topic.learning_state.goal == 'Graphs' and len(session.archived_topics) == 1
     assert session.active_topic.learning_state.mastery == []
+
+
+def test_session_view_returns_consistent_public_state_progress_and_feedback():
+    from .test_orchestrator import one_concept_responses
+    from athena_agent.contracts import RequestContext
+    mock = MockLLM([*one_concept_responses(), {'misconceptions': [], 'prerequisite_gaps': []}, {'text': 'Compare neighbours.'}])
+    store = InMemoryConversationStore()
+    app = create_app(store, mock, learner_resolver=lambda request: 'trusted')
+    first = request(app, 'POST', '/sessions', json={'session_id': 's', 'goal': 'Sorting'}).json()['data']
+    initial = request(app, 'GET', '/sessions/s').json()['data']
+    assert initial['activity'] == first and initial['progress']['next_step'] == 'answer'
+    assert initial['latest_feedback'] is None
+    request(app, 'POST', '/sessions/s/answers', json={'answer': {'kind': 'multiple_choice', 'question_id': first['question']['question_id'], 'selected_choice_id': 'b'}})
+    context = RequestContext(request_id='check', learner_id='trusted', session_id='s')
+    before = store.read(context)
+    response = request(app, 'GET', '/sessions/s')
+    data = response.json()['data']
+    assert data['activity']['kind'] == 'explanation' and data['learning_state']['phase'] == 'teach'
+    assert data['progress']['next_step'] == 'continue'
+    assert data['latest_feedback']['content']['outcome'] == 'incorrect'
+    assert store.read(context) == before
+    assert 'question_records' not in response.text and 'correct_choice_id' not in response.text

@@ -194,3 +194,17 @@ class LearningOrchestrator:
                 activity = topic.current_activity
             self._publish(context, original, staged)
             return LearningMessageResult(reply=reply, activity=activity)
+
+
+    def view(self, context: RequestContext):
+        from .orchestrator_models import LearningView
+        from .progress import summarize_progress
+        session = self.store.read(context)
+        topic = session.active_topic
+        if topic is None:
+            raise ConversationError('An active learning roadmap is required.')
+        staged = self._stage(context, session)
+        feedback = (AssessmentService(staged, self.llm).feedback_activity(context, topic.assessment_records[-1].assessment.assessment_id)
+                    if topic.assessment_records else None)
+        return LearningView(activity=topic.current_activity, learning_state=topic.learning_state,
+                            progress=summarize_progress(topic), latest_feedback=feedback)

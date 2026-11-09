@@ -16,7 +16,7 @@ from .llm import LLM, MockLLM
 from .memory import LearningMemoryStore, LearnerScopedMemory
 from .api_models import StartSession, MessageSubmission, ContinueSubmission
 from .assessment_models import AnswerSubmission
-from .orchestrator_models import LearningMessageResult
+from .orchestrator_models import LearningMessageResult, LearningView
 from .learning import LearningActivity
 from .orchestrator import LearningOrchestrator
 
@@ -117,6 +117,11 @@ def create_app(store: LearningMemoryStore, llm: LLM, *, learner_resolver: Identi
     async def continue_session(session_id: NonBlankString, payload: ContinueSubmission, context: Annotated[RequestContext, Depends(request_context)]):
         activity = await orchestrator(context).continue_learning(context, payload.activity_id)
         return SuccessResponse[LearningActivity](request_id=context.request_id, session_id=context.session_id, data=activity)
+
+    @app.get('/sessions/{session_id}', response_model=SuccessResponse[LearningView])
+    async def session_view(session_id: NonBlankString, context: Annotated[RequestContext, Depends(request_context)]):
+        view = orchestrator(context).view(context)
+        return SuccessResponse[LearningView](request_id=context.request_id, session_id=context.session_id, data=view)
 
     return app
 

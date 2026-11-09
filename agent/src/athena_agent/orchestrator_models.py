@@ -8,3 +8,14 @@ from .learning import LearningActivity
 class LearningMessageResult(Contract):
     reply: ConversationReply
     activity: LearningActivity | None = None
+
+
+from .learning import FeedbackActivity, LearningState
+from .progress import ProgressSummary
+
+
+class LearningView(Contract):
+    activity: LearningActivity | None
+    learning_state: LearningState
+    progress: ProgressSummary
+    latest_feedback: FeedbackActivity | None = None

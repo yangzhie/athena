@@ -689,3 +689,8 @@ The response is the next activity. Host integrations supply reliable hint-use
 metadata. `POST /sessions/{id}/continue` accepts `{ "activity_id": "..." }` after
 teaching and returns an application question. All routes use existing atomic
 orchestration and answer idempotency, with strict request validation.
+
+`GET /sessions/{id}` returns one consistent learner-facing snapshot containing
+`activity`, `learning_state`, `progress`, and `latest_feedback`. It uses the stored
+assessment for feedback and the evidence-based progress projection, makes no model
+calls or writes, and excludes private question records and grading criteria.
