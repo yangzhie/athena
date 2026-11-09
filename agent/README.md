@@ -318,3 +318,9 @@ Only a `QuestionActivity` is returned. Its private `QuestionRecord` retains `Que
 Open-ended reasoning is evaluated against private criteria, with exact answer quotes supporting decisive feedback. Unsupported quotes are rejected. `AssessmentPolicy(evaluation_confidence_threshold=0.8)` converts lower-confidence judgements to `uncertain`. A successful evaluation records the answer, assessment, evidence quotes, and trusted host-supplied hint-use metadata atomically. It does not yet change mastery.
 
 Only one answer is recorded per question. An identical answer and hint status returns the saved assessment without another model call or write; changed answers/status require a fresh question. Failures and cancellation do not save partial evidence. Topic records enforce unique question/assessment IDs and matching references. Full store snapshots contain private criteria and remain backend-only.
+
+## Misconceptions and prerequisite gaps (04.4)
+
+`await service.diagnose(context, assessment_id)` records a structured `Diagnosis` for an existing assessment. Findings carry a `suspected`/`supported` status, exact answer-evidence quote, and confidence. Prerequisite findings may only reference ancestors of the assessed concept in the active roadmap. A selected option alone never proves a misconception; supported findings require decisive partial/incorrect written reasoning and sufficient confidence.
+
+An empty diagnosis is a successful result, distinct from a dependency failure. Repeated diagnosis returns its saved result without another call. Assessment grades, feedback, confidence, and learning state remain unchanged; misconception summaries preserve their status prefix, while prerequisite summaries contain concept IDs (consult the diagnosis for certainty). Diagnosis does not mark prerequisites mastered or change progression. All updates share atomic session writes and safe model failure handling.

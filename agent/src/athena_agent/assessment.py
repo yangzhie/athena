@@ -6,7 +6,7 @@ from uuid import uuid4
 from pydantic import TypeAdapter
 
 from .assessment_models import (
-    AnswerSubmission, AssessmentPolicy, AssessmentRecord, EvaluationDraft,
+    AnswerSubmission, AssessmentPolicy, AssessmentRecord, Diagnosis, EvaluationDraft,
     MultipleChoiceDraft, OpenEndedDraft, QuestionRecord,
 )
 from .context import ContextBuilder
@@ -175,3 +175,68 @@ class AssessmentService:
             ))
             self.store._save(context, session)
             return assessment.model_copy(deep=True)
+
+    def _assessment(self, topic: TopicContext | None, assessment_id: str) -> AssessmentRecord:
+        if topic is not None:
+            for record in topic.assessment_records:
+                if record.assessment.assessment_id == assessment_id:
+                    return record
+        raise ConversationError('The assessment is not available in the active topic.')
+
+    async def diagnose(self, context: RequestContext, assessment_id: str) -> Diagnosis:
+        async with self.store.interaction(context) as session:
+            topic = session.active_topic
+            record = self._assessment(topic, assessment_id)
+            if record.diagnosis is not None:
+                return record.diagnosis.model_copy(deep=True)
+            concept = self._concept(topic, record.assessment.concept_id)
+            question_record = self._question(topic, record.assessment.question_id)
+            by_id = {item.concept_id: item for item in topic.roadmap.graph.concepts}
+            ancestors: set[str] = set()
+            pending = list(concept.prerequisite_ids)
+            while pending:
+                key = pending.pop()
+                if key not in ancestors:
+                    ancestors.add(key)
+                    pending.extend(by_id[key].prerequisite_ids)
+            answer = record.answer
+            if isinstance(answer, TextAnswer):
+                evidence_text = answer.text
+            else:
+                evidence_text = next(choice.text for choice in question_record.bundle.question.choices if choice.choice_id == answer.selected_choice_id)
+            diagnosis = await self._call(
+                topic,
+                'Identify misconceptions and prerequisite gaps supported by the recorded answer. '
+                'Every finding must cite an exact substring of answer_evidence. Use suspected '
+                'rather than supported when evidence is insufficient. A selection alone never '
+                'proves a misconception, even if wrong. Only decisive partial/incorrect written '
+                'reasoning can support a definitive finding. Supported findings need high confidence. '
+                'Prerequisite IDs must be chosen from allowed_prerequisites. Return empty lists '
+                'when no findings are justified. Do not regrade the assessment or infer prerequisite mastery.',
+                Diagnosis, inputs={
+                    'question': question_record.bundle.question.model_dump(),
+                    'criteria': question_record.bundle.criteria.model_dump(),
+                    'assessment': record.assessment.model_dump(),
+                    'answer_evidence': evidence_text,
+                    'answer_kind': answer.kind,
+                    'allowed_prerequisites': [by_id[key].model_dump() for key in sorted(ancestors)],
+                },
+            )
+            for finding in [*diagnosis.misconceptions, *diagnosis.prerequisite_gaps]:
+                if finding.evidence_quote not in evidence_text:
+                    raise InvalidOutputError()
+                if finding.status == 'supported' and (
+                    not isinstance(answer, TextAnswer)
+                    or record.assessment.outcome not in {'partial', 'incorrect'}
+                    or finding.confidence < self.policy.evaluation_confidence_threshold
+                ):
+                    raise InvalidOutputError()
+            if any(finding.concept_id not in ancestors for finding in diagnosis.prerequisite_gaps):
+                raise InvalidOutputError()
+            record.diagnosis = diagnosis
+            record.assessment.misconceptions = [
+                f'{finding.status}: {finding.description}' for finding in diagnosis.misconceptions
+            ]
+            record.assessment.prerequisite_gaps = [finding.concept_id for finding in diagnosis.prerequisite_gaps]
+            self.store._save(context, session)
+            return diagnosis.model_copy(deep=True)

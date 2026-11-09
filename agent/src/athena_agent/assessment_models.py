@@ -1,6 +1,6 @@
 """Internal assessment records and model-output contracts."""
 
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import Field, model_validator
 
@@ -46,11 +46,39 @@ class EvaluationDraft(Contract):
     evidence_quotes: list[NonBlankString] = Field(default_factory=list)
 
 
+class MisconceptionFinding(Contract):
+    description: NonBlankString
+    status: Literal['suspected', 'supported']
+    evidence_quote: NonBlankString
+    confidence: Confidence
+
+
+class PrerequisiteFinding(Contract):
+    concept_id: NonBlankString
+    status: Literal['suspected', 'supported']
+    evidence_quote: NonBlankString
+    confidence: Confidence
+
+
+class Diagnosis(Contract):
+    misconceptions: list[MisconceptionFinding] = Field(default_factory=list)
+    prerequisite_gaps: list[PrerequisiteFinding] = Field(default_factory=list)
+
+    @model_validator(mode='after')
+    def unique_findings(self) -> Self:
+        descriptions = [item.description for item in self.misconceptions]
+        concepts = [item.concept_id for item in self.prerequisite_gaps]
+        if len(set(descriptions)) != len(descriptions) or len(set(concepts)) != len(concepts):
+            raise ValueError('Diagnosis findings must be unique.')
+        return self
+
+
 class AssessmentRecord(Contract):
     answer: Answer
     assessment: Assessment
     hint_used: bool = False
     evidence_quotes: list[NonBlankString] = Field(default_factory=list)
+    diagnosis: Diagnosis | None = None
 
     @model_validator(mode='after')
     def matching_question(self) -> Self:
