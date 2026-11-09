@@ -12,6 +12,7 @@ from .conversation import (
     TopicContext,
 )
 from .llm import LLM, Message
+from .learning import LearningState
 from .reliable_llm import ReliableLLM
 
 
@@ -70,7 +71,11 @@ class ConversationManager:
 
     def _prepare_topic(self, session: ConversationSession, decision: IntentDecision) -> None:
         if decision.intent == 'topic_change':
-            raise ConversationError('Topic switching is not available yet.')
+            if session.active_topic is not None:
+                session.archived_topics.append(session.active_topic.model_copy(deep=True))
+            session.active_topic = TopicContext(
+                learning_state=LearningState(goal=decision.new_goal),
+            )
 
     async def send(self, context: RequestContext, text: str) -> ConversationReply:
         # Validate before model calls or state mutation.

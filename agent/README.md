@@ -240,3 +240,9 @@ Construct `ConversationManager(store, llm)` from `athena_agent.conversation_mana
 A structured intent call distinguishes continuations, requests for clarification, explicit topic changes, and ambiguous intent. Continuations/clarifications get a second call for a contextual reply. Ambiguous requests return a clarifying question without changing the goal or focus. Topic switching is connected in 02.4. Replies do not assess mastery or advance learning phases.
 
 Each successful interaction atomically appends its user/assistant pair and updates focus. Failures and cancellation do not append partial turns. A store-owned per-session async lock serialises managers sharing that store; revision checks reject stale writes caused by synchronous out-of-band changes. This is a single-process, single-event-loop service boundary; it is not distributed locking or durable persistence.
+
+## Topic changes (02.4)
+
+An explicit, unambiguous topic-change decision archives the active `TopicContext` in `session.archived_topics` and creates a new topic ID and fresh `LearningState`. Classification may consult the current topic to understand the request, but the new topic's reply receives only fresh state and the current message. Old mastery, focus, and turns are not included.
+
+The switch and its reply commit together. Failed or cancelled generation preserves the previous active topic without creating an archive. Ambiguous changes trigger clarification, and comparisons/examples stay in the existing topic. All turns remain in chronological `session.history`; archived topic snapshots can be inspected via `store.read`. Automatic topic restoration is not implemented. Intent interpretation is model-based and should receive live quality evaluation before production use.

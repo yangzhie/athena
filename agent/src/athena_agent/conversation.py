@@ -43,6 +43,7 @@ class ConversationSession(Contract):
     session_id: NonBlankString
     history: list[ConversationTurn] = Field(default_factory=list)
     active_topic: TopicContext | None = None
+    archived_topics: list[TopicContext] = Field(default_factory=list)
     revision: int = Field(default=0, ge=0)
 
 
