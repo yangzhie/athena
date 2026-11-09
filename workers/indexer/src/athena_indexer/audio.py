@@ -111,6 +111,26 @@ def plan_chunks(duration_s: float, chunk_s: float = CHUNK_S, overlap_s: float = 
     return chunks
 
 
+def read_samples(path: Path):
+    """Decode audio to a float32 numpy array at 16 kHz mono, the input Whisper expects.
+
+    Decoding with the ffmpeg CLI keeps us independent of PyAV's Python API, which
+    changes between releases.
+    """
+    import numpy as np  # installed with faster-whisper
+
+    if shutil.which("ffmpeg") is None:
+        raise AudioError("ffmpeg is not installed or not on PATH")
+    proc = subprocess.run(
+        ["ffmpeg", "-nostdin", "-v", "error", "-i", str(path), "-f", "f32le", "-ac", "1", "-ar", str(SAMPLE_RATE), "-"],
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        tail = "\n".join(proc.stderr.decode(errors="replace").strip().splitlines()[-5:])
+        raise AudioError(f"ffmpeg failed: {tail}")
+    return np.frombuffer(proc.stdout, dtype=np.float32)
+
+
 def cut_chunk(audio: Path, chunk: Chunk, dest: Path, *, overwrite: bool = False) -> Path:
     """Write one chunk of `audio` to `dest` (FLAC). Skips existing files unless `overwrite`."""
     if not overwrite and dest.exists():

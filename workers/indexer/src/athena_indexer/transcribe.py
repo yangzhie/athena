@@ -11,7 +11,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Protocol
 
-from .audio import CHUNK_S, OVERLAP_S, Chunk, cut_chunk, extract_audio, plan_chunks, probe_duration
+from .audio import CHUNK_S, OVERLAP_S, Chunk, cut_chunk, extract_audio, plan_chunks, probe_duration, read_samples
 from .models import Transcript, TranscriptSegment
 
 
@@ -48,7 +48,7 @@ class WhisperTranscriber:
 
     def transcribe(self, audio: Path) -> list[tuple[float, float, str]]:
         segments, _info = self._load().transcribe(
-            str(audio),
+            read_samples(audio),  # decode with ffmpeg rather than faster-whisper's PyAV call
             language=self.language,
             vad_filter=True,  # skip silence: faster, and fewer made-up words in quiet parts
             beam_size=5,

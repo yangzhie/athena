@@ -114,3 +114,15 @@ def test_errors_are_readable(tmp_path):
     bad.write_text("hello")
     with pytest.raises(AudioError, match="ffprobe failed"):
         probe_duration(bad)
+
+
+@needs_ffmpeg
+def test_read_samples_is_16k_mono_float32(recording, tmp_path):
+    import numpy as np
+
+    from athena_indexer.audio import read_samples
+
+    samples = read_samples(extract_audio(recording, tmp_path / "audio.flac"))
+    assert samples.dtype == np.float32
+    assert len(samples) == pytest.approx(25 * SAMPLE_RATE, rel=0.01)
+    assert 0.01 < float(np.abs(samples).max()) <= 1.0  # not silence, not clipped

@@ -40,6 +40,6 @@ runs locally on the CPU; the model downloads once on first use.
 - [x] 2. Audio extraction and chunking (`audio.py`)
 - [x] 3. Local Whisper transcription (`transcribe.py`)
 - [x] 4. Transcript → numbered lines (`lines.py`)
-- [ ] 5. LLM segmentation
+- [x] 5. LLM segmentation (`segment.py`)
 - [ ] 6. Boundary cleanup
 - [ ] 7. `index-lecture` command
