@@ -34,10 +34,12 @@ export default function ClipsView() {
           <section key={lecture.id} className="overflow-hidden rounded-xl border border-line bg-surface">
             <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
               <h2 className="font-semibold">
-                Week {lecture.week} · {lecture.title}
+                {lecture.week > 0 && `Week ${lecture.week} · `}
+                {lecture.title}
               </h2>
               <span className="flex items-center gap-2 text-xs text-muted">
                 {formatTimestamp(lecture.durationS)}
+                {lecture.draft && <Badge tone="warn">awaiting lecturer approval</Badge>}
                 {lecture.status !== 'ready' && (
                   <Badge tone={lecture.status === 'failed' ? 'bad' : 'warn'}>{lecture.status}</Badge>
                 )}

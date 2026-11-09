@@ -54,17 +54,24 @@ def test_index_lecture_end_to_end_and_rerun_is_cached(tmp_path):
     seg = FakeSegmenter()
     logs = []
 
-    result = index_lecture(rec, work, TOPICS, FakeTranscriber(), seg, recording_id="alg-w2", title="Sorting", log=logs.append)
+    result = index_lecture(
+        rec, work, TOPICS, FakeTranscriber(), seg, recording_id="alg-w2", title="Sorting",
+        offering_id="cse5alg-2026-s2", week=2, log=logs.append,
+    )
 
     assert [c.topic for c in result.clips] == ["Insertion Sort", "Hash Tables"]
     assert result.clips[0].end_s <= result.clips[1].start_s
     clips = json.loads((work / "clips.json").read_text())
     assert clips["recordingId"] == "alg-w2" and len(clips["clips"]) == 2
+    assert (clips["offeringId"], clips["week"]) == ("cse5alg-2026-s2", 2)
     video = json.loads((work / "video_segments.json").read_text())
     assert video[0]["kind"] == "video" and video[0]["source_id"] == "alg-w2"
     assert any("clips →" in m for m in logs)
 
     seg2 = FakeSegmenter()
-    again = index_lecture(rec, work, TOPICS, FakeTranscriber(), seg2, recording_id="alg-w2", title="Sorting")
+    again = index_lecture(
+        rec, work, TOPICS, FakeTranscriber(), seg2, recording_id="alg-w2", title="Sorting",
+        offering_id="cse5alg-2026-s2", week=2,
+    )
     assert seg2.calls == 0
     assert again == result

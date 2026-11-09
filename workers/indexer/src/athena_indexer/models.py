@@ -135,6 +135,9 @@ class IndexResult(_CamelOut):
     title: NonBlank
     duration_s: Seconds
     status: RecordingStatus
+    #: The offering (study space) this lecture belongs to, e.g. "cse5alg-2026-s2".
+    offering_id: NonBlank | None = None
+    week: Annotated[int, Field(ge=1)] | None = None
     clips: list[Clip] = Field(default_factory=list)
 
     @model_validator(mode="after")

@@ -94,6 +94,8 @@ def build_clips(
     recording_id: str,
     title: str,
     duration_s: float,
+    offering_id: str | None = None,
+    week: int | None = None,
     min_clip_s: float = MIN_CLIP_S,
     bridge_noise_s: float = BRIDGE_NOISE_S,
 ) -> IndexResult:
@@ -113,4 +115,7 @@ def build_clips(
         )
         for n, s in enumerate(tidy(segments, lines, min_clip_s=min_clip_s, bridge_noise_s=bridge_noise_s), start=1)
     ]
-    return IndexResult(recording_id=recording_id, title=title, duration_s=duration_s, status="ready", clips=clips)
+    return IndexResult(
+        recording_id=recording_id, title=title, duration_s=duration_s, status="ready",
+        offering_id=offering_id, week=week, clips=clips,
+    )

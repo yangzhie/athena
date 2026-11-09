@@ -28,12 +28,14 @@ recordings, audio or transcripts.
 
 ```sh
 uv run index-lecture data/<recording>.mp4 --topics topics/cse5alg.json \
-  --title "Week 2: Insertion sort" --recording-id alg-w2 --llm-model <openai-model-id>
+  --title "Insertion sort" --recording-id alg-w2 --offering cse5alg-2026-s2 --week 2 \
+  --llm-model <openai-model-id>
 ```
 
 Runs every step and writes `data/<recording>/clips.json` (for the frontend) and
 `video_segments.json` (for the agent). Each step is cached, so reruns only redo
-what changed. Needs `OPENAI_API_KEY`, and `OPENAI_MODEL` unless `--llm-model` is given,
+what changed. With `--offering`, the web app's Lecture clips view picks the
+lecture up automatically when run locally (see `apps/web/src/api/lectures.ts`). Needs `OPENAI_API_KEY`, and `OPENAI_MODEL` unless `--llm-model` is given,
 in the environment or the repo's `.env`.
 
 ## Transcribe only
