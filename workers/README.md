@@ -1,6 +1,8 @@
 # workers
 
-Python background jobs on Redis (Celery or RQ). Not scaffolded yet.
+Python background jobs. Each worker is its own uv package.
 
-Planned: document ingestion (parse, chunk, embed), lecture pipeline
-(transcode, transcribe, segment into clips), mastery updates from events.
+- [`indexer/`](indexer/): lecture indexing (recording → transcript → topic-labelled clips). In progress.
+
+Planned: document ingestion (parse, chunk, embed), mastery updates from events.
+A Redis queue (Celery or RQ) comes later; workers start as command-line tools.
