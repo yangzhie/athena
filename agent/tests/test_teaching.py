@@ -204,3 +204,29 @@ def test_uncertain_and_other_concept_evidence_do_not_count_as_struggle(gap):
     session.active_topic.assessment_records[-1].assessment.confidence = 0.4
     store._save(context, session)
     assert teaching_approach(store.read(context).active_topic, 'bubble-sort') == 'direct'
+
+
+@pytest.mark.parametrize('format', ['text', 'diagram', 'animation', 'simulation'])
+def test_format_recommendation_is_description_without_state_change(gap, format):
+    context, store, _ = gap
+    service, mock = teaching(store, [{'format': format, 'rationale': 'Shows how adjacent swaps move values.'}])
+    before = store.read(context)
+    recommendation = asyncio.run(service.recommend_format(context, 'bubble-sort'))
+    assert recommendation.format == format and recommendation.concept_id == 'bubble-sort'
+    assert 'specific pedagogical benefit' in mock.calls[0].messages[0].content
+    assert 'Trace a complete sorting pass.' in mock.calls[0].messages[1].content
+    assert store.read(context) == before
+
+
+def test_format_recommendation_rejects_code_unknown_and_foreign_input(gap):
+    context, store, _ = gap
+    service, mock = teaching(store, [{'format': 'html', 'rationale': 'Render this', 'code': '<script/>'}])
+    before = store.read(context)
+    with pytest.raises(ConversationError, match='not in'):
+        asyncio.run(service.recommend_format(context, 'missing'))
+    with pytest.raises(SessionNotFoundError):
+        asyncio.run(service.recommend_format(context.model_copy(update={'learner_id': 'other'}), 'bubble-sort'))
+    assert mock.calls == []
+    with pytest.raises(LLMError):
+        asyncio.run(service.recommend_format(context, 'bubble-sort'))
+    assert store.read(context) == before

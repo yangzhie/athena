@@ -386,3 +386,11 @@ analogy mapped back to the concept. A decisive correct answer resets this count;
 uncertain, low-confidence (`<0.8`), and other-concept records do not contribute.
 Repeated explanation requests alone never count as struggles. These conservative
 starting thresholds affect teaching style only, never assessment grades or mastery.
+
+`await teaching.recommend_format(context, concept_id)` returns a typed
+`FormatRecommendation` with `text`, `diagram`, `animation`, or `simulation` and a
+short rationale tied to concept objectives. Instructions prefer text unless a
+richer format has a specific benefit. Recommendations contain no executable UI;
+client capability selection and structured activity parameters are separate
+integration concerns. This read-only operation uses the same bounded context,
+validation, retry, ownership, and stale-result checks as explanations.
