@@ -187,3 +187,17 @@ Configure `timeout` (default 30 seconds) and `max_output_tokens` (default 2,048)
 Refusals and incomplete responses are terminal failures. Connection/timeouts, HTTP 408/409/429, and server errors are marked retryable; authentication, permissions, and other request errors are terminal. Invalid parsed output raises `InvalidOutputError`. Messages exposed by the adapter contain no raw provider diagnostics. Tests inject a client and make no live API calls.
 
 Reference: [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
+
+## Validation and retry policy (01.6)
+
+Wrap any `LLM` in `athena_agent.reliable_llm.ReliableLLM`. Each result must be an instance of the requested response model and is dumped/revalidated to check field and cross-field rules, even if a provider bypassed model construction validation.
+
+```python
+from athena_agent.reliable_llm import ReliableLLM, RetryPolicy
+
+async def generate_reliably(provider, messages, response_model):
+    llm = ReliableLLM(provider, policy=RetryPolicy(max_attempts=3))
+    return await llm.generate(messages, response_model)
+```
+
+The default is three total attempts with 0.5- and 1-second delays. `initial_delay`, `max_delay` (default 30 seconds), and `max_attempts` are configurable. Retries cover classified transient dependencies and invalid model outputs. Refusals, authentication, permission, invalid-request, and unexpected failures are terminal. Terminal exception messages are sanitized; cancellation propagates unchanged. The wrapper leaves provider ownership/closing to its caller and changes no learning state. Tests inject a sleeper to verify attempts and delays without waiting.
