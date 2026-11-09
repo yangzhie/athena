@@ -496,3 +496,12 @@ topics and evidence are preserved; replacing topics or goals through conversatio
 restore is rejected. Restoring into an empty session creates conversation context
 without inventing learning evidence. Exported snapshots contain no private criteria.
 Use the revision from `store.read` for compare-and-save; stale imports fail.
+
+`load_learning(context)` and `save_learning(context, memory, expected_revision=...)`
+handle a separate private `LearningMemory` snapshot: roadmaps, mastery, assessment
+evidence/diagnosis, question records, and current activity, including archived
+topics. It contains no conversation history or focus. Save validates evidence
+references and topic/goal/identity/revision compatibility atomically, while
+preserving existing conversation data. To restore both projections into an empty
+session, save conversation then learning using the updated revision. Learning
+snapshots include private keys and criteria and must remain backend-only.

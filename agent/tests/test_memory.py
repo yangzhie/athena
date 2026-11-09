@@ -74,3 +74,39 @@ def test_conversation_save_preserves_learning_and_rejects_stale_foreign_or_retar
     with pytest.raises(ConversationError, match='goal'):
         store.save_conversation(context, exported, expected_revision=snapshot.revision)
     assert store.read(context) == snapshot
+
+
+def test_separate_learning_restore_retains_evidence_mastery_and_conversation():
+    from athena_agent.learning import MultipleChoiceAnswer
+    context = RequestContext(request_id='r', learner_id='l', session_id='s')
+    source = InMemoryLearningMemory()
+    orchestrator = LearningOrchestrator(source, MockLLM([*one_concept_responses(),
+        {'misconceptions': [{'description': 'Random pairs', 'status': 'suspected', 'evidence_quote': 'Any random pair', 'confidence': 0.6}], 'prerequisite_gaps': []},
+        {'text': 'Compare adjacent pairs.'},
+    ]))
+    question = asyncio.run(orchestrator.start(context, 'Compare'))
+    asyncio.run(orchestrator.answer(context, MultipleChoiceAnswer(question_id=question.question.question_id, selected_choice_id='b')))
+    conversation = source.load_conversation(context)
+    learning = source.load_learning(context)
+    assert 'history' not in learning.model_dump_json()
+    restored = InMemoryLearningMemory()
+    restored.create(context)
+    restored.save_conversation(context, conversation, expected_revision=0)
+    restored.save_learning(context, learning, expected_revision=restored.read(context).revision)
+    assert restored.load_conversation(context) == conversation
+    assert restored.load_learning(context) == learning
+    assert restored.read(context).active_topic.learning_state.mastery[0].status == 'developing'
+    assert restored.read(context).active_topic.assessment_records[0].diagnosis.misconceptions[0].status == 'suspected'
+
+
+def test_invalid_learning_references_fail_atomically():
+    from pydantic import ValidationError
+    context = RequestContext(request_id='r', learner_id='l', session_id='s')
+    store = InMemoryLearningMemory()
+    asyncio.run(LearningOrchestrator(store, MockLLM(one_concept_responses())).start(context, 'Compare'))
+    memory = store.load_learning(context)
+    before = store.read(context)
+    memory.active_topic.question_records[0].parent_assessment_id = 'missing'
+    with pytest.raises(ValidationError):
+        store.save_learning(context, memory, expected_revision=before.revision)
+    assert store.read(context) == before

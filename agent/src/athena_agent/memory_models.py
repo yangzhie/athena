@@ -30,3 +30,33 @@ class ConversationMemory(Contract):
         if len({item.topic_id for item in topics}) != len(topics):
             raise ValueError('Topic IDs must be unique.')
         return self
+
+
+from .assessment_models import AssessmentRecord, QuestionRecord
+from .learning import LearningActivity, LearningState
+from .roadmap import Roadmap
+
+
+class TopicLearning(Contract):
+    topic_id: NonBlankString
+    learning_state: LearningState
+    roadmap: Roadmap | None = None
+    question_records: list[QuestionRecord] = Field(default_factory=list)
+    assessment_records: list[AssessmentRecord] = Field(default_factory=list)
+    current_activity: LearningActivity | None = None
+
+
+class LearningMemory(Contract):
+    """Private backend snapshot: includes question keys and grading criteria."""
+
+    learner_id: NonBlankString
+    session_id: NonBlankString
+    active_topic: TopicLearning | None = None
+    archived_topics: list[TopicLearning] = Field(default_factory=list)
+
+    @model_validator(mode='after')
+    def unique_topics(self):
+        topics = [*self.archived_topics, *([self.active_topic] if self.active_topic else [])]
+        if len({item.topic_id for item in topics}) != len(topics):
+            raise ValueError('Topic IDs must be unique.')
+        return self
