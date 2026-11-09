@@ -14,10 +14,14 @@ from .contracts import AgentError, ErrorResponse, RequestContext, SuccessRespons
 from .conversation import ConversationError, InMemoryConversationStore
 from .llm import LLM, MockLLM
 from .memory import LearningMemoryStore, LearnerScopedMemory
-from .api_models import StartSession, MessageSubmission, ContinueSubmission
+from .api_models import StartSession, MessageSubmission, ContinueSubmission, MaterialSubmission, ContentRequest
 from .assessment_models import AnswerSubmission
 from .orchestrator_models import LearningMessageResult, LearningView
 from .learning import LearningActivity
+from .activities import ClientCapabilities
+from .content import ContentService
+from .knowledge import KnowledgeService
+from .retrieval import Retriever, RetrievalRequest, RetrievalResult
 from .orchestrator import LearningOrchestrator
 
 IdentityResolver = Callable[[Request], str | Awaitable[str]]
@@ -59,7 +63,7 @@ def error_response(request: Request, code: str, message: str, status: int, *, re
     return JSONResponse(status_code=status, content=response.model_dump(mode='json'))
 
 
-def create_app(store: LearningMemoryStore, llm: LLM, *, learner_resolver: IdentityResolver = host_learner) -> FastAPI:
+def create_app(store: LearningMemoryStore, llm: LLM, *, learner_resolver: IdentityResolver = host_learner, retriever_resolver: Callable[[RequestContext], Retriever] | None = None) -> FastAPI:
     app = FastAPI(title='Athena Agent', version='0.1.0')
     app.state.store = store
     app.state.llm = llm
@@ -95,7 +99,7 @@ def create_app(store: LearningMemoryStore, llm: LLM, *, learner_resolver: Identi
     async def start_session(payload: StartSession, request: Request, context: Annotated[RequestContext, Depends(request_context)]):
         context = context.model_copy(update={'session_id': payload.session_id})
         request.state.context = context
-        activity = await orchestrator(context).start(context, payload.goal, difficulty=payload.difficulty)
+        activity = await orchestrator(context).start(context, payload.goal, difficulty=payload.difficulty, materials=payload.materials, capabilities=payload.capabilities)
         return SuccessResponse[LearningActivity](request_id=context.request_id, session_id=context.session_id, data=activity)
 
     @app.get('/sessions/{session_id}/resume', response_model=SuccessResponse[LearningActivity])
@@ -122,6 +126,27 @@ def create_app(store: LearningMemoryStore, llm: LLM, *, learner_resolver: Identi
     async def session_view(session_id: NonBlankString, context: Annotated[RequestContext, Depends(request_context)]):
         view = orchestrator(context).view(context)
         return SuccessResponse[LearningView](request_id=context.request_id, session_id=context.session_id, data=view)
+
+    @app.put('/sessions/{session_id}/materials', response_model=SuccessResponse[RetrievalResult])
+    async def select_materials(session_id: NonBlankString, payload: MaterialSubmission, context: Annotated[RequestContext, Depends(request_context)]):
+        result = await KnowledgeService(LearnerScopedMemory(store, context.learner_id)).supply(context, payload.result, source_ids=payload.source_ids, max_results=payload.max_results)
+        return SuccessResponse[RetrievalResult](request_id=context.request_id, session_id=context.session_id, data=result)
+
+    @app.post('/sessions/{session_id}/retrieval', response_model=SuccessResponse[RetrievalResult])
+    async def retrieve_materials(session_id: NonBlankString, payload: RetrievalRequest, context: Annotated[RequestContext, Depends(request_context)]):
+        retriever = retriever_resolver(context) if retriever_resolver is not None else None
+        result = await KnowledgeService(LearnerScopedMemory(store, context.learner_id), retriever).retrieve(context, payload.query, source_ids=payload.source_ids, max_results=payload.max_results)
+        return SuccessResponse[RetrievalResult](request_id=context.request_id, session_id=context.session_id, data=result)
+
+    @app.put('/sessions/{session_id}/capabilities', response_model=SuccessResponse[ClientCapabilities])
+    async def update_capabilities(session_id: NonBlankString, payload: ClientCapabilities, context: Annotated[RequestContext, Depends(request_context)]):
+        await ContentService(LearnerScopedMemory(store, context.learner_id), llm).set_capabilities(context, payload)
+        return SuccessResponse[ClientCapabilities](request_id=context.request_id, session_id=context.session_id, data=payload)
+
+    @app.post('/sessions/{session_id}/content', response_model=SuccessResponse[LearningActivity])
+    async def generate_content(session_id: NonBlankString, payload: ContentRequest, context: Annotated[RequestContext, Depends(request_context)]):
+        activity = await ContentService(LearnerScopedMemory(store, context.learner_id), llm).generate(context, payload.concept_id)
+        return SuccessResponse[LearningActivity](request_id=context.request_id, session_id=context.session_id, data=activity)
 
     return app
 

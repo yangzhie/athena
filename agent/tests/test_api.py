@@ -117,3 +117,33 @@ def test_session_view_returns_consistent_public_state_progress_and_feedback():
     assert data['latest_feedback']['content']['outcome'] == 'incorrect'
     assert store.read(context) == before
     assert 'question_records' not in response.text and 'correct_choice_id' not in response.text
+
+
+def test_api_accepts_materials_and_context_bound_retrieval():
+    from .test_orchestrator import one_concept_responses
+    from .test_knowledge import material
+    from athena_agent.retrieval import MockRetriever
+    mock = MockLLM(one_concept_responses())
+    retriever = MockRetriever([material()])
+    resolved = []
+    def resolver(context):
+        resolved.append((context.learner_id, context.session_id))
+        return retriever
+    app = create_app(InMemoryConversationStore(), mock, learner_resolver=lambda request: 'trusted', retriever_resolver=resolver)
+    request(app, 'POST', '/sessions', json={'session_id': 's', 'goal': 'Sorting'})
+    supplied = request(app, 'PUT', '/sessions/s/materials', json={'result': material().model_dump(mode='json')})
+    assert supplied.status_code == 200 and supplied.json()['data'] == material().model_dump(mode='json')
+    fetched = request(app, 'POST', '/sessions/s/retrieval', json={'query': 'Adjacent comparisons'})
+    assert fetched.status_code == 200 and resolved == [('trusted', 's')]
+    assert retriever.calls[0].query == 'Adjacent comparisons'
+
+
+def test_api_capabilities_drive_structured_content_generation():
+    from .test_orchestrator import one_concept_responses
+    mock = MockLLM([*one_concept_responses(), {'format': 'diagram', 'rationale': 'Shows comparison.'}, {'text': 'Compare adjacent values.', 'parameters': {'kind': 'diagram', 'nodes': [{'node_id': 'a', 'label': 'Compare'}]}}])
+    app = create_app(InMemoryConversationStore(), mock, learner_resolver=lambda request: 'trusted')
+    request(app, 'POST', '/sessions', json={'session_id': 's', 'goal': 'Sorting'})
+    assert request(app, 'PUT', '/sessions/s/capabilities', json={'formats': ['diagram']}).status_code == 200
+    content = request(app, 'POST', '/sessions/s/content', json={'concept_id': 'comparison'})
+    assert content.status_code == 200 and content.json()['data']['kind'] == 'rich'
+    assert request(app, 'PUT', '/sessions/s/capabilities', json={'formats': ['html']}).status_code == 422

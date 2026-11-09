@@ -5,6 +5,7 @@ from uuid import uuid4
 from pydantic import TypeAdapter
 
 from .adaptation import adjust_learning
+from .activities import ClientCapabilities
 from .assessment import AssessmentService
 from .assessment_models import AnswerSubmission
 from .context import ContextBuilder
@@ -26,13 +27,17 @@ class LearningOrchestrator:
         self.llm = llm if isinstance(llm, ReliableLLM) else ReliableLLM(llm)
         self.context_builder = context_builder if context_builder is not None else ContextBuilder()
 
-    async def start(self, context: RequestContext, goal: str, *, difficulty: Difficulty = 'beginner', materials: RetrievalResult | None = None) -> QuestionActivity:
+    async def start(self, context: RequestContext, goal: str, *, difficulty: Difficulty = 'beginner', materials: RetrievalResult | None = None, capabilities: ClientCapabilities | None = None) -> QuestionActivity:
         """Start a resolved goal with a proactive diagnostic, publishing all or nothing."""
         difficulty = TypeAdapter(Difficulty).validate_python(difficulty)
         async with self.store.creation(context):
             staged = InMemoryConversationStore()
             staged.create(context)
             staged.initialize_goal(context, goal)
+            if capabilities is not None:
+                session = staged.read(context)
+                session.capabilities = ClientCapabilities.model_validate(capabilities.model_dump())
+                staged._save(context, session)
             if materials is not None:
                 session = staged.read(context)
                 session.active_topic.knowledge = RetrievalResult.model_validate(materials.model_dump())

@@ -694,3 +694,13 @@ orchestration and answer idempotency, with strict request validation.
 `activity`, `learning_state`, `progress`, and `latest_feedback`. It uses the stored
 assessment for feedback and the evidence-based progress projection, makes no model
 calls or writes, and excludes private question records and grading criteria.
+
+`POST /sessions` also accepts optional typed `materials` and `capabilities`, saved
+atomically before planning. Existing sessions accept `PUT /sessions/{id}/materials`
+with `{ "result": { "items": [...] }, "source_ids": null, "max_results": 5 }`.
+`POST /sessions/{id}/retrieval` accepts the established retrieval request; hosts
+inject `retriever_resolver(context)` to provide an adapter authorized for that
+trusted learner/session. External source authorization remains the host's duty.
+`PUT /sessions/{id}/capabilities` accepts `{ "formats": ["text", "diagram"] }`.
+`POST /sessions/{id}/content` accepts `{ "concept_id": "..." }` and returns a
+capability-aware structured activity without advancing learning state.
