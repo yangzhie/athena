@@ -670,3 +670,11 @@ reflecting submitted content. No account system or frontend is provided.
 
 Implementation references: [FastAPI dependencies](https://fastapi.tiangolo.com/tutorial/dependencies/)
 and [exception handlers](https://fastapi.tiangolo.com/tutorial/handling-errors/).
+
+`POST /sessions` accepts `{ "session_id": "s1", "goal": "Bubble Sort",
+"difficulty": "beginner" }` and returns a proactive `LearningActivity` in the
+success envelope. `GET /sessions/{session_id}/resume` returns the saved activity
+without another model call. Every learning operation binds storage to the trusted
+host-resolved learner. Request bodies reject `learner_id`; another learner's same
+session identifier resolves independently or returns the same 404 as a missing
+session. Inject `SQLiteLearningMemory` to resume across service restarts.

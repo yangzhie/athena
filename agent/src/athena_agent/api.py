@@ -1,10 +1,10 @@
 """FastAPI integration boundary with injected dependencies and trusted host identity."""
 
 import inspect
-from typing import Awaitable, Callable, Literal
+from typing import Annotated, Awaitable, Callable, Literal
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import TypeAdapter, ValidationError
@@ -13,7 +13,10 @@ from ._schema import Contract, NonBlankString
 from .contracts import AgentError, ErrorResponse, RequestContext, SuccessResponse
 from .conversation import ConversationError, InMemoryConversationStore
 from .llm import LLM, MockLLM
-from .memory import LearningMemoryStore
+from .memory import LearningMemoryStore, LearnerScopedMemory
+from .api_models import StartSession
+from .learning import LearningActivity
+from .orchestrator import LearningOrchestrator
 
 IdentityResolver = Callable[[Request], str | Awaitable[str]]
 
@@ -48,7 +51,7 @@ async def request_context(request: Request) -> RequestContext:
 def error_response(request: Request, code: str, message: str, status: int, *, retryable: bool = False) -> JSONResponse:
     response = ErrorResponse(
         request_id=getattr(request.state, 'request_id', str(uuid4())),
-        session_id=request.path_params.get('session_id'),
+        session_id=getattr(getattr(request.state, 'context', None), 'session_id', None) or request.path_params.get('session_id'),
         error=AgentError(code=code, message=message, retryable=retryable),
     )
     return JSONResponse(status_code=status, content=response.model_dump(mode='json'))
@@ -77,11 +80,26 @@ def create_app(store: LearningMemoryStore, llm: LLM, *, learner_resolver: Identi
 
     @app.exception_handler(ConversationError)
     async def invalid_operation(request: Request, error: ConversationError):
-        return error_response(request, error.code, str(error), 400)
+        return error_response(request, error.code, str(error), 404 if error.code == 'session_not_found' else 400)
 
     @app.get('/health', response_model=SuccessResponse[Health])
     async def health(request: Request):
         return SuccessResponse[Health](request_id=request.state.request_id, data=Health())
+
+    def orchestrator(context: RequestContext):
+        return LearningOrchestrator(LearnerScopedMemory(store, context.learner_id), llm)
+
+    @app.post('/sessions', response_model=SuccessResponse[LearningActivity])
+    async def start_session(payload: StartSession, request: Request, context: Annotated[RequestContext, Depends(request_context)]):
+        context = context.model_copy(update={'session_id': payload.session_id})
+        request.state.context = context
+        activity = await orchestrator(context).start(context, payload.goal, difficulty=payload.difficulty)
+        return SuccessResponse[LearningActivity](request_id=context.request_id, session_id=context.session_id, data=activity)
+
+    @app.get('/sessions/{session_id}/resume', response_model=SuccessResponse[LearningActivity])
+    async def resume_session(session_id: NonBlankString, context: Annotated[RequestContext, Depends(request_context)]):
+        activity = orchestrator(context).resume(context)
+        return SuccessResponse[LearningActivity](request_id=context.request_id, session_id=context.session_id, data=activity)
 
     return app
 
