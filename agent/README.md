@@ -616,3 +616,10 @@ alternative. `AssessmentService.feedback_activity(context, assessment_id)` retur
 structured outcome/message feedback from saved evidence without exposing criteria,
 generating another grade, or changing state. Existing text-only activity payloads
 remain valid; clients own presentation and rendering.
+
+`orchestrator.progress(context)` derives a learner-facing `ProgressSummary` with
+concept titles/status/evidence counts, mastered/total counts, prerequisite-eligible
+concept IDs, phase, coverage, and `next_step` (`answer`, `continue`, `plan`, `expand`,
+or `complete`). Completion requires the actual narrow full-coverage mastery rule;
+broad partial coverage is never reported complete. The projection makes no model
+calls or state changes and excludes private question/assessment records.
