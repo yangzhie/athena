@@ -152,3 +152,37 @@ def test_learning_loop_behavior_evaluations():
     fixture = json.loads((Path(__file__).parent / 'fixtures/learning_loop.json').read_text())
     result = asyncio.run(evaluate_fixture(fixture))
     assert result['passed'] and len(result['results']) == 3
+
+
+def test_supported_prerequisite_gap_triggers_recheck_without_demoting_it(planning_data):
+    from athena_agent.assessment import AssessmentService
+    from athena_agent.learning import ConceptMastery, TextAnswer
+    context, store, _, _, _ = started(planning_data, [])
+    assessor = AssessmentService(store, MockLLM([OPEN]))
+    question = asyncio.run(assessor.generate_open_ended(context, 'bubble-sort'))
+    session = store.read(context)
+    session.active_topic.current_activity = question
+    session.active_topic.learning_state.mastery = [ConceptMastery(concept_id='comparison', status='mastered', assessment_ids=['historical-evidence'])]
+    store._save(context, session)
+    mock = MockLLM([
+        {'outcome': 'incorrect', 'feedback': 'Recheck comparison.', 'confidence': 0.95, 'evidence_quotes': ['cannot compare']},
+        {'misconceptions': [], 'prerequisite_gaps': [{'concept_id': 'comparison', 'status': 'supported', 'evidence_quote': 'cannot compare', 'confidence': 0.95}]}, MC,
+    ])
+    activity = asyncio.run(LearningOrchestrator(store, mock).answer(context, TextAnswer(question_id=question.question.question_id, text='I cannot compare 3 and 2.')))
+    assert activity.kind == 'question' and activity.question.concept_id == 'comparison'
+    assert store.read(context).active_topic.learning_state.mastery[0].status == 'mastered'
+
+
+def test_recovery_continuation_requests_a_single_step(planning_data):
+    from athena_agent.learning import MultipleChoiceAnswer
+    from .test_teaching import add_selection
+    context, store, _, _, question = started(planning_data, [])
+    for _ in range(3):
+        add_selection(context, store, concept_id='comparison')
+    mock = MockLLM([{'misconceptions': [], 'prerequisite_gaps': []}, {'text': 'For [2, 1], compare these two neighbours.'}, OPEN])
+    orchestrator = LearningOrchestrator(store, mock)
+    teaching = asyncio.run(orchestrator.answer(context, MultipleChoiceAnswer(question_id=question.question.question_id, selected_choice_id='b')))
+    assert 'worked steps' in mock.calls[1].messages[0].content
+    asyncio.run(orchestrator.continue_learning(context, teaching.activity_id))
+    assert '"recovery": true' in mock.calls[2].messages[1].content
+    assert 'just one reasoning step' in mock.calls[2].messages[0].content

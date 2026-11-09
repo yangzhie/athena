@@ -84,7 +84,9 @@ class AssessmentService:
                'not repetition of earlier prompts. For purpose application, require transfer to a new '
                'concrete situation with reasoning. For purpose retention, ask for unaided recall and '
                'explanation without showing the previous solution or answer in the prompt. For verification, '
-               'target uncertainty. Do not claim to know whether an earlier selection was a guess.'
+               'target uncertainty. When recovery=true, reset to the simplest concrete case and ask '
+               'for just one reasoning step, rather than another full problem. '
+               'Do not claim to know whether an earlier selection was a guess.'
                if followup_context is not None else ''),
             OpenEndedDraft, inputs=inputs,
         )
@@ -298,10 +300,18 @@ class AssessmentService:
                     return QuestionActivity(activity_id=record.activity_id, question=record.bundle.question.model_copy(deep=True))
             concept = self._concept(topic, parent.assessment.concept_id)
             original = self._question(topic, parent.assessment.question_id)
+            failures = 0
+            for item in reversed(topic.assessment_records):
+                if item.assessment.concept_id != concept.concept_id or item.assessment.outcome == 'uncertain' or item.assessment.confidence < 0.8:
+                    continue
+                if item.assessment.outcome == 'correct':
+                    break
+                failures += 1
             bundle = await self._draft_question(
                 topic, concept, difficulty or original.bundle.question.difficulty, 'open_ended',
                 followup_context={
                     'purpose': purpose,
+                    'recovery': failures >= 4,
                     'question': original.bundle.question.model_dump(),
                     'answer': parent.answer.model_dump(),
                     'assessment': parent.assessment.model_dump(),

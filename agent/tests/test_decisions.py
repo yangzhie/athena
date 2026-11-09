@@ -42,3 +42,13 @@ def test_gap_teaches_then_mastery_advances_only_eligible_concepts(assessed_topic
     assert select_action(topic, assessment.assessment_id).action == 'progress'
     with pytest.raises(ConversationError, match='assessment'):
         select_action(topic, 'missing')
+
+
+def test_repeated_failures_select_reset_instead_of_identical_teaching(assessed_topic):
+    context, store = assessed_topic
+    for _ in range(4):
+        assessment = evidence(context, store, 'comparison', 'b')
+    topic = store.read(context).active_topic
+    decision = select_action(topic, assessment.assessment_id)
+    assert decision.action == 'recover' and decision.concept_id == 'comparison'
+    assert topic.learning_state.mastery[0].status == 'developing'

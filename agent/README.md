@@ -443,3 +443,10 @@ favor application checks. Orchestrated follow-ups and next diagnostics use these
 adjustments, and mastered strengths remain excluded from candidate selection.
 The original roadmap difficulty and mastery evidence are preserved. Explicit
 follow-up difficulty overrides cannot replace an already cached question.
+
+Supported high-confidence prerequisite findings trigger a fresh diagnostic for
+that prerequisite, including a recheck of previously mastered evidence. Diagnosis
+alone never demotes prerequisite mastery. Four decisive unsuccessful concept
+attempts select `recover`: a smaller worked example followed by a single-step
+application task, with existing difficulty/depth adaptation. Suspected findings
+remain hypotheses and do not alone trigger prerequisite rechecks.

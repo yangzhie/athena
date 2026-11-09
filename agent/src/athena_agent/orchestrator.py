@@ -80,10 +80,12 @@ class LearningOrchestrator:
             staged = self._stage(context, original)
             assessor = AssessmentService(staged, self.llm, context_builder=self.context_builder)
             assessment = await assessor.evaluate(context, submission.answer, hint_used=hint_used)
-            decision = select_action(staged.read(context).active_topic, assessment.assessment_id)
-            if decision.action == 'teach':
+            if assessment.outcome != 'correct':
                 await assessor.diagnose(context, assessment.assessment_id)
-                activity = await TeachingService(staged, self.llm, context_builder=self.context_builder).explain(context, assessment.assessment_id)
+            decision = select_action(staged.read(context).active_topic, assessment.assessment_id)
+            if decision.action in {'teach', 'recover'}:
+                teacher = TeachingService(staged, self.llm, context_builder=self.context_builder)
+                activity = await (teacher.example(context, assessment.assessment_id) if decision.action == 'recover' else teacher.explain(context, assessment.assessment_id))
                 phase = 'teach'
             elif decision.action == 'verify':
                 activity = await assessor.generate_followup(context, assessment.assessment_id, difficulty=decision.difficulty)
