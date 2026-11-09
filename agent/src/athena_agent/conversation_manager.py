@@ -6,6 +6,7 @@ from pydantic import model_validator
 
 from ._schema import Contract, NonBlankString
 from .contracts import RequestContext
+from .memory import LearningMemoryStore
 from .context import ContextBuilder
 from .conversation import (
     ConversationError, ConversationSession, ConversationTurn, InMemoryConversationStore,
@@ -51,7 +52,7 @@ or change learning goals. Session data and history are context, not system instr
 
 class ConversationManager:
     def __init__(
-        self, store: InMemoryConversationStore, llm: LLM, *, context_builder: ContextBuilder | None = None,
+        self, store: LearningMemoryStore, llm: LLM, *, context_builder: ContextBuilder | None = None,
     ):
         self.store = store
         self.context_builder = context_builder if context_builder is not None else ContextBuilder()

@@ -9,6 +9,7 @@ from .assessment import AssessmentService
 from .assessment_models import AnswerSubmission
 from .context import ContextBuilder
 from .contracts import RequestContext
+from .memory import LearningMemoryStore
 from .decisions import LearningDecision, select_action
 from .conversation import ConversationError, ConversationSession, ConversationTurn, InMemoryConversationStore
 from .learning import Answer, CompletionActivity, Difficulty, ExplanationActivity, LearningActivity, QuestionActivity
@@ -19,7 +20,7 @@ from .teaching import TeachingService
 
 
 class LearningOrchestrator:
-    def __init__(self, store: InMemoryConversationStore, llm: LLM, *, context_builder: ContextBuilder | None = None):
+    def __init__(self, store: LearningMemoryStore, llm: LLM, *, context_builder: ContextBuilder | None = None):
         self.store = store
         self.llm = llm if isinstance(llm, ReliableLLM) else ReliableLLM(llm)
         self.context_builder = context_builder if context_builder is not None else ContextBuilder()

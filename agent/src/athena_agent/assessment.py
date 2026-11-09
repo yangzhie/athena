@@ -11,6 +11,7 @@ from .assessment_models import (
 )
 from .context import ContextBuilder
 from .contracts import RequestContext
+from .memory import LearningMemoryStore
 from .conversation import ConversationError, InMemoryConversationStore, TopicContext
 from .learning import (
     Answer, Assessment, Difficulty, LearningState, MultipleChoiceAnswer, TextAnswer, MultipleChoiceCriteria, MultipleChoiceQuestion, OpenEndedCriteria,
@@ -23,7 +24,7 @@ from .mastery import MasteryPolicy, derive_mastery
 
 
 class AssessmentService:
-    def __init__(self, store: InMemoryConversationStore, llm: LLM, *, context_builder: ContextBuilder | None = None, policy: AssessmentPolicy | None = None, mastery_policy: MasteryPolicy | None = None):
+    def __init__(self, store: LearningMemoryStore, llm: LLM, *, context_builder: ContextBuilder | None = None, policy: AssessmentPolicy | None = None, mastery_policy: MasteryPolicy | None = None):
         self.store = store
         self.mastery_policy = (mastery_policy or MasteryPolicy()).model_copy(deep=True)
         self.policy = (policy or AssessmentPolicy()).model_copy(deep=True)

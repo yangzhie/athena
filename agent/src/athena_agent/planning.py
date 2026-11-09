@@ -8,6 +8,7 @@ from ._schema import Contract, NonBlankString
 from .context import ContextBuilder
 from .conversation import ConversationError, ConversationTurn, InMemoryConversationStore, TopicContext
 from .contracts import RequestContext
+from .memory import LearningMemoryStore
 from .learning import LearningState
 from .llm import LLM, Model, InvalidOutputError, Message
 from .reliable_llm import ReliableLLM
@@ -33,7 +34,7 @@ class PlanningPolicy(Contract):
 
 
 class PlanningService:
-    def __init__(self, llm: LLM, *, context_builder: ContextBuilder | None = None, policy: PlanningPolicy | None = None, store: InMemoryConversationStore | None = None):
+    def __init__(self, llm: LLM, *, context_builder: ContextBuilder | None = None, policy: PlanningPolicy | None = None, store: LearningMemoryStore | None = None):
         self.store = store
         self.policy = (policy or PlanningPolicy()).model_copy(deep=True)
         self._llm = llm if isinstance(llm, ReliableLLM) else ReliableLLM(llm)
@@ -126,7 +127,7 @@ class PlanningService:
             partial_coverage=graph.partial_coverage,
         )
 
-    def _store(self) -> InMemoryConversationStore:
+    def _store(self) -> LearningMemoryStore:
         if self.store is None:
             raise ConversationError('Session planning requires a conversation store.')
         return self.store

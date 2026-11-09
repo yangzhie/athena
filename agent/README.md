@@ -477,3 +477,13 @@ learner-facing text, phases, and mastery counts. Behavioral expectations fail th
 process exit code. The same fixture works through `athena_agent.evaluation` and
 checks targeted teaching, conciseness, adaptive phases, and mastery decisions.
 No credentials, network, frontend, or paid model calls are used.
+
+## Learning-memory interface
+
+`athena_agent.memory.LearningMemoryStore` defines identity-scoped session snapshots,
+atomic compare-and-save, and per-session interaction/creation contexts. Existing
+conversation, planning, teaching, assessment, and orchestration services depend on
+this protocol. `InMemoryLearningMemory` names the established
+`InMemoryConversationStore` implementation; it is an alias, preserving existing
+integrations and avoiding duplicate memory services. Returned snapshots are copies;
+private assessment criteria make whole-session snapshots backend-only.

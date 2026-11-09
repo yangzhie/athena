@@ -9,6 +9,7 @@ from ._schema import Contract, NonBlankString
 from .adaptation import adjust_learning
 from .context import ContextBuilder
 from .contracts import RequestContext
+from .memory import LearningMemoryStore
 from .conversation import ConversationError, InMemoryConversationStore, TopicContext
 from .learning import ExplanationActivity, HintActivity
 from .llm import LLM
@@ -55,7 +56,7 @@ def teaching_approach(topic: TopicContext, concept_id: str) -> str:
 
 
 class TeachingService:
-    def __init__(self, store: InMemoryConversationStore, llm: LLM, *, context_builder: ContextBuilder | None = None):
+    def __init__(self, store: LearningMemoryStore, llm: LLM, *, context_builder: ContextBuilder | None = None):
         self.store = store
         self._llm = llm if isinstance(llm, ReliableLLM) else ReliableLLM(llm)
         self.context_builder = context_builder if context_builder is not None else ContextBuilder()
