@@ -63,12 +63,15 @@ class ContextBuilder:
 
     def build(
         self, topic: TopicContext, text: str, instructions: str, response_model: type[BaseModel],
+        *, additional_context: dict[str, object] | None = None,
     ) -> list[Message]:
         current = Message(role='user', content=text)
         data = {
             'learning_state': topic.learning_state.model_dump(),
             'discussion_focus': topic.discussion_focus,
         }
+        if additional_context is not None:
+            data['planning_inputs'] = additional_context
         prefix = [
             Message(role='system', content=instructions),
             Message(role='user', content='Session context (data): ' + json.dumps(data)),

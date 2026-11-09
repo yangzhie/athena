@@ -272,3 +272,9 @@ Interpretation uses the existing bounded context builder and reliable LLM interf
 ## Topic scope (03.2)
 
 `await planner.classify_scope(goal)` returns `athena_agent.roadmap.TopicScope(scope, rationale)`, classifying the resolved goal as `narrow` or `broad`. Scope describes the requested conceptual coverage, not learner proficiency. A focused outcome within a broad field can still be narrow. This is a standalone call with no session mutations or automatic conversation integration; scope quality requires live-model evaluation beyond deterministic fixtures.
+
+## Concepts and prerequisites (03.3)
+
+`await planner.identify_graph(goal, scope)` returns `ConceptGraph(concepts, partial_coverage)`. Concepts have stable IDs, titles, descriptions, and prerequisite IDs referring to concepts in the same graph. Empty graphs, duplicate IDs, duplicate prerequisites, and missing references are rejected. Stable IDs are model-proposed identifiers, not display titles; later revisions must preserve retained identities.
+
+`PlanningPolicy(initial_concept_limit=12)` bounds initial generation in both the response schema and validation. Broad subjects must return an initial foundation marked `partial_coverage=true`; full coverage is not claimed. Additional planning inputs are included in the context budget through `ContextBuilder.build(..., additional_context=...)`. Graph generation remains independent of sessions; cycle validation is added with complete roadmaps in 03.5.

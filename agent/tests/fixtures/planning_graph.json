@@ -1,0 +1,7 @@
+{
+  "concepts": [
+    {"concept_id": "comparison", "title": "Comparing values", "description": "Recognise when adjacent values are out of order.", "prerequisite_ids": []},
+    {"concept_id": "bubble-sort", "title": "Bubble Sort", "description": "Understand adjacent swaps and repeated passes.", "prerequisite_ids": ["comparison"]}
+  ],
+  "partial_coverage": false
+}
