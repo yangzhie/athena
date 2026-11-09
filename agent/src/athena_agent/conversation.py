@@ -1,10 +1,13 @@
 """In-memory conversation sessions; no persistence or transport dependency."""
 
+from uuid import uuid4
+
 from pydantic import Field
 
 from ._schema import Contract, NonBlankString
 from .contracts import RequestContext
 from .llm import Message
+from .learning import LearningState
 
 
 class ConversationError(Exception):
@@ -26,10 +29,18 @@ class ConversationTurn(Contract):
         return [Message(role='user', content=self.user_text), Message(role='assistant', content=self.assistant_text)]
 
 
+class TopicContext(Contract):
+    topic_id: NonBlankString = Field(default_factory=lambda: str(uuid4()))
+    learning_state: LearningState
+    discussion_focus: NonBlankString | None = None
+    history: list[ConversationTurn] = Field(default_factory=list)
+
+
 class ConversationSession(Contract):
     learner_id: NonBlankString
     session_id: NonBlankString
     history: list[ConversationTurn] = Field(default_factory=list)
+    active_topic: TopicContext | None = None
 
 
 class InMemoryConversationStore:
@@ -59,6 +70,27 @@ class InMemoryConversationStore:
 
     def append_turn(self, context: RequestContext, turn: ConversationTurn) -> ConversationSession:
         session = self.read(context)
-        session.history.append(ConversationTurn.model_validate(turn.model_dump()))
-        self._sessions[self._key(context)] = session
-        return session.model_copy(deep=True)
+        validated = ConversationTurn.model_validate(turn.model_dump())
+        session.history.append(validated)
+        if session.active_topic is not None:
+            session.active_topic.history.append(validated.model_copy(deep=True))
+        return self._save(context, session)
+
+    def _save(self, context: RequestContext, session: ConversationSession) -> ConversationSession:
+        validated = ConversationSession.model_validate(session.model_dump())
+        self._sessions[self._key(context)] = validated
+        return validated.model_copy(deep=True)
+
+    def initialize_goal(self, context: RequestContext, goal: str) -> ConversationSession:
+        session = self.read(context)
+        if session.active_topic is not None:
+            raise ConversationError('The session already has an active learning goal.')
+        session.active_topic = TopicContext(learning_state=LearningState(goal=goal))
+        return self._save(context, session)
+
+    def update_focus(self, context: RequestContext, focus: str | None) -> ConversationSession:
+        session = self.read(context)
+        if session.active_topic is None:
+            raise ConversationError('Initialize a learning goal first.')
+        session.active_topic.discussion_focus = focus
+        return self._save(context, session)

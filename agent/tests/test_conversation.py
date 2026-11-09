@@ -64,3 +64,58 @@ def test_session_id_required():
 def test_turns_are_complete_and_user_assistant_only(data):
     with pytest.raises(ValidationError):
         ConversationTurn(**data)
+
+
+def test_initial_goal_uses_learning_state_and_unique_topic_id():
+    store = InMemoryConversationStore()
+    store.create(context())
+    first = store.initialize_goal(context(), 'Sorting')
+    assert first.active_topic.learning_state.goal == 'Sorting'
+    assert first.active_topic.learning_state.phase == 'diagnose'
+    assert first.active_topic.learning_state.mastery == []
+    assert first.active_topic.discussion_focus is None
+    store.create(context(session='other'))
+    second = store.initialize_goal(context(session='other'), 'Graphs')
+    assert first.active_topic.topic_id != second.active_topic.topic_id
+
+
+def test_focus_and_history_do_not_change_learning_evidence():
+    store = InMemoryConversationStore()
+    store.create(context())
+    initial = store.initialize_goal(context(), 'Sorting')
+    store.update_focus(context(), 'Adjacent comparisons')
+    store.append_turn(context(), ConversationTurn(user_text='Why?', assistant_text='To compare.'))
+    updated = store.read(context())
+    assert updated.active_topic.learning_state == initial.active_topic.learning_state
+    assert updated.active_topic.discussion_focus == 'Adjacent comparisons'
+    assert updated.active_topic.history == updated.history
+    assert store.update_focus(context(), None).active_topic.discussion_focus is None
+
+
+def test_invalid_goal_and_focus_leave_session_unchanged():
+    store = InMemoryConversationStore()
+    store.create(context())
+    with pytest.raises(ConversationError, match='Initialize'):
+        store.update_focus(context(), 'Focus')
+    with pytest.raises(ValidationError):
+        store.initialize_goal(context(), ' ')
+    assert store.read(context()).active_topic is None
+    initial = store.initialize_goal(context(), 'Sorting')
+    with pytest.raises(ConversationError, match='already has'):
+        store.initialize_goal(context(), 'Graphs')
+    with pytest.raises(ValidationError):
+        store.update_focus(context(), ' ')
+    assert store.read(context()) == initial
+
+
+def test_topic_snapshot_does_not_share_state_or_history():
+    store = InMemoryConversationStore()
+    store.create(context())
+    store.append_turn(context(), ConversationTurn(user_text='Before goal', assistant_text='Reply'))
+    snapshot = store.initialize_goal(context(), 'Sorting')
+    snapshot.active_topic.learning_state.goal = 'Changed'
+    snapshot.active_topic.history.append(ConversationTurn(user_text='Fake', assistant_text='Fake'))
+    stored = store.read(context())
+    assert stored.active_topic.learning_state.goal == 'Sorting'
+    assert stored.active_topic.history == []
+    assert len(stored.history) == 1

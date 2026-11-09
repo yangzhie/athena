@@ -226,3 +226,9 @@ Supply model instances or dictionaries to script document/video results, or `Ret
 `athena_agent.conversation.InMemoryConversationStore` provides synchronous `create(context)`, `read(context)`, and `append_turn(context, turn)`. Use a `RequestContext` containing caller-supplied learner/session IDs. A `ConversationTurn` contains nonblank `user_text` and `assistant_text` and converts to ordered LLM messages with `messages()`.
 
 Sessions are keyed by learner and session, duplicate creation fails without replacing history, and missing/cross-learner sessions produce the same `SessionNotFoundError`. Reads and writes return independent snapshots. This is process-local memory, not durable storage or authentication; the host must supply a trusted learner identity. Completed turn pairs are stored together so partial exchanges cannot enter history.
+
+## Goals and discussion context (02.2)
+
+Use `store.initialize_goal(context, goal)` once to start a `TopicContext` with a generated topic ID and fresh `LearningState`. The goal is stored only in `learning_state.goal`. `store.update_focus(context, focus)` updates or clears the discussion focus without changing mastery or phase. Invalid changes leave stored state untouched.
+
+An active topic tracks its own turn history; `session.history` retains the full chronological conversation, including turns before goal initialisation. `append_turn` updates both histories when a topic is active. Returned topic state is independently copied. Goal changes are handled by the later topic-switch operation, not by repeated initialisation.
