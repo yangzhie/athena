@@ -462,3 +462,18 @@ retry without false completion or lost evidence.
 Automatic expansion preserves the existing topic scope; a model cannot silently
 narrow a broad subject into a fully covered topic. Scope changes require an
 explicit planning operation rather than implicit progression.
+
+## Local text learning journey
+
+```sh
+uv run python -m athena_agent.runner tests/fixtures/text_journey.json
+```
+
+The runner composes the real orchestrator, planning, teaching, and assessment
+services with a scripted mock model and in-memory storage. A wrong diagnostic
+answer receives a concise targeted unit, followed by application and independent
+reasoning before mastery and narrow-topic completion. The JSON transcript exposes
+learner-facing text, phases, and mastery counts. Behavioral expectations fail the
+process exit code. The same fixture works through `athena_agent.evaluation` and
+checks targeted teaching, conciseness, adaptive phases, and mastery decisions.
+No credentials, network, frontend, or paid model calls are used.

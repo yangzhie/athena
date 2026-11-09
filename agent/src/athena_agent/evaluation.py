@@ -117,6 +117,9 @@ async def evaluate_continuity(fixture: dict) -> dict:
 
 
 async def evaluate_fixture(fixture: dict) -> dict:
+    if 'turns' in fixture:
+        from .runner import run_text_journey
+        return await run_text_journey(fixture)
     if 'behavior_scenarios' in fixture:
         results = [await (evaluate_continuity(scenario) if scenario['kind'] == 'continuity' else evaluate_assessment_loop(scenario)) for scenario in fixture['behavior_scenarios']]
         return {'passed': bool(results) and all(result['passed'] for result in results), 'results': results}
