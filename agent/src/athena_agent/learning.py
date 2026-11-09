@@ -161,7 +161,7 @@ class TeachingContent(Contract):
 
     @model_validator(mode='after')
     def focused_unit(self):
-        combined = ' '.join([self.summary, *self.steps, self.worked_example or ''])
+        combined = ' '.join([self.summary, *self.steps, *([self.worked_example] if self.worked_example is not None else [])])
         if len(combined.split()) > 120 or len(combined) > 1000:
             raise ValueError('Structured teaching must remain one concise unit.')
         return self

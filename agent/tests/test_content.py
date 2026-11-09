@@ -38,3 +38,11 @@ def test_feedback_content_is_derived_from_assessment_without_private_criteria(ga
     assert activity.content.message == activity.text == assessment.feedback
     assert 'correct_choice_id' not in activity.model_dump_json()
     assert store.read(context) == before
+
+
+def test_text_only_explanation_at_character_boundary_keeps_valid_fallback(gap):
+    context, store, assessment = gap
+    text = 'x' * 1000
+    teacher, _ = teaching(store, [{'text': text}])
+    activity = asyncio.run(teacher.explain(context, assessment.assessment_id))
+    assert activity.text == activity.content.summary == text
