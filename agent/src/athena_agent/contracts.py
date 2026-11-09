@@ -1,8 +1,8 @@
 """Transport-independent envelopes for agent requests and responses."""
 
-from typing import Annotated, Generic, Literal, TypeVar
+from typing import Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from ._schema import Contract as _Contract, NonBlankString as _NonBlankString
 
 __all__ = [
     "AgentError",
@@ -13,7 +13,6 @@ __all__ = [
     "SuccessResponse",
 ]
 
-_NonBlankString = Annotated[str, StringConstraints(min_length=1, pattern=r"\S")]
 _Payload = TypeVar("_Payload")
 
 ErrorCode = Literal[
@@ -23,10 +22,6 @@ ErrorCode = Literal[
     "invalid_model_output",
     "internal_error",
 ]
-
-
-class _Contract(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid")
 
 
 class RequestContext(_Contract):
