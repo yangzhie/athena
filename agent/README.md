@@ -284,3 +284,9 @@ Interpretation uses the existing bounded context builder and reliable LLM interf
 `await planner.enrich_graph(graph, goal=goal, learner_state=None)` returns an `EnrichedGraph` with one or more learning objectives and an existing difficulty level per concept. Optional learner state must match the goal. Supplied mastery/evidence is context only and is never changed.
 
 The model returns an `ObjectiveBatch` containing IDs, objectives, and difficulty only. The service requires exactly the original ID set and merges results into the unchanged graph, preserving titles, descriptions, ordering, and prerequisites. Unexpected IDs or attempts to return changed edges are rejected; empty/blank objectives and unknown difficulty levels are invalid.
+
+## Session roadmaps (03.5)
+
+Pass `store=store` to `PlanningService`, then call `await planner.plan(context)` after goal resolution and session initialisation. The service classifies scope, generates the bounded graph, enriches objectives, and saves a `Roadmap` on `session.active_topic.roadmap` in one transaction. Failed, cancelled, oversized, or stale planning leaves the topic unchanged. A second `plan` call rejects an existing roadmap; use revision rather than replacing it blindly.
+
+`Roadmap` holds the goal, `TopicScope`, and `EnrichedGraph`; graph validation now rejects self-dependencies and cycles as well as broken references. `roadmap.eligible_concept_ids(learning_state)` returns unmastered concepts whose prerequisites are demonstrated as mastered. The returned options are not a mandatory sequence and do not advance phase or alter mastery. Topic validation keeps roadmap and learning-state goals consistent. Archived topics retain their own roadmap; new conversation topics start without one. Ordinary conversation sends still make no automatic planning calls.

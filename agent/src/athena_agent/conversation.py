@@ -4,12 +4,13 @@ import asyncio
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
 from .contracts import RequestContext
 from .llm import Message
 from .learning import LearningState
+from .roadmap import Roadmap
 
 
 class ConversationError(Exception):
@@ -36,6 +37,13 @@ class TopicContext(Contract):
     learning_state: LearningState
     discussion_focus: NonBlankString | None = None
     history: list[ConversationTurn] = Field(default_factory=list)
+    roadmap: Roadmap | None = None
+
+    @model_validator(mode='after')
+    def matching_roadmap_goal(self):
+        if self.roadmap is not None and self.roadmap.goal != self.learning_state.goal:
+            raise ValueError('Roadmap and learning state must have the same goal.')
+        return self
 
 
 class ConversationSession(Contract):

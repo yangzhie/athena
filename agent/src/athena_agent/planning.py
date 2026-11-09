@@ -6,11 +6,12 @@ from pydantic import Field, create_model, model_validator
 
 from ._schema import Contract, NonBlankString
 from .context import ContextBuilder
-from .conversation import ConversationError, ConversationTurn, TopicContext
+from .conversation import ConversationError, ConversationTurn, InMemoryConversationStore, TopicContext
+from .contracts import RequestContext
 from .learning import LearningState
 from .llm import LLM, Model, InvalidOutputError
 from .reliable_llm import ReliableLLM
-from .roadmap import Concept, ConceptGraph, EnrichedConcept, EnrichedGraph, ObjectiveBatch, TopicScope
+from .roadmap import Concept, ConceptGraph, EnrichedConcept, EnrichedGraph, ObjectiveBatch, Roadmap, TopicScope
 
 
 class GoalInterpretation(Contract):
@@ -32,7 +33,8 @@ class PlanningPolicy(Contract):
 
 
 class PlanningService:
-    def __init__(self, llm: LLM, *, context_builder: ContextBuilder | None = None, policy: PlanningPolicy | None = None):
+    def __init__(self, llm: LLM, *, context_builder: ContextBuilder | None = None, policy: PlanningPolicy | None = None, store: InMemoryConversationStore | None = None):
+        self.store = store
         self.policy = (policy or PlanningPolicy()).model_copy(deep=True)
         self._llm = llm if isinstance(llm, ReliableLLM) else ReliableLLM(llm)
         self.context_builder = context_builder if context_builder is not None else ContextBuilder()
@@ -123,3 +125,25 @@ class PlanningService:
             ) for concept in graph.concepts],
             partial_coverage=graph.partial_coverage,
         )
+
+    def _store(self) -> InMemoryConversationStore:
+        if self.store is None:
+            raise ConversationError('Session planning requires a conversation store.')
+        return self.store
+
+    async def plan(self, context: RequestContext) -> Roadmap:
+        store = self._store()
+        async with store.interaction(context) as session:
+            topic = session.active_topic
+            if topic is None:
+                raise ConversationError('Initialize a learning goal before planning.')
+            if topic.roadmap is not None:
+                raise ConversationError('A roadmap already exists; use revise instead.')
+            goal = topic.learning_state.goal
+            scope = await self.classify_scope(goal)
+            graph = await self.identify_graph(goal, scope)
+            enriched = await self.enrich_graph(graph, goal=goal, learner_state=topic.learning_state)
+            roadmap = Roadmap(goal=goal, scope=scope, graph=enriched)
+            topic.roadmap = roadmap
+            store._save(context, session)
+            return roadmap.model_copy(deep=True)

@@ -1,11 +1,12 @@
 """Planning data contracts, independent of session storage and providers."""
 
+from graphlib import CycleError, TopologicalSorter
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
-from .learning import Difficulty
+from .learning import Difficulty, LearningState
 
 
 class TopicScope(Contract):
@@ -35,6 +36,14 @@ class ConceptGraph(Contract):
                 raise ValueError('Prerequisite IDs must be unique per concept.')
             if not set(concept.prerequisite_ids) <= known:
                 raise ValueError('Prerequisites must reference concepts in the graph.')
+        if any(concept.concept_id in concept.prerequisite_ids for concept in self.concepts):
+            raise ValueError('Concepts cannot depend on themselves.')
+        try:
+            tuple(TopologicalSorter({
+                concept.concept_id: set(concept.prerequisite_ids) for concept in self.concepts
+            }).static_order())
+        except CycleError:
+            raise ValueError('Concept prerequisites must not contain cycles.') from None
         return self
 
 
@@ -62,3 +71,26 @@ class EnrichedConcept(Concept):
 
 class EnrichedGraph(ConceptGraph):
     concepts: Annotated[list[EnrichedConcept], Field(min_length=1)]
+
+
+class Roadmap(Contract):
+    goal: NonBlankString
+    scope: TopicScope
+    graph: EnrichedGraph
+
+    @model_validator(mode='after')
+    def broad_coverage_is_partial(self) -> Self:
+        if self.scope.scope == 'broad' and not self.graph.partial_coverage:
+            raise ValueError('Broad subjects require a partial initial roadmap.')
+        return self
+
+    def eligible_concept_ids(self, state: LearningState) -> list[str]:
+        """Return options, not a mandatory lesson sequence; mutate no state."""
+        state = LearningState.model_validate(state.model_dump())
+        if state.goal != self.goal:
+            raise ValueError('Learning state must match the roadmap goal.')
+        mastered = {record.concept_id for record in state.mastery if record.status == 'mastered'}
+        return [
+            concept.concept_id for concept in self.graph.concepts
+            if concept.concept_id not in mastered and set(concept.prerequisite_ids) <= mastered
+        ]
