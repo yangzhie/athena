@@ -48,7 +48,7 @@ def test_open_answer_outcomes_are_recorded(assessed_topic, outcome):
     assert 'expected_reasoning' in mock.calls[0].messages[1].content
     after = store.read(context)
     assert after.history == before.history
-    assert after.active_topic.learning_state == before.active_topic.learning_state
+    assert after.active_topic.learning_state.model_dump(exclude={'mastery'}) == before.active_topic.learning_state.model_dump(exclude={'mastery'})
     assert after.active_topic.assessment_records[0].evidence_quotes == GRADE['evidence_quotes']
 
 

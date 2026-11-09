@@ -13,17 +13,19 @@ from .context import ContextBuilder
 from .contracts import RequestContext
 from .conversation import ConversationError, InMemoryConversationStore, TopicContext
 from .learning import (
-    Answer, Assessment, Difficulty, MultipleChoiceAnswer, TextAnswer, MultipleChoiceCriteria, MultipleChoiceQuestion, OpenEndedCriteria,
+    Answer, Assessment, Difficulty, LearningState, MultipleChoiceAnswer, TextAnswer, MultipleChoiceCriteria, MultipleChoiceQuestion, OpenEndedCriteria,
     OpenEndedQuestion, QuestionActivity, QuestionWithCriteria,
 )
 from .llm import LLM, Model, InvalidOutputError
 from .reliable_llm import ReliableLLM
 from .roadmap import EnrichedConcept
+from .mastery import MasteryPolicy, derive_mastery
 
 
 class AssessmentService:
-    def __init__(self, store: InMemoryConversationStore, llm: LLM, *, context_builder: ContextBuilder | None = None, policy: AssessmentPolicy | None = None):
+    def __init__(self, store: InMemoryConversationStore, llm: LLM, *, context_builder: ContextBuilder | None = None, policy: AssessmentPolicy | None = None, mastery_policy: MasteryPolicy | None = None):
         self.store = store
+        self.mastery_policy = (mastery_policy or MasteryPolicy()).model_copy(deep=True)
         self.policy = (policy or AssessmentPolicy()).model_copy(deep=True)
         self._llm = llm if isinstance(llm, ReliableLLM) else ReliableLLM(llm)
         self.context_builder = context_builder if context_builder is not None else ContextBuilder()
@@ -173,6 +175,7 @@ class AssessmentService:
             topic.assessment_records.append(AssessmentRecord(
                 answer=answer, assessment=assessment, hint_used=submission.hint_used, evidence_quotes=quotes,
             ))
+            self._update_mastery(topic, assessment.concept_id)
             self.store._save(context, session)
             return assessment.model_copy(deep=True)
 
@@ -240,3 +243,34 @@ class AssessmentService:
             record.assessment.prerequisite_gaps = [finding.concept_id for finding in diagnosis.prerequisite_gaps]
             self.store._save(context, session)
             return diagnosis.model_copy(deep=True)
+
+    def _update_mastery(self, topic: TopicContext, concept_id: str) -> None:
+        previous = next((record for record in topic.learning_state.mastery if record.concept_id == concept_id), None)
+        updated = derive_mastery(
+            concept_id, topic.question_records, topic.assessment_records,
+            policy=self.mastery_policy, previous=previous,
+        )
+        if previous is None:
+            topic.learning_state.mastery.append(updated)
+        else:
+            index = topic.learning_state.mastery.index(previous)
+            topic.learning_state.mastery[index] = updated
+
+    async def recompute_mastery(self, context: RequestContext, concept_id: str | None = None) -> LearningState:
+        async with self.store.interaction(context) as session:
+            topic = session.active_topic
+            if topic is None or topic.roadmap is None:
+                raise ConversationError('An active learning roadmap is required for assessment.')
+            known = dict.fromkeys([
+                *(item.concept_id for item in topic.roadmap.graph.concepts),
+                *(item.concept_id for item in topic.learning_state.mastery),
+                *(item.assessment.concept_id for item in topic.assessment_records),
+            ])
+            if concept_id is not None and concept_id not in known:
+                raise ConversationError('The concept has no learning context in this topic.')
+            before = topic.learning_state.model_dump()
+            for key in [concept_id] if concept_id is not None else known:
+                self._update_mastery(topic, key)
+            if topic.learning_state.model_dump() != before:
+                self.store._save(context, session)
+            return topic.learning_state.model_copy(deep=True)
