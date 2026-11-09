@@ -8,6 +8,7 @@ from ._schema import Contract, NonBlankString
 from .contracts import RequestContext
 from .memory import LearningMemoryStore
 from .context import ContextBuilder
+from .grounding import generate_grounded
 from .conversation import (
     ConversationError, ConversationSession, ConversationTurn, InMemoryConversationStore,
     TopicContext,
@@ -78,7 +79,7 @@ class ConversationManager:
             if topic is None:
                 raise ConversationError('Initialize a learning goal first.')
             decision = await self._llm.generate(
-                self._messages(topic, incoming.content, _ROUTE, IntentDecision), IntentDecision,
+                self._messages(topic.model_copy(update={'knowledge': None}), incoming.content, _ROUTE, IntentDecision), IntentDecision,
             )
             if decision.intent == 'ambiguous':
                 reply = ConversationReply(
@@ -88,7 +89,8 @@ class ConversationManager:
             else:
                 self._prepare_topic(session, decision)
                 topic = session.active_topic
-                reply = await self._llm.generate(
+                reply = await generate_grounded(
+                    self._llm, self.context_builder, topic,
                     self._messages(topic, incoming.content, _REPLY, ConversationReply), ConversationReply,
                 )
             turn = ConversationTurn(user_text=incoming.content, assistant_text=reply.text)

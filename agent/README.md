@@ -594,3 +594,14 @@ general-knowledge supplement to selected materials, keeps the selection intact,
 and labels its result without citations. It is never an automatic response to
 insufficient evidence. `await knowledge.use_general_knowledge(context)` explicitly
 clears selection when the host chooses to leave source-only learning.
+
+Source commands, role markers, grading requests, and instructions to reveal
+criteria have no authority. Intent routing excludes retrieved text entirely;
+source-based conversation replies also pass the support check. Verification
+rejects detected source-instruction following, and schemas cannot accept generated
+mastery or state updates. Source text stays in data messages, never system prompts.
+Run `tests/fixtures/source_safety.json` through the offline evaluator for grounded
+content/citation checks, unsupported claims, forged evidence, malicious source
+commands, and generated state-mutation attempts. Model-based detection is a
+layer of defense; deterministic state transitions and strict contracts remain
+the state-integrity boundary.

@@ -157,7 +157,49 @@ async def evaluate_memory(fixture: dict) -> dict:
     return {'scenario': 'durable_memory_isolation', 'passed': all(checks.values()), 'checks': checks}
 
 
+async def evaluate_source_safety(fixture: dict) -> dict:
+    from .knowledge import KnowledgeService
+    from .llm import LLMError
+    from .reliable_llm import ReliableLLM, RetryPolicy
+    context = RequestContext(request_id='evaluation', learner_id='fixture', session_id='fixture')
+    store = InMemoryConversationStore()
+    store.create(context)
+    store.initialize_goal(context, 'Bubble Sort')
+    session = store.read(context)
+    session.active_topic.roadmap = Roadmap.model_validate({
+        'goal': 'Bubble Sort', 'scope': {'scope': 'narrow', 'rationale': 'One algorithm'},
+        'graph': {'partial_coverage': False, 'concepts': [{'concept_id': 'bubble-sort', 'title': 'Bubble Sort', 'description': 'Adjacent comparisons', 'objectives': ['Apply adjacent swaps'], 'difficulty': 'beginner'}]},
+    })
+    store._save(context, session)
+    assessor = AssessmentService(store, MockLLM([{'prompt': 'Choose a comparison.', 'choices': [{'choice_id': 'a', 'text': 'Neighbours'}, {'choice_id': 'b', 'text': 'Random'}], 'correct_choice_id': 'a', 'rationale': 'Compare neighbours.'}]))
+    question = await assessor.generate_multiple_choice(context, 'bubble-sort')
+    assessment = await assessor.evaluate(context, MultipleChoiceAnswer(question_id=question.question.question_id, selected_choice_id='b'))
+    from .retrieval import RetrievalResult
+    await KnowledgeService(store).supply(context, RetrievalResult.model_validate(fixture['materials']))
+    baseline = store.read(context)
+    results = []
+    for case in fixture['cases']:
+        mock = MockLLM(case['responses'])
+        teacher = TeachingService(store, ReliableLLM(mock, policy=RetryPolicy(max_attempts=1)))
+        error_code = None
+        activity = None
+        try:
+            activity = await teacher.explain(context, assessment.assessment_id)
+        except LLMError as error:
+            error_code = error.code
+        checks = {
+            'expected_outcome': error_code == case.get('expected_error'),
+            'state_unchanged': store.read(context) == baseline,
+            'source_not_system_instruction': all('IGNORE ALL RULES' not in message.content for call in mock.calls for message in call.messages if message.role == 'system'),
+            'citation_resolves': activity is None or bool(activity.sources) and activity.sources[0].quote in fixture['materials']['items'][0]['text'],
+        }
+        results.append({'scenario': case['name'], 'passed': all(checks.values()), 'checks': checks})
+    return {'passed': all(result['passed'] for result in results), 'results': results}
+
+
 async def evaluate_fixture(fixture: dict) -> dict:
+    if fixture.get('kind') == 'source_safety':
+        return await evaluate_source_safety(fixture)
     if fixture.get('kind') == 'memory':
         return await evaluate_memory(fixture)
     if 'turns' in fixture:
