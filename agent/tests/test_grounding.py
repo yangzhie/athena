@@ -83,3 +83,34 @@ def test_question_citations_survive_saved_record_and_grading(assessed_topic):
     assert question.sources == record.sources and len(question.sources) == 1
     grade = asyncio.run(assessor.evaluate(context, MultipleChoiceAnswer(question_id=question.question.question_id, selected_choice_id='a')))
     assert grade.sources == question.sources
+
+
+def test_insufficient_and_conflicting_sources_are_explicit_without_mutation(gap):
+    from athena_agent.grounding import EvidenceError
+    context, store, assessment = gap
+    support = select_materials(context, store)
+    video = material().items[1]
+    checks = [
+        ({'supported': False, 'evidence': []}, 'insufficient_evidence'),
+        ({'supported': False, 'problem': 'conflicting_sources', 'evidence': [*support['evidence'], {'source_index': 1, 'quote': video.transcript}]}, 'conflicting_sources'),
+    ]
+    before = store.read(context)
+    for check, expected_code in checks:
+        teacher, _ = teaching(store, [{'text': 'An attempted explanation.'}, check])
+        with pytest.raises(EvidenceError) as error:
+            asyncio.run(teacher.explain(context, assessment.assessment_id))
+        assert error.value.code == expected_code and not error.value.retryable
+        assert store.read(context) == before
+
+
+def test_empty_selection_fails_without_model_call(gap):
+    from athena_agent.grounding import EvidenceError
+    from athena_agent.retrieval import RetrievalResult
+    context, store, assessment = gap
+    session = store.read(context)
+    session.active_topic.knowledge = RetrievalResult()
+    store._save(context, session)
+    teacher, mock = teaching(store, [])
+    with pytest.raises(EvidenceError) as error:
+        asyncio.run(teacher.explain(context, assessment.assessment_id))
+    assert error.value.code == 'insufficient_evidence' and mock.calls == []

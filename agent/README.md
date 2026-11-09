@@ -577,3 +577,11 @@ start/end times from verified evidence, plus its exact quote. Models select
 source indices and quotes; they cannot generate citation metadata. Question
 citations are retained with private records for replay and deterministic grading.
 Internal generation provenance is excluded from schemas and serialization.
+
+Source-based generation reports `insufficient_evidence` when selected materials
+cannot support the requested content and `conflicting_sources` when the support
+check identifies conflicting supplied evidence. Conflict reports must resolve exact
+quotes in at least two selected items. These safe, nonretryable errors preserve
+learning state and ask for more relevant materials or source clarification; the
+agent never silently picks a source winner. Retrieval unavailability remains a
+separate `dependency_unavailable` failure and preserves the previous selection.

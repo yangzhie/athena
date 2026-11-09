@@ -21,6 +21,8 @@ ErrorCode = Literal[
     "dependency_unavailable",
     "invalid_model_output",
     "internal_error",
+    "insufficient_evidence",
+    "conflicting_sources",
 ]
 
 

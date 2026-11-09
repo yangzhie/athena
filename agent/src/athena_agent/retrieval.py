@@ -62,6 +62,7 @@ class RetrievalResult(Contract):
 
 
 class RetrievalError(Exception):
+    code = 'dependency_unavailable'
     """Safe retrieval dependency failure, distinct from a successful empty result."""
 
     def __init__(self, message: str = 'The retrieval service is unavailable.', *, retryable: bool = False):
