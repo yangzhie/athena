@@ -361,3 +361,12 @@ It emits a JSON result and exits nonzero on a failed check. Fixtures and scripte
 models make no network calls. Source archives explicitly include only application
 source, application tests, README, pyproject, and lockfile; local workflow tooling
 is excluded.
+
+`await teaching.example(context, assessment_id)` returns a concise worked practical
+example for the same gap. `await teaching.hint(context, question_id)` returns a
+`HintActivity` offering one reasoning step for an unanswered active-topic question;
+its model input omits the private key and rubric. Answered, removed, and foreign
+questions are rejected. These explicit calls change no evidence or state. The host
+must pass `hint_used=True` when submitting a hint-assisted answer to assessment;
+requesting a hint does not itself submit or grade an answer. Whether a model hint
+reveals too much remains a pedagogical evaluation concern.

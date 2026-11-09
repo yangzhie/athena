@@ -103,3 +103,62 @@ def test_repeatable_offline_evaluation():
     first = asyncio.run(evaluate_teaching(fixture))
     assert first['passed']
     assert first == asyncio.run(evaluate_teaching(fixture))
+
+
+def test_practical_example_uses_gap_and_requests_worked_steps(gap):
+    context, store, assessment = gap
+    service, mock = teaching(store, [{'text': 'For [3, 1], compare neighbours: 3 > 1, so swap to [1, 3].'}])
+    before = store.read(context)
+    activity = asyncio.run(service.example(context, assessment.assessment_id))
+    assert activity.kind == 'explanation' and activity.concept_id == 'bubble-sort'
+    assert 'worked steps' in mock.calls[0].messages[0].content
+    assert store.read(context) == before
+
+
+def test_hint_targets_unanswered_question_without_private_key(gap):
+    context, store, _ = gap
+    assessor = AssessmentService(store, MockLLM([MC]))
+    question = asyncio.run(assessor.generate_multiple_choice(context, 'bubble-sort'))
+    service, mock = teaching(store, [{'text': 'Think about which values are neighbours.'}])
+    before = store.read(context)
+    hint = asyncio.run(service.hint(context, question.question.question_id))
+    assert hint.kind == 'hint' and hint.question_id == question.question.question_id
+    data = mock.calls[0].messages[1].content
+    assert question.question.question_id in data
+    assert 'correct_choice_id' not in data and 'criteria' not in data
+    assert 'not the final answer' in mock.calls[0].messages[0].content
+    assert store.read(context) == before
+
+
+def test_hint_rejects_answered_missing_foreign_and_removed_questions(gap):
+    context, store, assessment = gap
+    service, mock = teaching(store, [])
+    with pytest.raises(ConversationError, match='already answered'):
+        asyncio.run(service.hint(context, assessment.question_id))
+    with pytest.raises(ConversationError, match='question'):
+        asyncio.run(service.hint(context, 'missing'))
+    with pytest.raises(SessionNotFoundError):
+        asyncio.run(service.hint(context.model_copy(update={'learner_id': 'other'}), assessment.question_id))
+    assessor = AssessmentService(store, MockLLM([MC]))
+    question = asyncio.run(assessor.generate_multiple_choice(context, 'bubble-sort'))
+    session = store.read(context)
+    session.active_topic.roadmap.graph.concepts.pop()
+    store._save(context, session)
+    with pytest.raises(ConversationError, match='not in'):
+        asyncio.run(service.hint(context, question.question.question_id))
+    assert mock.calls == []
+
+
+@pytest.mark.parametrize('method', ['hint', 'example'])
+def test_hint_and_example_failure_preserve_state(gap, method):
+    context, store, assessment = gap
+    if method == 'hint':
+        question = asyncio.run(AssessmentService(store, MockLLM([MC])).generate_multiple_choice(context, 'bubble-sort'))
+        identifier = question.question.question_id
+    else:
+        identifier = assessment.assessment_id
+    service, _ = teaching(store, [{'text': 'x' * 1001}])
+    before = store.read(context)
+    with pytest.raises(LLMError):
+        asyncio.run(getattr(service, method)(context, identifier))
+    assert store.read(context) == before
