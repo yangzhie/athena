@@ -8,3 +8,5 @@ build/
 *.egg-info/
 
 MODULES.md
+.env
+.env.*

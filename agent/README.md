@@ -169,3 +169,21 @@ activity = asyncio.run(mock.generate(
 ```
 
 The mock accepts model instances, dictionaries, JSON strings, or `LLMError` failures. It consumes them in order, records independent message snapshots in `calls`, and fails explicitly when exhausted. Invalid scripted outputs raise `InvalidOutputError`. Provider-independent failures expose safe messages, a shared error `code`, and `retryable`; `ModelRefusalError` is terminal and uses the `invalid_model_output` code. There are no automatic retries yet.
+
+## Live OpenAI adapter (01.5)
+
+`athena_agent.openai_llm.OpenAILLM` implements the same interface using the official OpenAI Python SDK and Responses structured-output parser. Choose an account-accessible model that supports structured outputs. Set `OPENAI_MODEL` and `OPENAI_API_KEY` in the process environment; no model is chosen automatically and `.env` files are not loaded. Never commit credentials.
+
+```python
+from athena_agent.openai_llm import OpenAILLM, OpenAISettings
+
+async def generate_live(messages, response_model):
+    async with OpenAILLM(OpenAISettings.from_env()) as llm:
+        return await llm.generate(messages, response_model)
+```
+
+Configure `timeout` (default 30 seconds) and `max_output_tokens` (default 2,048) through `OpenAISettings`. API keys are excluded from configuration serialization and representation. The adapter requests `store=False`, disables SDK retries, and closes its owned client on exit. An injected SDK client is left open; its request options also disable retries.
+
+Refusals and incomplete responses are terminal failures. Connection/timeouts, HTTP 408/409/429, and server errors are marked retryable; authentication, permissions, and other request errors are terminal. Invalid parsed output raises `InvalidOutputError`. Messages exposed by the adapter contain no raw provider diagnostics. Tests inject a client and make no live API calls.
+
+Reference: [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
