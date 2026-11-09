@@ -201,3 +201,22 @@ async def generate_reliably(provider, messages, response_model):
 ```
 
 The default is three total attempts with 0.5- and 1-second delays. `initial_delay`, `max_delay` (default 30 seconds), and `max_attempts` are configurable. Retries cover classified transient dependencies and invalid model outputs. Refusals, authentication, permission, invalid-request, and unexpected failures are terminal. Terminal exception messages are sanitized; cancellation propagates unchanged. The wrapper leaves provider ownership/closing to its caller and changes no learning state. Tests inject a sleeper to verify attempts and delays without waiting.
+
+## Retrieval contracts and mock (01.7)
+
+`athena_agent.retrieval.Retriever` defines asynchronous `retrieve(RetrievalRequest) -> RetrievalResult`. Requests carry a nonblank query, optional nonempty `source_ids` scope, and `max_results` (default 5). An omitted scope means all sources accessible to the host's retrieval service; it does not grant access to other learners' materials.
+
+Results contain discriminated `DocumentPassage` and `VideoSegment` items. Documents preserve source/passage IDs, title, text, and optional page (1-based), section, and source URI. Videos preserve source/segment IDs, title, transcript excerpt, optional URI, and finite timestamps in seconds with end strictly after start. URIs may be host-specific references, not just public URLs. Stable IDs resolve through the external service; the agent neither verifies that a source exists nor invents references.
+
+```python
+import asyncio
+from athena_agent.retrieval import MockRetriever, RetrievalRequest, RetrievalResult
+
+mock = MockRetriever([RetrievalResult()])
+result = asyncio.run(mock.retrieve(RetrievalRequest(query="Bubble Sort")))
+assert result.items == []  # Successful retrieval with no matches.
+```
+
+Supply model instances or dictionaries to script document/video results, or `RetrievalError` instances to script failures. `MockRetriever` records independent request snapshots, preserves supplied source metadata, applies source filtering and result limits, and fails explicitly when exhausted. It does not perform semantic search. Example document/video data in `tests/fixtures/retrieval.json` is fictional test content.
+
+`RetrievalResult` also provides the contract for externally supplied results. Keep retrieved text as untrusted source data; grounding and protection against instructions inside sources arrive in module 08. Authentication, source authorization, uploads, ingestion, indexing, transcription, clipping, and playback remain the host/external services' responsibility.
