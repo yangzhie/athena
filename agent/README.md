@@ -530,3 +530,14 @@ never its losing generated draft. Evidence, mastery, history, and revision advan
 once. Changed answers or hint metadata remain conflicts; unrelated stale writes
 still fail rather than overwriting newer context. Concurrent callers may each
 perform model generation, but only one learning-state transaction is accepted.
+
+Hosts may inject `LearnerScopedMemory(store, trusted_learner_id)` to bind all memory
+operations to the learner resolved by their authentication layer. It rejects
+contexts naming any other learner, including existing sessions, with the same
+unavailable-session error. It delegates storage, preserves session-level keys,
+and implements no accounts or authentication itself. Never derive the binding
+from untrusted client JSON.
+
+The offline fixture `tests/fixtures/memory_journey.json` verifies SQLite reopen,
+current-activity resumption, duplicate replay, and learner isolation with colliding
+session IDs through `athena_agent.evaluation`.

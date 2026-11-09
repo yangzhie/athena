@@ -111,3 +111,11 @@ def test_concurrent_identical_answers_across_connections_commit_once(tmp_path):
         with pytest.raises(ConversationError, match='already has an answer'):
             asyncio.run(LearningOrchestrator(reopened, mock).answer(context(), answer, hint_used=True))
         assert reopened.read(context()) == saved
+
+
+def test_bundled_memory_evaluation():
+    import json
+    from pathlib import Path
+    from athena_agent.evaluation import evaluate_fixture
+    fixture = json.loads((Path(__file__).parent / 'fixtures/memory_journey.json').read_text())
+    assert asyncio.run(evaluate_fixture(fixture))['passed']

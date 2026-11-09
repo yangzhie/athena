@@ -110,3 +110,18 @@ def test_invalid_learning_references_fail_atomically():
     with pytest.raises(ValidationError):
         store.save_learning(context, memory, expected_revision=before.revision)
     assert store.read(context) == before
+
+
+@pytest.mark.parametrize('operation', ['create', 'read', 'load_conversation', 'load_learning', 'interaction', 'creation'])
+def test_host_bound_memory_rejects_other_learner_even_when_their_session_exists(operation):
+    from athena_agent.memory import LearnerScopedMemory
+    store = InMemoryLearningMemory()
+    first = RequestContext(request_id='r', learner_id='first', session_id='same-session')
+    other = first.model_copy(update={'learner_id': 'other'})
+    store.create(first)
+    store.create(other)
+    bound = LearnerScopedMemory(store, 'first')
+    assert isinstance(bound, LearningMemoryStore)
+    with pytest.raises(SessionNotFoundError):
+        getattr(bound, operation)(other)
+    assert bound.read(first).learner_id == 'first'

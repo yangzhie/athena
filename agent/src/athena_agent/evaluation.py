@@ -116,7 +116,47 @@ async def evaluate_continuity(fixture: dict) -> dict:
     return {'scenario': fixture['name'], 'passed': all(checks.values()), 'checks': checks}
 
 
+async def evaluate_memory(fixture: dict) -> dict:
+    from tempfile import TemporaryDirectory
+    from .conversation import SessionNotFoundError
+    from .memory import LearnerScopedMemory
+    from .orchestrator import LearningOrchestrator
+    from .sqlite_memory import SQLiteLearningMemory
+    first = RequestContext(request_id='evaluation', learner_id='first', session_id='shared')
+    second = first.model_copy(update={'learner_id': 'second'})
+    with TemporaryDirectory(prefix='athena-evaluation-') as directory:
+        path = Path(directory) / 'memory.sqlite'
+        with SQLiteLearningMemory(path) as store:
+            bound = LearnerScopedMemory(store, first.learner_id)
+            question = await LearningOrchestrator(bound, MockLLM(fixture['start']['responses'])).start(first, fixture['start']['goal'])
+            other_question = await LearningOrchestrator(store, MockLLM(fixture['start']['responses'])).start(second, 'Other learner goal')
+            other_before = store.read(second)
+        with SQLiteLearningMemory(path) as store:
+            bound = LearnerScopedMemory(store, first.learner_id)
+            orchestrator = LearningOrchestrator(bound, MockLLM([fixture['followup']]))
+            resumed = orchestrator.resume(first) == question
+            blocked = False
+            try:
+                bound.read(second)
+            except SessionNotFoundError:
+                blocked = True
+            answer = MultipleChoiceAnswer(question_id=question.question.question_id, selected_choice_id='a')
+            activity = await orchestrator.answer(first, answer)
+            saved = store.read(first)
+            replay = await orchestrator.answer(first, answer)
+            checks = {
+                'resumed': resumed,
+                'duplicate_result': replay == activity,
+                'duplicate_no_write': store.read(first) == saved and len(saved.active_topic.assessment_records) == 1,
+                'learner_binding': blocked,
+                'same_session_isolated': store.read(second) == other_before and other_question.question.question_id != question.question.question_id,
+            }
+    return {'scenario': 'durable_memory_isolation', 'passed': all(checks.values()), 'checks': checks}
+
+
 async def evaluate_fixture(fixture: dict) -> dict:
+    if fixture.get('kind') == 'memory':
+        return await evaluate_memory(fixture)
     if 'turns' in fixture:
         from .runner import run_text_journey
         return await run_text_journey(fixture)
