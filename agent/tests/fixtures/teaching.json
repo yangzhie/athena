@@ -1,0 +1,4 @@
+{
+  "question": {"prompt": "Which pair should Bubble Sort swap?", "choices": [{"choice_id": "a", "text": "An adjacent out-of-order pair"}, {"choice_id": "b", "text": "Any random pair"}], "correct_choice_id": "a", "rationale": "Compare adjacent values, swapping only when out of order."},
+  "explanation": {"text": "Bubble Sort compares neighbours, not arbitrary pairs. In [3, 1, 2], compare 3 and 1 first: swap them to get [1, 3, 2]. Each adjacent swap moves the larger value one position right."}
+}

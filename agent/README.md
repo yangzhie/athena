@@ -338,3 +338,26 @@ Pass `mastery_policy=MasteryPolicy(...)` to `AssessmentService`, or call `await 
 `await service.generate_followup(context, assessment_id)` returns a fresh open-ended question for the parent's concept and difficulty. It uses the previous question, answer, and assessment to request a new reasoning/application example, and rejects normalized prompts already used for that concept. The private record links to its parent assessment. Identical generation requests return the same activity without another model call, including concurrent requests.
 
 Assess follow-ups through `evaluate` as usual. A correct selection followed by successful independent reasoning can satisfy the mastery policy; contradictory follow-up evidence leaves or returns the concept to developing without proving that the earlier answer was guessed. The model is explicitly instructed not to make that claim. Topic validation checks parent existence, concept consistency, and one follow-up per parent; archives retain old records while new topics start empty. Teaching, automatic question initiation, progression, and retrieval grounding remain later modules.
+
+## Targeted microlearning
+
+`TeachingService(store, llm).explain(context, assessment_id)` returns an
+`ExplanationActivity` for one gap from an incorrect, partial, or uncertain assessment
+in the active roadmap. Correct answers alone do not identify a gap. Explanations
+are limited to 120 words and 1000 characters and use the concept objectives,
+question, answer, and feedback without sending private criteria to the teaching
+model. Generation changes no history, evidence, mastery, or phase. Cancellation,
+context overflow, dependency failures, and stale snapshots return no activity.
+Pedagogical relevance is model judgement; deterministic checks verify contracts
+and targeting inputs rather than asserting live teaching quality.
+
+Run the repeatable offline behavioral evaluation from `agent/`:
+
+```sh
+uv run python -m athena_agent.evaluation tests/fixtures/teaching.json
+```
+
+It emits a JSON result and exits nonzero on a failed check. Fixtures and scripted
+models make no network calls. Source archives explicitly include only application
+source, application tests, README, pyproject, and lockfile; local workflow tooling
+is excluded.

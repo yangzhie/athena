@@ -19,3 +19,7 @@ packages = ["src/athena_agent"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--import-mode=importlib"
+
+[tool.hatch.build.targets.sdist]
+include = ["/src/athena_agent", "/tests", "/README.md", "/pyproject.toml", "/uv.lock"]
+exclude = ["/.gitignore", "/workflow", "/.workflow", "/MODULES.md"]
