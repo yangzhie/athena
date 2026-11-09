@@ -24,7 +24,19 @@ uv run pytest
 Tests run offline. Put recordings in `data/` (gitignored). Never commit
 recordings, audio or transcripts.
 
-## Transcribe a recording
+## Index a recording
+
+```sh
+uv run index-lecture data/<recording>.mp4 --topics topics/cse5alg.json \
+  --title "Week 2: Insertion sort" --recording-id alg-w2 --llm-model <openai-model-id>
+```
+
+Runs every step and writes `data/<recording>/clips.json` (for the frontend) and
+`video_segments.json` (for the agent). Each step is cached, so reruns only redo
+what changed. Needs `OPENAI_API_KEY`, and `OPENAI_MODEL` unless `--llm-model` is given,
+in the environment or the repo's `.env`.
+
+## Transcribe only
 
 ```sh
 uv run python -m athena_indexer.transcribe data/<recording>.mp4 --model small
@@ -42,4 +54,4 @@ runs locally on the CPU; the model downloads once on first use.
 - [x] 4. Transcript → numbered lines (`lines.py`)
 - [x] 5. LLM segmentation (`segment.py`)
 - [x] 6. Boundary cleanup (`cleanup.py`)
-- [ ] 7. `index-lecture` command
+- [x] 7. `index-lecture` command (`pipeline.py`)
