@@ -9,9 +9,9 @@ from .context import ContextBuilder
 from .conversation import ConversationError, ConversationTurn, InMemoryConversationStore, TopicContext
 from .contracts import RequestContext
 from .learning import LearningState
-from .llm import LLM, Model, InvalidOutputError
+from .llm import LLM, Model, InvalidOutputError, Message
 from .reliable_llm import ReliableLLM
-from .roadmap import Concept, ConceptGraph, EnrichedConcept, EnrichedGraph, ObjectiveBatch, Roadmap, TopicScope
+from .roadmap import Concept, ConceptGraph, EnrichedConcept, EnrichedGraph, ObjectiveBatch, Roadmap, RoadmapRevision, TopicScope
 
 
 class GoalInterpretation(Contract):
@@ -147,3 +147,69 @@ class PlanningService:
             topic.roadmap = roadmap
             store._save(context, session)
             return roadmap.model_copy(deep=True)
+
+    async def revise(self, context: RequestContext, requested_change: str | None = None) -> Roadmap:
+        if requested_change is not None:
+            Message(role='user', content=requested_change)
+        store = self._store()
+        async with store.interaction(context) as session:
+            topic = session.active_topic
+            if topic is None or topic.roadmap is None:
+                raise ConversationError('Create a roadmap before requesting revision.')
+            old = topic.roadmap
+            limit = self.policy.initial_concept_limit
+            bounded_graph = create_model(
+                'RevisionConceptGraph', __base__=ConceptGraph,
+                concepts=(Annotated[list[Concept], Field(min_length=1, max_length=len(old.graph.concepts) + limit)], ...),
+            )
+            bounded_revision = create_model(
+                'BoundedRoadmapRevision', __base__=RoadmapRevision,
+                graph=(bounded_graph | None, None),
+            )
+            proposal = await self._call(
+                topic, requested_change if requested_change is not None else 'Revise using current learner evidence; keep the goal unchanged.',
+                f'Revise the supplied roadmap within the active subject. Add at most {limit} new concepts. '
+                'Respond unrelated with no goal/scope/graph for a different subject; the caller must switch topics. '
+                'For a same-topic revision, return the complete proposed goal, scope, and concept graph. '
+                'Only refine the goal when the current request explicitly asks for a related depth or outcome change. '
+                'Otherwise keep the goal verbatim. Preserve IDs, titles, and descriptions for retained concepts; '
+                'never rename an existing concept ID to erase evidence. Correct prerequisite relationships '
+                'when needed, retaining all prerequisite nodes referenced by the remaining graph. '
+                'Use mastery evidence to prioritise gaps and expand a partial roadmap, without declaring mastery '
+                'or deleting history. For broad subjects retain partial_coverage=true.',
+                bounded_revision, inputs={
+                    'roadmap': old.model_dump(),
+                    'requested_change': requested_change,
+                    'new_concept_limit': limit,
+                },
+            )
+            if proposal.relation == 'unrelated':
+                raise ConversationError('An unrelated subject requires a conversation topic switch.')
+            if requested_change is None and proposal.goal != old.goal:
+                raise InvalidOutputError()
+            previous = {concept.concept_id: concept for concept in old.graph.concepts}
+            proposed = {concept.concept_id: concept for concept in proposal.graph.concepts}
+            new_ids = proposed.keys() - previous.keys()
+            if len(new_ids) > limit:
+                raise InvalidOutputError()
+            historical_ids = {record.concept_id for record in topic.learning_state.mastery}
+            if new_ids & (historical_ids - previous.keys()):
+                # No historical definitions exist here to prove safe identity reuse.
+                raise InvalidOutputError()
+            for concept_id in proposed.keys() & previous.keys():
+                before, after = previous[concept_id], proposed[concept_id]
+                if (before.title, before.description) != (after.title, after.description):
+                    raise InvalidOutputError()
+            old_titles = {concept.title.strip().casefold() for concept in previous.values()}
+            if any(proposed[key].title.strip().casefold() in old_titles for key in new_ids):
+                raise InvalidOutputError()
+            state = topic.learning_state.model_copy(deep=True)
+            state.goal = proposal.goal
+            if state.current_concept_id is not None and state.current_concept_id not in proposed:
+                state.current_concept_id = None
+            enriched = await self.enrich_graph(proposal.graph, goal=state.goal, learner_state=state)
+            revised = Roadmap(goal=state.goal, scope=proposal.scope, graph=enriched)
+            topic.learning_state = state
+            topic.roadmap = revised
+            store._save(context, session)
+            return revised.model_copy(deep=True)

@@ -94,3 +94,21 @@ class Roadmap(Contract):
             concept.concept_id for concept in self.graph.concepts
             if concept.concept_id not in mastered and set(concept.prerequisite_ids) <= mastered
         ]
+
+
+class RoadmapRevision(Contract):
+    relation: Literal['same_topic', 'unrelated']
+    goal: NonBlankString | None = None
+    scope: TopicScope | None = None
+    graph: ConceptGraph | None = None
+
+    @model_validator(mode='after')
+    def complete_proposal(self) -> Self:
+        fields = (self.goal, self.scope, self.graph)
+        if self.relation == 'same_topic' and any(value is None for value in fields):
+            raise ValueError('Same-topic revisions require a goal, scope, and graph.')
+        if self.relation == 'same_topic' and self.scope.scope == 'broad' and not self.graph.partial_coverage:
+            raise ValueError('Broad revisions must identify partial coverage.')
+        if self.relation == 'unrelated' and any(value is not None for value in fields):
+            raise ValueError('Unrelated goals must use topic switching instead of a revision graph.')
+        return self
