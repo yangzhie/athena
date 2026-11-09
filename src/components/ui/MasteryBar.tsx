@@ -1,4 +1,5 @@
 import { cn } from '../../lib/cn'
+import { masteryLevel, masteryMeta } from '../../lib/mastery'
 
 export interface MasteryBarProps {
   /** Mastery estimate from 0 to 1. */
@@ -7,21 +8,18 @@ export interface MasteryBarProps {
   className?: string
 }
 
-function tone(value: number) {
-  if (value >= 0.8) return 'bg-good'
-  if (value >= 0.4) return 'bg-warn'
-  return 'bg-bad'
-}
-
 export function MasteryBar({ value, label, className }: MasteryBarProps) {
   const v = Math.min(1, Math.max(0, value))
   const pct = Math.round(v * 100)
+  const meta = masteryMeta[masteryLevel(v)]
   return (
     <div className={className}>
       {label && (
-        <div className="mb-1 flex justify-between text-sm">
-          <span>{label}</span>
-          <span className="text-muted tabular-nums">{pct}%</span>
+        <div className="mb-1 flex justify-between gap-3 text-sm">
+          <span className="truncate">{label}</span>
+          <span className="shrink-0 text-muted tabular-nums">
+            <span aria-hidden>{meta.icon}</span> {meta.label} · {pct}%
+          </span>
         </div>
       )}
       <div
@@ -30,9 +28,10 @@ export function MasteryBar({ value, label, className }: MasteryBarProps) {
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={pct}
+        aria-valuetext={`${pct}%, ${meta.label}`}
         aria-label={label ?? 'Mastery'}
       >
-        <div className={cn('h-full rounded-full transition-all', tone(v))} style={{ width: `${pct}%` }} />
+        <div className={cn('h-full rounded-full transition-all', meta.bar)} style={{ width: `${pct}%` }} />
       </div>
     </div>
   )
