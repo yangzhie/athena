@@ -11,7 +11,7 @@ from athena_agent.learning import (
     FeedbackActivity, HintActivity, LearningActivity, LearningState,
     MultipleChoiceAnswer, MultipleChoiceCriteria, MultipleChoiceQuestion,
     OpenEndedCriteria, OpenEndedQuestion, Question, QuestionActivity,
-    QuestionWithCriteria, TextAnswer,
+    QuestionWithCriteria, TextAnswer, RichActivity,
 )
 
 
@@ -193,6 +193,7 @@ def test_all_activities_round_trip_and_generate_schema(bundle):
         HintActivity(activity_id='a3', question_id='q1', text='Look at adjacent items.'),
         FeedbackActivity(activity_id='a4', question_id='q1', text='Good reasoning.'),
         CompletionActivity(activity_id='a5', text='You have demonstrated understanding.'),
+        RichActivity(activity_id='a6', concept_id='sorting', text='Compare neighbours.', parameters={'kind': 'diagram', 'nodes': [{'node_id': 'a', 'label': 'A'}]}),
     ]
     adapter = TypeAdapter(LearningActivity)
     for activity in activities:
@@ -200,7 +201,7 @@ def test_all_activities_round_trip_and_generate_schema(bundle):
         assert SuccessResponse[LearningActivity].model_validate_json(response.model_dump_json()) == response
     schema = adapter.json_schema()
     assert set(schema['discriminator']['mapping']) == {
-        'question', 'explanation', 'hint', 'feedback', 'completion',
+        'question', 'explanation', 'hint', 'feedback', 'completion', 'rich',
     }
     json.dumps(SuccessResponse[LearningActivity].model_json_schema())
     json.dumps(AgentRequest[Answer].model_json_schema())

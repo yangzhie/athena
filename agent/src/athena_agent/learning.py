@@ -6,6 +6,7 @@ from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
 from .retrieval import SourceAttribution
+from .activities import RichParameters
 
 __all__ = [
     'Difficulty', 'AssessmentOutcome', 'LearningPhase', 'MasteryStatus',
@@ -14,7 +15,7 @@ __all__ = [
     'QuestionWithCriteria', 'MultipleChoiceAnswer', 'TextAnswer', 'Answer',
     'Assessment', 'ConceptMastery', 'LearningState', 'QuestionActivity',
     'ExplanationActivity', 'TeachingContent', 'FeedbackContent', 'HintActivity', 'FeedbackActivity',
-    'CompletionActivity', 'LearningActivity',
+    'CompletionActivity', 'RichActivity', 'LearningActivity',
 ]
 
 Difficulty = Literal['beginner', 'intermediate', 'advanced']
@@ -198,7 +199,14 @@ class CompletionActivity(_Activity):
     text: NonBlankString
 
 
+class RichActivity(_Activity):
+    kind: Literal['rich'] = 'rich'
+    concept_id: NonBlankString
+    parameters: RichParameters
+    text: NonBlankString
+
+
 LearningActivity = Annotated[
-    QuestionActivity | ExplanationActivity | HintActivity | FeedbackActivity | CompletionActivity,
+    QuestionActivity | ExplanationActivity | HintActivity | FeedbackActivity | CompletionActivity | RichActivity,
     Field(discriminator='kind'),
 ]

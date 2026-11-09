@@ -630,3 +630,12 @@ client format support as session conversation context, including durable resume.
 with declared support; unsupported recommendations become text. Text is always
 available, including empty/default capability declarations, without a model call
 when no richer formats are supported. Descriptions contain no rendering code.
+
+`await content.generate(context, concept_id)` returns a text explanation or a
+`RichActivity` using supported declared capabilities. Rich parameters are typed:
+diagrams have bounded unique nodes and valid edges; animations have bounded frames,
+finite values and valid highlight indices; simulations have finite named control
+ranges and a plain-language relationship/observation prompt. All outputs include
+a complete bounded text alternative. Parameters contain no executable UI or formula
+language, and invalid references/ranges fail before return. Generation is read-only
+and uses existing source support checks when materials are selected.

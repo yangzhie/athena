@@ -64,3 +64,42 @@ def test_client_capabilities_gate_recommendations_and_default_to_text(gap):
     assert store.read(context) == before
     with pytest.raises(ValidationError):
         ClientCapabilities(formats=['html'])
+
+
+def test_generate_validated_diagram_without_executing_ui(gap):
+    from athena_agent.activities import ClientCapabilities
+    from athena_agent.content import ContentService
+    context, store, _ = gap
+    mock = MockLLM([{'format': 'diagram', 'rationale': 'Shows adjacent comparisons.'}, {'text': 'Compare two neighbouring items.', 'parameters': {'kind': 'diagram', 'nodes': [{'node_id': 'a', 'label': 'Left'}, {'node_id': 'b', 'label': 'Right'}], 'edges': [{'from_id': 'a', 'to_id': 'b', 'label': 'Compare'}]}}])
+    service = ContentService(store, mock)
+    asyncio.run(service.set_capabilities(context, ClientCapabilities(formats=['diagram'])))
+    before = store.read(context)
+    activity = asyncio.run(service.generate(context, 'bubble-sort'))
+    assert activity.kind == 'rich' and activity.parameters.kind == 'diagram'
+    assert activity.text and store.read(context) == before
+
+
+@pytest.mark.parametrize('model,data', [
+    ('DiagramParameters', {'nodes': [{'node_id': 'a', 'label': 'A'}], 'edges': [{'from_id': 'a', 'to_id': 'missing'}]}),
+    ('AnimationParameters', {'frames': [{'label': 'Step', 'values': [1.0], 'highlight_indices': [1]}]}),
+    ('SimulationParameters', {'variables': [{'name': 'x', 'minimum': 2.0, 'maximum': 1.0, 'initial': 1.0, 'step': 0.1}], 'relationship': 'More x means more y', 'observation_prompt': 'What changes?'}),
+])
+def test_invalid_rich_parameters_reject_inconsistent_references_and_ranges(model, data):
+    from athena_agent import activities
+    with pytest.raises(ValidationError):
+        getattr(activities, model).model_validate(data)
+
+
+@pytest.mark.parametrize('format,parameters', [
+    ('animation', {'kind': 'animation', 'frames': [{'label': 'Compare', 'values': [2.0, 1.0], 'highlight_indices': [0, 1]}, {'label': 'Swap', 'values': [1.0, 2.0]}]}),
+    ('simulation', {'kind': 'simulation', 'variables': [{'name': 'size', 'minimum': 1.0, 'maximum': 10.0, 'initial': 3.0, 'step': 1.0}], 'relationship': 'Larger inputs require more comparisons.', 'observation_prompt': 'How does increasing size affect comparisons?'}),
+])
+def test_generate_supported_animation_and_simulation(gap, format, parameters):
+    from athena_agent.activities import ClientCapabilities
+    from athena_agent.content import ContentService
+    context, store, _ = gap
+    mock = MockLLM([{'format': format, 'rationale': 'Shows the process.'}, {'text': 'Observe adjacent comparisons.', 'parameters': parameters}])
+    service = ContentService(store, mock)
+    asyncio.run(service.set_capabilities(context, ClientCapabilities(formats=[format])))
+    activity = asyncio.run(service.generate(context, 'bubble-sort'))
+    assert activity.parameters.kind == format and activity.text
