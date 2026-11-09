@@ -24,11 +24,21 @@ uv run pytest
 Tests run offline. Put recordings in `data/` (gitignored). Never commit
 recordings, audio or transcripts.
 
+## Transcribe a recording
+
+```sh
+uv run python -m athena_indexer.transcribe data/<recording>.mp4 --model small
+```
+
+Writes `data/<recording>/transcript.json`. Each 10-minute chunk is cached in
+`data/<recording>/chunks/`, so rerunning after an interruption resumes. Whisper
+runs locally on the CPU; the model downloads once on first use.
+
 ## Status
 
 - [x] 1. Data formats (`models.py`)
 - [x] 2. Audio extraction and chunking (`audio.py`)
-- [ ] 3. Local Whisper transcription
+- [x] 3. Local Whisper transcription (`transcribe.py`)
 - [ ] 4. Transcript → numbered lines
 - [ ] 5. LLM segmentation
 - [ ] 6. Boundary cleanup
