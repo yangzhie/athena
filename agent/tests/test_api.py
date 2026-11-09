@@ -147,3 +147,34 @@ def test_api_capabilities_drive_structured_content_generation():
     content = request(app, 'POST', '/sessions/s/content', json={'concept_id': 'comparison'})
     assert content.status_code == 200 and content.json()['data']['kind'] == 'rich'
     assert request(app, 'PUT', '/sessions/s/capabilities', json={'formats': ['html']}).status_code == 422
+
+
+def test_api_dependency_model_and_unknown_errors_are_safe_and_correlated():
+    from athena_agent.llm import DependencyError, InvalidOutputError
+    from athena_agent.reliable_llm import ReliableLLM, RetryPolicy
+    cases = [(DependencyError('secret provider body', retryable=True), 503, 'dependency_unavailable', True), (InvalidOutputError(), 502, 'invalid_model_output', True)]
+    for failure, status, code, retryable in cases:
+        mock = ReliableLLM(MockLLM([failure]), policy=RetryPolicy(max_attempts=1))
+        app = create_app(InMemoryConversationStore(), mock, learner_resolver=lambda request: 'trusted')
+        response = request(app, 'POST', '/sessions', json={'session_id': 's', 'goal': 'Sorting'}, headers={'x-request-id': 'r-safe'})
+        assert response.status_code == status and response.json()['error']['code'] == code
+        assert response.json()['error']['retryable'] == retryable
+        assert response.json()['request_id'] == 'r-safe' and response.json()['session_id'] == 's'
+        assert 'secret provider body' not in response.text
+    def broken_resolver(request):
+        raise RuntimeError('unrelated secret traceback')
+    app = create_app(InMemoryConversationStore(), MockLLM([]), learner_resolver=broken_resolver)
+    response = request(app, 'GET', '/sessions/s')
+    assert response.status_code == 500 and response.json()['error']['code'] == 'internal_error'
+    assert 'traceback' not in response.text
+
+
+def test_api_missing_retrieval_and_bad_routes_use_envelopes():
+    from .test_orchestrator import one_concept_responses
+    app = create_app(InMemoryConversationStore(), MockLLM(one_concept_responses()), learner_resolver=lambda request: 'trusted')
+    request(app, 'POST', '/sessions', json={'session_id': 's', 'goal': 'Sorting'})
+    response = request(app, 'POST', '/sessions/s/retrieval', json={'query': 'Sorting'})
+    assert response.status_code == 503 and response.json()['error']['code'] == 'dependency_unavailable'
+    assert request(app, 'GET', '/unknown').json()['status'] == 'error'
+    blank = request(app, 'GET', '/sessions/%20/resume')
+    assert blank.status_code in {400, 422} and blank.json()['session_id'] is None

@@ -7,12 +7,13 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException
 from pydantic import TypeAdapter, ValidationError
 
 from ._schema import Contract, NonBlankString
 from .contracts import AgentError, ErrorResponse, RequestContext, SuccessResponse
 from .conversation import ConversationError, InMemoryConversationStore
-from .llm import LLM, MockLLM
+from .llm import LLM, LLMError, MockLLM
 from .memory import LearningMemoryStore, LearnerScopedMemory
 from .api_models import StartSession, MessageSubmission, ContinueSubmission, MaterialSubmission, ContentRequest
 from .assessment_models import AnswerSubmission
@@ -21,7 +22,7 @@ from .learning import LearningActivity
 from .activities import ClientCapabilities
 from .content import ContentService
 from .knowledge import KnowledgeService
-from .retrieval import Retriever, RetrievalRequest, RetrievalResult
+from .retrieval import Retriever, RetrievalError, RetrievalRequest, RetrievalResult
 from .orchestrator import LearningOrchestrator
 
 IdentityResolver = Callable[[Request], str | Awaitable[str]]
@@ -55,9 +56,14 @@ async def request_context(request: Request) -> RequestContext:
 
 
 def error_response(request: Request, code: str, message: str, status: int, *, retryable: bool = False) -> JSONResponse:
+    candidate_session = getattr(getattr(request.state, 'context', None), 'session_id', None) or request.path_params.get('session_id')
+    try:
+        session_id = TypeAdapter(NonBlankString | None).validate_python(candidate_session)
+    except ValidationError:
+        session_id = None
     response = ErrorResponse(
         request_id=getattr(request.state, 'request_id', str(uuid4())),
-        session_id=getattr(getattr(request.state, 'context', None), 'session_id', None) or request.path_params.get('session_id'),
+        session_id=session_id,
         error=AgentError(code=code, message=message, retryable=retryable),
     )
     return JSONResponse(status_code=status, content=response.model_dump(mode='json'))
@@ -78,15 +84,38 @@ def create_app(store: LearningMemoryStore, llm: LLM, *, learner_resolver: Identi
                 request.state.request_id = TypeAdapter(NonBlankString).validate_python(supplied)
             except ValidationError:
                 return error_response(request, 'invalid_request', 'Request identifier must be nonblank.', 422)
-        return await call_next(request)
+        try:
+            return await call_next(request)
+        except Exception:
+            return error_response(request, 'internal_error', 'The learning service could not complete this request.', 500)
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request: Request, error: RequestValidationError):
         return error_response(request, 'invalid_request', 'The request does not match the API contract.', 422)
 
-    @app.exception_handler(ConversationError)
-    async def invalid_operation(request: Request, error: ConversationError):
-        return error_response(request, error.code, str(error), 404 if error.code == 'session_not_found' else 400)
+    async def operation_failure(request: Request, error: Exception):
+        messages = {
+            'invalid_request': ('The learning request is invalid for the current session.', 400),
+            'session_not_found': ('The conversation session is unavailable.', 404),
+            'dependency_unavailable': ('A learning dependency is temporarily unavailable.', 503),
+            'invalid_model_output': ('The model returned an invalid structured response.', 502),
+            'insufficient_evidence': ('Supply more relevant learning materials.', 409),
+            'conflicting_sources': ('The selected materials conflict; clarify which source to use.', 409),
+            'internal_error': ('The learning service could not complete this request.', 500),
+        }
+        code = getattr(error, 'code', 'internal_error')
+        if code not in messages:
+            code = 'internal_error'
+        message, status = messages[code]
+        return error_response(request, code, message, status, retryable=bool(getattr(error, 'retryable', False)))
+
+    app.add_exception_handler(ConversationError, operation_failure)
+    app.add_exception_handler(LLMError, operation_failure)
+    app.add_exception_handler(RetrievalError, operation_failure)
+
+    @app.exception_handler(HTTPException)
+    async def invalid_http_operation(request: Request, error: HTTPException):
+        return error_response(request, 'invalid_request', 'The requested API operation is unavailable.', error.status_code)
 
     @app.get('/health', response_model=SuccessResponse[Health])
     async def health(request: Request):

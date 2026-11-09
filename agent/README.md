@@ -704,3 +704,12 @@ trusted learner/session. External source authorization remains the host's duty.
 `PUT /sessions/{id}/capabilities` accepts `{ "formats": ["text", "diagram"] }`.
 `POST /sessions/{id}/content` accepts `{ "concept_id": "..." }` and returns a
 capability-aware structured activity without advancing learning state.
+
+All API errors use correlated safe envelopes. HTTP mappings are: malformed input
+422, invalid learning operation 400, missing/foreign session 404, insufficient or
+conflicting evidence 409, invalid model output 502, unavailable dependency 503,
+and unexpected failure 500. Retryability follows classified dependency/model
+failures. Provider bodies, validation payloads, SQLite diagnostics, host-resolver
+exceptions, and tracebacks are not returned. Unsupported routes/methods also use
+the envelope. Cancellation propagates and existing atomic operations preserve
+state when dependencies fail.

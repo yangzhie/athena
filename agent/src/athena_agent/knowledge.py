@@ -25,7 +25,9 @@ class KnowledgeService:
                 if not isinstance(result, RetrievalResult):
                     raise RetrievalError()
                 result = RetrievalResult.model_validate(result.model_dump())
-            except (ValidationError, RetrievalError):
+            except RetrievalError as error:
+                raise RetrievalError(retryable=error.retryable) from None
+            except ValidationError:
                 raise RetrievalError() from None
             except Exception:
                 raise RetrievalError() from None

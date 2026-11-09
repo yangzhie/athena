@@ -15,6 +15,7 @@ from .memory_models import ConversationMemory, LearningMemory
 
 class MemoryUnavailableError(ConversationError):
     code = 'dependency_unavailable'
+    retryable = True
 
     def __init__(self):
         super().__init__('Learning memory is temporarily unavailable.')
