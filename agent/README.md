@@ -653,3 +653,20 @@ source attribution, and text. Rich generation whose parameters remain invalid
 after normal bounded retries gets one separate validated text-generation fallback.
 That fallback still uses selected-source checks; insufficient/conflicting evidence,
 refusals, cancellation, or stale state are not silently bypassed.
+
+## FastAPI service shell
+
+```sh
+uv run uvicorn athena_agent.api:create_demo_app --factory --host 127.0.0.1
+```
+
+`create_app(store, llm, learner_resolver=...)` constructs an injectable FastAPI app.
+Hosts own adapter lifetime and provide trusted learner identity through a resolver
+or trusted middleware setting `request.state.learner_id`; client JSON and headers
+never establish identity. The demo factory uses empty mocks and no credentials.
+`GET /health` returns a typed success envelope. Optional `X-Request-ID` correlates
+requests; absent IDs are generated. Validation errors use safe envelopes without
+reflecting submitted content. No account system or frontend is provided.
+
+Implementation references: [FastAPI dependencies](https://fastapi.tiangolo.com/tutorial/dependencies/)
+and [exception handlers](https://fastapi.tiangolo.com/tutorial/handling-errors/).
