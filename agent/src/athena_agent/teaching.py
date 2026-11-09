@@ -8,7 +8,7 @@ from pydantic import Field, model_validator
 from ._schema import Contract, NonBlankString
 from .context import ContextBuilder
 from .contracts import RequestContext
-from .conversation import ConversationError, InMemoryConversationStore
+from .conversation import ConversationError, InMemoryConversationStore, TopicContext
 from .learning import ExplanationActivity, HintActivity
 from .llm import LLM
 from .reliable_llm import ReliableLLM
@@ -23,6 +23,23 @@ class ExplanationDraft(Contract):
         if len(self.text.split()) > 120:
             raise ValueError('An explanation must contain at most 120 words.')
         return self
+
+
+def teaching_approach(topic: TopicContext, concept_id: str) -> str:
+    """Choose an approach from consecutive decisive evidence, not message count."""
+    failures = 0
+    for record in reversed(topic.assessment_records):
+        assessment = record.assessment
+        if assessment.concept_id != concept_id or assessment.outcome == 'uncertain' or assessment.confidence < 0.8:
+            continue
+        if assessment.outcome == 'correct':
+            break
+        failures += 1
+    if failures >= 4:
+        return 'analogy'
+    if failures >= 2:
+        return 'worked_steps'
+    return 'direct'
 
 
 class TeachingService:
@@ -53,9 +70,15 @@ class TeachingService:
             if concept is None:
                 raise ConversationError('The concept is not in the active roadmap.')
             question = next(item.bundle.question for item in topic.question_records if item.bundle.question.question_id == record.assessment.question_id)
+            approach = teaching_approach(topic, concept.concept_id)
+            approach_instructions = {
+                'direct': 'Use a direct intuitive explanation. ',
+                'worked_steps': 'Repeated difficulty: change approach to smaller worked steps with concrete values. ',
+                'analogy': 'Persistent difficulty: change approach to a familiar analogy, explicitly mapping it back to the concept. ',
+            }[approach]
             messages = self.context_builder.build(
                 topic, 'Explain the single knowledge gap identified by this assessment.',
-                ('Give one concrete practical example with worked steps showing the correction. ' if practical_example else '')
+                approach_instructions + ('Give one concrete practical example with worked steps showing the correction. ' if practical_example else '')
                 + 'Teach only one focused gap within the supplied concept. Use the answer and feedback '
                 'to choose a single correction or clarification, rather than surveying all objectives. '
                 'For uncertain answers, clarify without claiming a proven misconception. '
@@ -65,6 +88,7 @@ class TeachingService:
                 ExplanationDraft, additional_context={
                     'concept': concept.model_dump(), 'question': question.model_dump(),
                     'answer': record.answer.model_dump(), 'assessment': record.assessment.model_dump(),
+                    'teaching_approach': approach,
                 },
             )
             draft = await self._llm.generate(messages, ExplanationDraft)

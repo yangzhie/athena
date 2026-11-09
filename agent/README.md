@@ -379,3 +379,10 @@ concept prompts. Assess these questions through the existing evaluation service;
 generation alone never proves retention or changes mastery. Delayed delivery and
 scheduling belong to the host, so an immediate recall check makes no claim about
 long-term retention.
+
+Teaching changes approach from recorded concept evidence: two consecutive decisive
+partial/incorrect assessments request smaller worked steps, and four request an
+analogy mapped back to the concept. A decisive correct answer resets this count;
+uncertain, low-confidence (`<0.8`), and other-concept records do not contribute.
+Repeated explanation requests alone never count as struggles. These conservative
+starting thresholds affect teaching style only, never assessment grades or mastery.

@@ -162,3 +162,45 @@ def test_hint_and_example_failure_preserve_state(gap, method):
     with pytest.raises(LLMError):
         asyncio.run(getattr(service, method)(context, identifier))
     assert store.read(context) == before
+
+
+def add_selection(context, store, *, correct=False, concept_id='bubble-sort'):
+    assessor = AssessmentService(store, MockLLM([MC]))
+    question = asyncio.run(assessor.generate_multiple_choice(context, concept_id))
+    return asyncio.run(assessor.evaluate(context, MultipleChoiceAnswer(question_id=question.question.question_id, selected_choice_id='a' if correct else 'b')))
+
+
+def test_repeated_struggles_change_approach_and_success_resets(gap):
+    context, store, assessment = gap
+    service, mock = teaching(store, [{'text': 'A focused explanation.'}] * 4)
+    asyncio.run(service.explain(context, assessment.assessment_id))
+    second = add_selection(context, store)
+    asyncio.run(service.explain(context, second.assessment_id))
+    add_selection(context, store)
+    fourth = add_selection(context, store)
+    before = store.read(context)
+    asyncio.run(service.example(context, fourth.assessment_id))
+    assert store.read(context) == before
+    add_selection(context, store, correct=True)
+    new_gap = add_selection(context, store)
+    asyncio.run(service.explain(context, new_gap.assessment_id))
+    assert '"teaching_approach": "direct"' in mock.calls[0].messages[1].content
+    assert 'smaller worked steps' in mock.calls[1].messages[0].content
+    assert 'familiar analogy' in mock.calls[2].messages[0].content
+    assert '"teaching_approach": "direct"' in mock.calls[3].messages[1].content
+
+
+def test_uncertain_and_other_concept_evidence_do_not_count_as_struggle(gap):
+    from athena_agent.teaching import teaching_approach
+    context, store, _ = gap
+    other = add_selection(context, store, concept_id='comparison')
+    second = add_selection(context, store)
+    session = store.read(context)
+    session.active_topic.assessment_records[-1].assessment.outcome = 'uncertain'
+    store._save(context, session)
+    assert teaching_approach(store.read(context).active_topic, 'bubble-sort') == 'direct'
+    session = store.read(context)
+    session.active_topic.assessment_records[-1].assessment.outcome = 'partial'
+    session.active_topic.assessment_records[-1].assessment.confidence = 0.4
+    store._save(context, session)
+    assert teaching_approach(store.read(context).active_topic, 'bubble-sort') == 'direct'
