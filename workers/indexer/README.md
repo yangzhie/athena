@@ -27,7 +27,7 @@ recordings, audio or transcripts.
 ## Status
 
 - [x] 1. Data formats (`models.py`)
-- [ ] 2. Audio extraction and chunking
+- [x] 2. Audio extraction and chunking (`audio.py`)
 - [ ] 3. Local Whisper transcription
 - [ ] 4. Transcript → numbered lines
 - [ ] 5. LLM segmentation
