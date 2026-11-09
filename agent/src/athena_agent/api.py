@@ -70,7 +70,11 @@ def error_response(request: Request, code: str, message: str, status: int, *, re
 
 
 def create_app(store: LearningMemoryStore, llm: LLM, *, learner_resolver: IdentityResolver = host_learner, retriever_resolver: Callable[[RequestContext], Retriever] | None = None) -> FastAPI:
-    app = FastAPI(title='Athena Agent', version='0.1.0')
+    app = FastAPI(
+        title='Athena Agent', version='0.1.0',
+        description='Host-authenticated adaptive learning backend. Learner identity is supplied by trusted middleware/resolvers, never client JSON. Responses use correlated success/error envelopes; source authorization and rendering belong to the host.',
+        responses={status: {'model': ErrorResponse, 'description': 'Correlated safe error envelope.'} for status in [400, 404, 409, 422, 500, 502, 503]},
+    )
     app.state.store = store
     app.state.llm = llm
     app.state.learner_resolver = learner_resolver

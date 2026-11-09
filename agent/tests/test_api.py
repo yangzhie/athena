@@ -178,3 +178,19 @@ def test_api_missing_retrieval_and_bad_routes_use_envelopes():
     assert request(app, 'GET', '/unknown').json()['status'] == 'error'
     blank = request(app, 'GET', '/sessions/%20/resume')
     assert blank.status_code in {400, 422} and blank.json()['session_id'] is None
+
+
+def test_openapi_documents_error_envelopes_and_validated_request_examples():
+    from athena_agent.api_models import StartSession, MessageSubmission, ContinueSubmission, MaterialSubmission, ContentRequest
+    from athena_agent.assessment_models import AnswerSubmission
+    app = create_demo_app()
+    schema = request(app, 'GET', '/openapi.json').json()
+    for model in [StartSession, MessageSubmission, ContinueSubmission, MaterialSubmission, ContentRequest, AnswerSubmission]:
+        examples = model.model_json_schema()['examples']
+        for example in examples:
+            assert model.model_validate(example)
+        assert schema['components']['schemas'][model.__name__]['examples'] == examples
+    responses = schema['paths']['/sessions']['post']['responses']
+    assert responses['422']['content']['application/json']['schema']['$ref'].endswith('/ErrorResponse')
+    assert responses['503']['content']['application/json']['schema']['$ref'].endswith('/ErrorResponse')
+    assert 'learner_id' not in schema['components']['schemas']['StartSession']['properties']

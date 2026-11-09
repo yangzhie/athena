@@ -713,3 +713,53 @@ failures. Provider bodies, validation payloads, SQLite diagnostics, host-resolve
 exceptions, and tracebacks are not returned. Unsupported routes/methods also use
 the envelope. Cancellation propagates and existing atomic operations preserve
 state when dependencies fail.
+
+## Host integration contract
+
+The generated `/openapi.json` includes strict request schemas, validated examples,
+learner-facing activity variants, and error-envelope schemas. `/docs` provides
+interactive contract inspection; the backend does not include a learning frontend.
+
+| Method and path | Input | Success data |
+| --- | --- | --- |
+| `POST /sessions` | session ID, resolved goal, optional difficulty/materials/capabilities | Proactive diagnostic activity |
+| `GET /sessions/{id}/resume` | session path | Saved current activity |
+| `GET /sessions/{id}` | session path | Activity, learning state, progress, latest feedback |
+| `POST /sessions/{id}/messages` | text | Reply and current/new diagnostic activity |
+| `POST /sessions/{id}/answers` | typed answer, hint-use metadata | Next learning activity |
+| `POST /sessions/{id}/continue` | teaching activity ID | Application question |
+| `PUT /sessions/{id}/materials` | authorized retrieval result, optional scope/limit | Selected materials |
+| `POST /sessions/{id}/retrieval` | query, optional scope/limit | Selected materials |
+| `PUT /sessions/{id}/capabilities` | supported format list | Accepted capabilities |
+| `POST /sessions/{id}/content` | concept ID | Text or declarative rich activity |
+
+A start request from the authenticated host:
+
+```json
+{"session_id":"session-1","goal":"Bubble Sort","difficulty":"beginner","capabilities":{"formats":["text","diagram"]}}
+```
+
+Example learner-facing success (IDs/text vary by model/session):
+
+```json
+{"status":"success","request_id":"host-request-1","session_id":"session-1","data":{"kind":"question","activity_id":"activity-1","question":{"kind":"open_ended","question_id":"question-1","concept_id":"bubble-sort","prompt":"Why compare adjacent values?","difficulty":"beginner"},"sources":[],"knowledge_origin":"general"}}
+```
+
+Submit answers using the returned question ID and continue using the returned
+teaching activity ID. Retry the same answer and hint metadata after a transport
+failure; question IDs identify accepted answer transactions. Conflicting edits
+require a fresh question. Message submission is conversational and is not an
+idempotent command queue. Hosts must serialize or retry unrelated stale operations.
+
+Construct the app with a host-owned `SQLiteLearningMemory` and configured LLM
+adapter. A synchronous or asynchronous identity resolver must read already verified
+host authentication state. Resolve retrieval adapters for that trusted context and
+authorize every supplied source independently. Keep adapter/database lifetimes at
+the host application level and close owned resources on shutdown. Private memory
+snapshots are internal; expose only the typed API projections. Render descriptions
+and text as data, handle declared capabilities, and resolve media through the host.
+
+Scope interpretation and teaching quality are model-dependent. Mastery thresholds
+are conservative starting rules. Broad coverage is partial, local SQLite storage
+is not a distributed service, and schema migrations/account systems are outside
+this package. Offline tests and evaluation fixtures require no model credentials.

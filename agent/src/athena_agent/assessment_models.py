@@ -42,6 +42,7 @@ class OpenEndedDraft(Contract):
 
 
 class AnswerSubmission(Contract):
+    model_config = {'json_schema_extra': {'examples': [{'answer': {'kind': 'multiple_choice', 'question_id': 'question-1', 'selected_choice_id': 'a'}, 'hint_used': False}]}}
     answer: Answer
     hint_used: bool = False
 
