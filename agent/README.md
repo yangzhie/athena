@@ -246,3 +246,19 @@ Each successful interaction atomically appends its user/assistant pair and updat
 An explicit, unambiguous topic-change decision archives the active `TopicContext` in `session.archived_topics` and creates a new topic ID and fresh `LearningState`. Classification may consult the current topic to understand the request, but the new topic's reply receives only fresh state and the current message. Old mastery, focus, and turns are not included.
 
 The switch and its reply commit together. Failed or cancelled generation preserves the previous active topic without creating an archive. Ambiguous changes trigger clarification, and comparisons/examples stay in the existing topic. All turns remain in chronological `session.history`; archived topic snapshots can be inspected via `store.read`. Automatic topic restoration is not implemented. Intent interpretation is model-based and should receive live quality evaluation before production use.
+
+## Context budgets (02.5)
+
+`athena_agent.context.ContextBuilder` is used for both intent classification and reply generation. It always retains application instructions, the active goal and structured learning state, discussion focus, and the full current user message. It then selects the newest contiguous suffix of complete user/assistant turns that fits. Archived topics are excluded; no stored history is deleted or summarised.
+
+```python
+from athena_agent.context import ContextBudget, ContextBuilder
+from athena_agent.conversation_manager import ConversationManager
+
+builder = ContextBuilder(ContextBudget(context_window=16384, output_reserve=2048))
+# manager = ConversationManager(store, llm, context_builder=builder)
+```
+
+The total estimate includes serialized messages, the requested response model's JSON Schema, output reserve, a framing allowance (default 512), and a per-message allowance (default 32). The default counter uses UTF-8 byte length as a conservative estimate, not an exact provider tokenizer. Supply a `TokenCounter` with `count(text) -> int` for a model-specific estimator; configure the context window for your selected model and keep the output reserve at least as large as the adapter's output-token limit. Provider-specific schema/framing overhead can vary, so retain headroom.
+
+When mandatory context exceeds the budget, `ContextBudgetError` reports `invalid_request` without a model call or silent truncation. If a later reply cannot fit after routing, the entire pending interaction still rolls back. Selection never skips a newer oversized turn to insert older discussion, which would distort conversational continuity.
