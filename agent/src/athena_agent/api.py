@@ -14,7 +14,9 @@ from .contracts import AgentError, ErrorResponse, RequestContext, SuccessRespons
 from .conversation import ConversationError, InMemoryConversationStore
 from .llm import LLM, MockLLM
 from .memory import LearningMemoryStore, LearnerScopedMemory
-from .api_models import StartSession
+from .api_models import StartSession, MessageSubmission, ContinueSubmission
+from .assessment_models import AnswerSubmission
+from .orchestrator_models import LearningMessageResult
 from .learning import LearningActivity
 from .orchestrator import LearningOrchestrator
 
@@ -99,6 +101,21 @@ def create_app(store: LearningMemoryStore, llm: LLM, *, learner_resolver: Identi
     @app.get('/sessions/{session_id}/resume', response_model=SuccessResponse[LearningActivity])
     async def resume_session(session_id: NonBlankString, context: Annotated[RequestContext, Depends(request_context)]):
         activity = orchestrator(context).resume(context)
+        return SuccessResponse[LearningActivity](request_id=context.request_id, session_id=context.session_id, data=activity)
+
+    @app.post('/sessions/{session_id}/messages', response_model=SuccessResponse[LearningMessageResult])
+    async def submit_message(session_id: NonBlankString, payload: MessageSubmission, context: Annotated[RequestContext, Depends(request_context)]):
+        result = await orchestrator(context).message(context, payload.text)
+        return SuccessResponse[LearningMessageResult](request_id=context.request_id, session_id=context.session_id, data=result)
+
+    @app.post('/sessions/{session_id}/answers', response_model=SuccessResponse[LearningActivity])
+    async def submit_answer(session_id: NonBlankString, payload: AnswerSubmission, context: Annotated[RequestContext, Depends(request_context)]):
+        activity = await orchestrator(context).answer(context, payload.answer, hint_used=payload.hint_used)
+        return SuccessResponse[LearningActivity](request_id=context.request_id, session_id=context.session_id, data=activity)
+
+    @app.post('/sessions/{session_id}/continue', response_model=SuccessResponse[LearningActivity])
+    async def continue_session(session_id: NonBlankString, payload: ContinueSubmission, context: Annotated[RequestContext, Depends(request_context)]):
+        activity = await orchestrator(context).continue_learning(context, payload.activity_id)
         return SuccessResponse[LearningActivity](request_id=context.request_id, session_id=context.session_id, data=activity)
 
     return app

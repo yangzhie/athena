@@ -79,7 +79,7 @@ class ConversationManager:
             if topic is None:
                 raise ConversationError('Initialize a learning goal first.')
             decision = await self._llm.generate(
-                self._messages(topic.model_copy(update={'knowledge': None}), incoming.content, _ROUTE, IntentDecision), IntentDecision,
+                self._messages(topic.model_copy(update={'knowledge': None, 'current_activity': None}), incoming.content, _ROUTE, IntentDecision), IntentDecision,
             )
             if decision.intent == 'ambiguous':
                 reply = ConversationReply(

@@ -174,3 +174,23 @@ class LearningOrchestrator:
         if topic is None:
             raise ConversationError('An active learning roadmap is required.')
         return summarize_progress(topic)
+
+
+    async def message(self, context: RequestContext, text: str):
+        from .conversation_manager import ConversationManager
+        from .orchestrator_models import LearningMessageResult
+        async with self.store.interaction(context) as original:
+            staged = self._stage(context, original)
+            reply = await ConversationManager(staged, self.llm, context_builder=self.context_builder).send(context, text)
+            topic = staged.read(context).active_topic
+            if topic.roadmap is None:
+                roadmap = await PlanningService(self.llm, store=staged, context_builder=self.context_builder).plan(context)
+                eligible = roadmap.eligible_concept_ids(topic.learning_state)
+                if not eligible:
+                    raise ConversationError('The roadmap has no eligible diagnostic concept.')
+                activity = await AssessmentService(staged, self.llm, context_builder=self.context_builder).generate_multiple_choice(context, eligible[0])
+                self._set_activity(context, staged, activity, 'diagnose')
+            else:
+                activity = topic.current_activity
+            self._publish(context, original, staged)
+            return LearningMessageResult(reply=reply, activity=activity)

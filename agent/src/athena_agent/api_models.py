@@ -8,3 +8,11 @@ class StartSession(Contract):
     session_id: NonBlankString
     goal: NonBlankString
     difficulty: Difficulty = 'beginner'
+
+
+class MessageSubmission(Contract):
+    text: NonBlankString
+
+
+class ContinueSubmission(Contract):
+    activity_id: NonBlankString

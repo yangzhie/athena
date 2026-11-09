@@ -62,3 +62,36 @@ def test_start_rejects_client_identity_and_missing_host_without_model_calls():
     bound = create_app(InMemoryConversationStore(), mock, learner_resolver=lambda request: 'trusted')
     response = request(bound, 'POST', '/sessions', json={'session_id': 's', 'goal': 'Sorting', 'learner_id': 'forged'})
     assert response.status_code == 422 and mock.calls == []
+
+
+def test_api_answers_teach_continue_and_preserve_idempotency():
+    from .test_orchestrator import one_concept_responses, OPEN
+    mock = MockLLM([*one_concept_responses(), {'misconceptions': [], 'prerequisite_gaps': []}, {'text': 'Compare adjacent values.'}, OPEN])
+    app = create_app(InMemoryConversationStore(), mock, learner_resolver=lambda request: 'trusted')
+    first = request(app, 'POST', '/sessions', json={'session_id': 's', 'goal': 'Sorting'}).json()['data']
+    payload = {'answer': {'kind': 'multiple_choice', 'question_id': first['question']['question_id'], 'selected_choice_id': 'b'}}
+    teaching = request(app, 'POST', '/sessions/s/answers', json=payload)
+    assert teaching.status_code == 200 and teaching.json()['data']['kind'] == 'explanation'
+    replay = request(app, 'POST', '/sessions/s/answers', json=payload)
+    assert replay.json()['data'] == teaching.json()['data']
+    followup = request(app, 'POST', '/sessions/s/continue', json={'activity_id': teaching.json()['data']['activity_id']})
+    assert followup.status_code == 200 and followup.json()['data']['question']['kind'] == 'open_ended'
+    malformed = request(app, 'POST', '/sessions/s/answers', json={'answer': {'kind': 'text', 'question_id': 'q', 'text': ' '}})
+    assert malformed.status_code == 422
+
+
+def test_message_clarification_preserves_current_question_and_topic_switch_replans():
+    from .test_orchestrator import one_concept_responses
+    mock = MockLLM([*one_concept_responses(), {'intent': 'clarification'}, {'text': 'Compare neighbours.'}, {'intent': 'topic_change', 'new_goal': 'Graphs'}, {'text': 'We will explore graphs.'}, *one_concept_responses()])
+    store = InMemoryConversationStore()
+    app = create_app(store, mock, learner_resolver=lambda request: 'trusted')
+    first = request(app, 'POST', '/sessions', json={'session_id': 's', 'goal': 'Sorting'}).json()['data']
+    clarification = request(app, 'POST', '/sessions/s/messages', json={'text': 'Explain that.'})
+    assert clarification.status_code == 200 and clarification.json()['data']['activity'] == first
+    assert first['question']['prompt'] in mock.calls[5].messages[1].content
+    changed = request(app, 'POST', '/sessions/s/messages', json={'text': 'Switch to graphs.'})
+    assert changed.status_code == 200 and changed.json()['data']['activity']['kind'] == 'question'
+    from athena_agent.contracts import RequestContext
+    session = store.read(RequestContext(request_id='check', learner_id='trusted', session_id='s'))
+    assert session.active_topic.learning_state.goal == 'Graphs' and len(session.archived_topics) == 1
+    assert session.active_topic.learning_state.mastery == []

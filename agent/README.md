@@ -678,3 +678,14 @@ without another model call. Every learning operation binds storage to the truste
 host-resolved learner. Request bodies reject `learner_id`; another learner's same
 session identifier resolves independently or returns the same 404 as a missing
 session. Inject `SQLiteLearningMemory` to resume across service restarts.
+
+`POST /sessions/{id}/messages` accepts `{ "text": "Explain that" }` and returns
+`{ "reply": ..., "activity": ... }`. Clarifications preserve the current question;
+explicit topic switches atomically archive old learning state, plan the new goal,
+and return a fresh diagnostic. `POST /sessions/{id}/answers` accepts the typed
+`{ "answer": { "kind": "multiple_choice", "question_id": "...",
+"selected_choice_id": "a" }, "hint_used": false }` or a `kind="text"` answer.
+The response is the next activity. Host integrations supply reliable hint-use
+metadata. `POST /sessions/{id}/continue` accepts `{ "activity_id": "..." }` after
+teaching and returns an application question. All routes use existing atomic
+orchestration and answer idempotency, with strict request validation.
