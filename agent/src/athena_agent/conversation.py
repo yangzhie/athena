@@ -10,6 +10,7 @@ from ._schema import Contract, NonBlankString
 from .contracts import RequestContext
 from .llm import Message
 from .learning import LearningState, LearningActivity
+from .memory_models import ConversationMemory, TopicConversation
 from .roadmap import Roadmap
 from .assessment_models import AssessmentRecord, QuestionRecord
 
@@ -167,3 +168,43 @@ class InMemoryConversationStore:
             if key in self._sessions:
                 raise ConversationError('The conversation session already exists.')
             yield
+
+
+    def load_conversation(self, context: RequestContext) -> ConversationMemory:
+        session = self.read(context)
+        def project(topic):
+            return TopicConversation(topic_id=topic.topic_id, goal=topic.learning_state.goal,
+                                     discussion_focus=topic.discussion_focus,
+                                     history=[turn.model_dump() for turn in topic.history])
+        return ConversationMemory(
+            learner_id=session.learner_id, session_id=session.session_id,
+            history=[turn.model_dump() for turn in session.history],
+            active_topic=project(session.active_topic) if session.active_topic else None,
+            archived_topics=[project(topic) for topic in session.archived_topics],
+        )
+
+    def save_conversation(self, context: RequestContext, memory: ConversationMemory, *, expected_revision: int) -> ConversationSession:
+        memory = ConversationMemory.model_validate(memory.model_dump())
+        if (memory.learner_id, memory.session_id) != self._key(context):
+            raise ConversationError('Conversation identity cannot change.')
+        session = self.read(context)
+        if type(expected_revision) is not int or session.revision != expected_revision:
+            raise ConversationError('The session changed; retry this interaction.')
+        existing = {topic.topic_id: topic for topic in [*session.archived_topics, *([session.active_topic] if session.active_topic else [])]}
+        proposed = [*memory.archived_topics, *([memory.active_topic] if memory.active_topic else [])]
+        if existing and (set(existing) != {topic.topic_id for topic in proposed} or
+                         (session.active_topic.topic_id if session.active_topic else None) != (memory.active_topic.topic_id if memory.active_topic else None)):
+            raise ConversationError('Conversation restore cannot replace existing learning topics.')
+        def restore(data):
+            topic = existing.get(data.topic_id)
+            if topic is None:
+                topic = TopicContext(topic_id=data.topic_id, learning_state=LearningState(goal=data.goal))
+            elif topic.learning_state.goal != data.goal:
+                raise ConversationError('Conversation restore cannot change the learning goal.')
+            topic.history = [ConversationTurn.model_validate(turn.model_dump()) for turn in data.history]
+            topic.discussion_focus = data.discussion_focus
+            return topic
+        session.history = [ConversationTurn.model_validate(turn.model_dump()) for turn in memory.history]
+        session.active_topic = restore(memory.active_topic) if memory.active_topic else None
+        session.archived_topics = [restore(topic) for topic in memory.archived_topics]
+        return self._save(context, session)

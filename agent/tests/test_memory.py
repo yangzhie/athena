@@ -35,3 +35,42 @@ def test_memory_contract_rejects_stale_and_foreign_snapshots():
         store.read(other)
     with pytest.raises(ConversationError, match='identity'):
         store.create(other, snapshot=store.read(context))
+
+
+def test_conversation_export_restores_history_goal_and_focus_without_evidence():
+    context = RequestContext(request_id='r', learner_id='l', session_id='s')
+    source = InMemoryLearningMemory()
+    asyncio.run(LearningOrchestrator(source, MockLLM(one_concept_responses())).start(context, 'Compare'))
+    source.append_turn(context, ConversationTurn(user_text='Why?', assistant_text='Compare values.'))
+    source.update_focus(context, 'Relative values')
+    exported = source.load_conversation(context)
+    assert 'question_records' not in exported.model_dump_json()
+    restored = InMemoryLearningMemory()
+    restored.create(context)
+    restored.save_conversation(context, exported, expected_revision=0)
+    assert restored.load_conversation(context) == exported
+    assert restored.read(context).active_topic.roadmap is None
+    exported.active_topic.discussion_focus = 'Mutated'
+    assert restored.read(context).active_topic.discussion_focus == 'Relative values'
+
+
+def test_conversation_save_preserves_learning_and_rejects_stale_foreign_or_retargeted_data():
+    context = RequestContext(request_id='r', learner_id='l', session_id='s')
+    store = InMemoryLearningMemory()
+    asyncio.run(LearningOrchestrator(store, MockLLM(one_concept_responses())).start(context, 'Compare'))
+    before = store.read(context)
+    exported = store.load_conversation(context)
+    exported.active_topic.discussion_focus = 'New focus'
+    store.save_conversation(context, exported, expected_revision=before.revision)
+    assert store.read(context).active_topic.question_records == before.active_topic.question_records
+    snapshot = store.read(context)
+    with pytest.raises(ConversationError, match='session changed'):
+        store.save_conversation(context, exported, expected_revision=before.revision)
+    exported.learner_id = 'other'
+    with pytest.raises(ConversationError, match='identity'):
+        store.save_conversation(context, exported, expected_revision=snapshot.revision)
+    exported.learner_id = context.learner_id
+    exported.active_topic.goal = 'Unrelated'
+    with pytest.raises(ConversationError, match='goal'):
+        store.save_conversation(context, exported, expected_revision=snapshot.revision)
+    assert store.read(context) == snapshot

@@ -487,3 +487,12 @@ this protocol. `InMemoryLearningMemory` names the established
 `InMemoryConversationStore` implementation; it is an alias, preserving existing
 integrations and avoiding duplicate memory services. Returned snapshots are copies;
 private assessment criteria make whole-session snapshots backend-only.
+
+`store.load_conversation(context)` exports a validated `ConversationMemory` with
+session history and active/archived topic goals, focus, and topic history.
+`store.save_conversation(context, memory, expected_revision=revision)` restores it
+atomically to an existing session with the same host identity. Existing learning
+topics and evidence are preserved; replacing topics or goals through conversation
+restore is rejected. Restoring into an empty session creates conversation context
+without inventing learning evidence. Exported snapshots contain no private criteria.
+Use the revision from `store.read` for compare-and-save; stale imports fail.

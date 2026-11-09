@@ -4,6 +4,7 @@ from contextlib import AbstractAsyncContextManager
 from typing import Protocol, runtime_checkable
 
 from .contracts import RequestContext
+from .memory_models import ConversationMemory
 from .conversation import ConversationSession, ConversationTurn, InMemoryConversationStore
 
 
@@ -25,6 +26,8 @@ class LearningMemoryStore(Protocol):
     def append_turn(self, context: RequestContext, turn: ConversationTurn) -> ConversationSession: ...
     def interaction(self, context: RequestContext) -> AbstractAsyncContextManager[ConversationSession]: ...
     def creation(self, context: RequestContext) -> AbstractAsyncContextManager[None]: ...
+    def load_conversation(self, context: RequestContext) -> ConversationMemory: ...
+    def save_conversation(self, context: RequestContext, memory: ConversationMemory, *, expected_revision: int) -> ConversationSession: ...
 
 
 # The established store already contains topic evidence and learning state. Reuse it.
