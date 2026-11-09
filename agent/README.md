@@ -152,3 +152,20 @@ Keep `QuestionWithCriteria` agent-internal. Send only its `question` through `Qu
 - Union payloads require a `kind` discriminator. Use `AgentRequest[Answer]` and `SuccessResponse[LearningActivity]` for typed envelopes; use Pydantic `TypeAdapter` to validate a standalone union.
 - All models reject unknown fields and blank required text. References to questions, concepts, and assessment evidence are opaque IDs; existence and session ownership must be checked by later services. Submitted answers are validated against a particular question by the later assessment module.
 - These contracts implement no generation, scoring, persistence, or UI rendering. Rich content and source references are added in later steps.
+
+## Structured model interface (01.4)
+
+`athena_agent.llm.LLM` defines asynchronous `generate(messages, response_model)`. Messages have an explicit role and nonblank content; the response model is a concrete Pydantic model class. Providers return validated model instances rather than plain chatbot text.
+
+```python
+import asyncio
+from athena_agent.learning import CompletionActivity
+from athena_agent.llm import Message, MockLLM
+
+mock = MockLLM([{"activity_id": "a1", "text": "A focused learning step."}])
+activity = asyncio.run(mock.generate(
+    [Message(role="user", content="Teach me Bubble Sort")], CompletionActivity,
+))
+```
+
+The mock accepts model instances, dictionaries, JSON strings, or `LLMError` failures. It consumes them in order, records independent message snapshots in `calls`, and fails explicitly when exhausted. Invalid scripted outputs raise `InvalidOutputError`. Provider-independent failures expose safe messages, a shared error `code`, and `retryable`; `ModelRefusalError` is terminal and uses the `invalid_model_output` code. There are no automatic retries yet.
