@@ -553,3 +553,10 @@ failures preserve the prior selection. `None` means no selected materials; an
 empty result records a successful search without matches. Selection is durable
 learning memory and follows topic/learner isolation. No search infrastructure,
 ingestion, transcription, or video processing is implemented here.
+
+`await KnowledgeService(store).supply(context, retrieval_result, source_ids=None,
+max_results=5)` accepts host-authorized external results through the same typed
+selection contract, scope validation, topic storage, and snapshot copying.
+It requires no retriever. Malformed or out-of-scope supplied data is an invalid
+request; unavailable retrieval is a dependency failure. An empty external result
+remains an explicit empty selection rather than silently enabling general knowledge.

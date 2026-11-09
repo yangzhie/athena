@@ -67,3 +67,27 @@ def test_out_of_scope_results_rejected_and_stale_selection_does_not_overwrite():
     with pytest.raises(ConversationError, match='session changed'):
         asyncio.run(KnowledgeService(store, Stale()).retrieve(context, 'Topic'))
     assert store.read(context).active_topic.knowledge is None
+
+
+def test_external_results_share_selection_contract_without_retriever():
+    context, store = setup()
+    service = KnowledgeService(store)
+    supplied = material()
+    accepted = asyncio.run(service.supply(context, supplied))
+    assert accepted == store.read(context).active_topic.knowledge == supplied
+    supplied.items.clear()
+    assert store.read(context).active_topic.knowledge == accepted
+    before = store.read(context)
+    with pytest.raises(ConversationError, match='outside'):
+        asyncio.run(service.supply(context, accepted, source_ids=['not-selected']))
+    with pytest.raises(SessionNotFoundError):
+        asyncio.run(service.supply(context.model_copy(update={'learner_id': 'other'}), accepted))
+    with pytest.raises(RetrievalError):
+        asyncio.run(service.retrieve(context, 'Topic'))
+    assert store.read(context) == before
+
+
+def test_empty_external_result_is_explicit_selection():
+    context, store = setup()
+    asyncio.run(KnowledgeService(store).supply(context, RetrievalResult()))
+    assert store.read(context).active_topic.knowledge == RetrievalResult()
