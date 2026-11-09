@@ -11,6 +11,7 @@ from .contracts import RequestContext
 from .llm import Message
 from .learning import LearningState
 from .roadmap import Roadmap
+from .assessment_models import QuestionRecord
 
 
 class ConversationError(Exception):
@@ -38,6 +39,7 @@ class TopicContext(Contract):
     discussion_focus: NonBlankString | None = None
     history: list[ConversationTurn] = Field(default_factory=list)
     roadmap: Roadmap | None = None
+    question_records: list[QuestionRecord] = Field(default_factory=list)
 
     @model_validator(mode='after')
     def matching_roadmap_goal(self):
