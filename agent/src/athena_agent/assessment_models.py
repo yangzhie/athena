@@ -5,7 +5,7 @@ from typing import Annotated, Self
 from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
-from .learning import Choice, QuestionWithCriteria
+from .learning import Answer, Assessment, AssessmentOutcome, Choice, Confidence, QuestionWithCriteria
 
 
 class MultipleChoiceDraft(Contract):
@@ -32,3 +32,32 @@ class QuestionRecord(Contract):
 class OpenEndedDraft(Contract):
     prompt: NonBlankString
     expected_reasoning: NonBlankString
+
+
+class AnswerSubmission(Contract):
+    answer: Answer
+    hint_used: bool = False
+
+
+class EvaluationDraft(Contract):
+    outcome: AssessmentOutcome
+    feedback: NonBlankString
+    confidence: Confidence
+    evidence_quotes: list[NonBlankString] = Field(default_factory=list)
+
+
+class AssessmentRecord(Contract):
+    answer: Answer
+    assessment: Assessment
+    hint_used: bool = False
+    evidence_quotes: list[NonBlankString] = Field(default_factory=list)
+
+    @model_validator(mode='after')
+    def matching_question(self) -> Self:
+        if self.answer.question_id != self.assessment.question_id:
+            raise ValueError('Answer and assessment must reference the same question.')
+        return self
+
+
+class AssessmentPolicy(Contract):
+    evaluation_confidence_threshold: Confidence = 0.8

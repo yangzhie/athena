@@ -11,7 +11,7 @@ from .contracts import RequestContext
 from .llm import Message
 from .learning import LearningState
 from .roadmap import Roadmap
-from .assessment_models import QuestionRecord
+from .assessment_models import AssessmentRecord, QuestionRecord
 
 
 class ConversationError(Exception):
@@ -40,11 +40,26 @@ class TopicContext(Contract):
     history: list[ConversationTurn] = Field(default_factory=list)
     roadmap: Roadmap | None = None
     question_records: list[QuestionRecord] = Field(default_factory=list)
+    assessment_records: list[AssessmentRecord] = Field(default_factory=list)
 
     @model_validator(mode='after')
     def matching_roadmap_goal(self):
         if self.roadmap is not None and self.roadmap.goal != self.learning_state.goal:
             raise ValueError('Roadmap and learning state must have the same goal.')
+        questions = {record.bundle.question.question_id: record for record in self.question_records}
+        if len(questions) != len(self.question_records):
+            raise ValueError('Question IDs must be unique within a topic.')
+        assessed_questions = set()
+        assessment_ids = set()
+        for record in self.assessment_records:
+            assessment = record.assessment
+            question = questions.get(assessment.question_id)
+            if question is None or question.bundle.question.concept_id != assessment.concept_id:
+                raise ValueError('Assessments must reference a recorded question and its concept.')
+            if assessment.question_id in assessed_questions or assessment.assessment_id in assessment_ids:
+                raise ValueError('Questions and assessment IDs cannot be assessed twice.')
+            assessed_questions.add(assessment.question_id)
+            assessment_ids.add(assessment.assessment_id)
         return self
 
 

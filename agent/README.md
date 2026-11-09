@@ -310,3 +310,11 @@ Only a `QuestionActivity` is returned. Its private `QuestionRecord` retains `Que
 ## Open-ended assessment generation (04.2)
 
 `await service.generate_open_ended(context, concept_id)` generates reasoning/application questions with private expected reasoning. Both question-generation methods accept an optional `difficulty="beginner" | "intermediate" | "advanced"` override; it changes the generated question, not the roadmap. Invalid overrides fail before any model call. All generation shares topic ownership, bounded context, atomic storage, and learner-facing question serialization. It does not evaluate an answer or update mastery.
+
+## Answer evaluation (04.3)
+
+`await service.evaluate(context, answer, hint_used=False)` accepts the existing `MultipleChoiceAnswer` or `TextAnswer` contracts. It validates active-topic question ownership and answer format; removed concepts cannot receive new assessments. Multiple-choice grading uses the stored key without an LLM call. Its confidence of 1 describes grading certainty, not demonstrated mastery.
+
+Open-ended reasoning is evaluated against private criteria, with exact answer quotes supporting decisive feedback. Unsupported quotes are rejected. `AssessmentPolicy(evaluation_confidence_threshold=0.8)` converts lower-confidence judgements to `uncertain`. A successful evaluation records the answer, assessment, evidence quotes, and trusted host-supplied hint-use metadata atomically. It does not yet change mastery.
+
+Only one answer is recorded per question. An identical answer and hint status returns the saved assessment without another model call or write; changed answers/status require a fresh question. Failures and cancellation do not save partial evidence. Topic records enforce unique question/assessment IDs and matching references. Full store snapshots contain private criteria and remain backend-only.

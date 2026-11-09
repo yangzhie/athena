@@ -5,22 +5,26 @@ from uuid import uuid4
 
 from pydantic import TypeAdapter
 
-from .assessment_models import MultipleChoiceDraft, OpenEndedDraft, QuestionRecord
+from .assessment_models import (
+    AnswerSubmission, AssessmentPolicy, AssessmentRecord, EvaluationDraft,
+    MultipleChoiceDraft, OpenEndedDraft, QuestionRecord,
+)
 from .context import ContextBuilder
 from .contracts import RequestContext
 from .conversation import ConversationError, InMemoryConversationStore, TopicContext
 from .learning import (
-    Difficulty, MultipleChoiceCriteria, MultipleChoiceQuestion, OpenEndedCriteria,
+    Answer, Assessment, Difficulty, MultipleChoiceAnswer, TextAnswer, MultipleChoiceCriteria, MultipleChoiceQuestion, OpenEndedCriteria,
     OpenEndedQuestion, QuestionActivity, QuestionWithCriteria,
 )
-from .llm import LLM, Model
+from .llm import LLM, Model, InvalidOutputError
 from .reliable_llm import ReliableLLM
 from .roadmap import EnrichedConcept
 
 
 class AssessmentService:
-    def __init__(self, store: InMemoryConversationStore, llm: LLM, *, context_builder: ContextBuilder | None = None):
+    def __init__(self, store: InMemoryConversationStore, llm: LLM, *, context_builder: ContextBuilder | None = None, policy: AssessmentPolicy | None = None):
         self.store = store
+        self.policy = (policy or AssessmentPolicy()).model_copy(deep=True)
         self._llm = llm if isinstance(llm, ReliableLLM) else ReliableLLM(llm)
         self.context_builder = context_builder if context_builder is not None else ContextBuilder()
 
@@ -103,3 +107,71 @@ class AssessmentService:
         self, context: RequestContext, concept_id: str, *, difficulty: Difficulty | None = None,
     ) -> QuestionActivity:
         return await self._generate(context, concept_id, 'open_ended', difficulty)
+
+    def _question(self, topic: TopicContext | None, question_id: str) -> QuestionRecord:
+        if topic is not None:
+            for record in topic.question_records:
+                if record.bundle.question.question_id == question_id:
+                    return record
+        raise ConversationError('The question is not available in the active topic.')
+
+    async def evaluate(self, context: RequestContext, answer: Answer, *, hint_used: bool = False) -> Assessment:
+        submission = AnswerSubmission.model_validate({
+            'answer': answer.model_dump() if hasattr(answer, 'model_dump') else answer,
+            'hint_used': hint_used,
+        })
+        answer = submission.answer
+        async with self.store.interaction(context) as session:
+            topic = session.active_topic
+            question_record = self._question(topic, answer.question_id)
+            question = question_record.bundle.question
+            for record in topic.assessment_records:
+                if record.answer.question_id == answer.question_id:
+                    if record.answer == answer and record.hint_used == submission.hint_used:
+                        return record.assessment.model_copy(deep=True)
+                    raise ConversationError('This question already has an answer; request a fresh question.')
+            self._concept(topic, question.concept_id)
+            criteria = question_record.bundle.criteria
+            if isinstance(question, MultipleChoiceQuestion):
+                if not isinstance(answer, MultipleChoiceAnswer):
+                    raise ConversationError('A selected choice is required for this question.')
+                choices = {choice.choice_id: choice.text for choice in question.choices}
+                if answer.selected_choice_id not in choices:
+                    raise ConversationError('The selected choice does not belong to this question.')
+                correct = answer.selected_choice_id == criteria.correct_choice_id
+                assessment = Assessment(
+                    assessment_id=str(uuid4()), question_id=question.question_id,
+                    concept_id=question.concept_id, outcome='correct' if correct else 'incorrect',
+                    feedback=('That choice is correct. ' if correct else 'That choice is incorrect. ') + criteria.rationale,
+                    confidence=1.0,
+                )
+                quotes = [choices[answer.selected_choice_id]]
+            else:
+                if not isinstance(answer, TextAnswer):
+                    raise ConversationError('A text answer is required for this question.')
+                draft = await self._call(
+                    topic,
+                    'Evaluate the submitted reasoning against the stored expected reasoning. '
+                    'Return correct, partial, incorrect, or uncertain, concise evidence-based feedback, '
+                    'and confidence in the evaluation, not confidence in learner mastery. '
+                    'Quote exact substrings of the answer supporting a decisive judgement. '
+                    'Use uncertain when the answer cannot be reliably interpreted. Do not grade '
+                    'writing style or invent reasoning that was not expressed.',
+                    EvaluationDraft, inputs={'question': question.model_dump(), 'criteria': criteria.model_dump(), 'answer': answer.model_dump()},
+                )
+                if any(quote not in answer.text for quote in draft.evidence_quotes):
+                    raise InvalidOutputError()
+                if draft.outcome != 'uncertain' and draft.confidence >= self.policy.evaluation_confidence_threshold and not draft.evidence_quotes:
+                    raise InvalidOutputError()
+                outcome = draft.outcome if draft.confidence >= self.policy.evaluation_confidence_threshold else 'uncertain'
+                assessment = Assessment(
+                    assessment_id=str(uuid4()), question_id=question.question_id,
+                    concept_id=question.concept_id, outcome=outcome,
+                    feedback=draft.feedback, confidence=draft.confidence,
+                )
+                quotes = draft.evidence_quotes
+            topic.assessment_records.append(AssessmentRecord(
+                answer=answer, assessment=assessment, hint_used=submission.hint_used, evidence_quotes=quotes,
+            ))
+            self.store._save(context, session)
+            return assessment.model_copy(deep=True)
