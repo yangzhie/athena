@@ -121,7 +121,7 @@ class PlaygroundTutor:
                                'executions': view['executions'][-4:]}
             self._save(sid, operation, data)
         prompts = [PromptMessage(role='system', content=SYSTEM),
-                   PromptMessage(role='user', content=encoded({'catalog': catalog(), 'learning_context': data['context']}))]
+                   PromptMessage(role='user', content=encoded({'catalog': {k: v for k, v in catalog().items() if k != 'schemas'}, 'scene_schema': catalog()['schemas']['Scene'], 'learning_context': data['context']}))]
         is_scene = kind == 'scene' or not view['checkpoint']
         if 'draft' not in data:
             if is_scene:
@@ -199,7 +199,7 @@ class PlaygroundTutor:
         # Atomically publish the whole discussion into the host chat and mark the turn complete.
         with service.lock, service.db:
             service.db.execute('BEGIN IMMEDIATE')
-            latest = service.authorize(student, offering, sid)
+            latest = service.authorize_transaction(student, offering, sid)
             now = datetime.now(timezone.utc)
             messages = []
             if kind in ('question', 'scene'):

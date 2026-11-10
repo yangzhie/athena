@@ -64,19 +64,23 @@ class OpenAIRephraser:
         if not self.model or not os.environ.get("OPENAI_API_KEY", "").strip():
             raise RephraseError("set OPENAI_API_KEY and OPENAI_MODEL to enable live rephrasing")
         self.name = f"openai:{self.model}"
-        self._client = OpenAI(timeout=timeout, max_retries=1)
+        self._client = OpenAI(timeout=timeout, max_retries=0)
 
     def rewrite(self, system: str, user: str) -> str:
         from openai import OpenAIError
+        from ..operations import MODELS, ModelCapacity
 
         try:
-            response = self._client.responses.parse(
-                model=self.model,
-                input=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-                text_format=_Output,
-                max_output_tokens=4000,
-                store=False,
-            )
+            with MODELS.slot():
+                response = self._client.responses.parse(
+                    model=self.model,
+                    input=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+                    text_format=_Output,
+                    max_output_tokens=4000,
+                    store=False,
+                )
+        except ModelCapacity:
+            raise RephraseError("model capacity unavailable") from None
         except OpenAIError as e:
             raise RephraseError(f"model request failed: {e.__class__.__name__}") from None
         if response.output_parsed is None:

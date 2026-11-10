@@ -18,6 +18,7 @@ class Executions:
         self.lock = RLock()
         with self.db:
             self.db.executescript('''
+                CREATE TABLE IF NOT EXISTS worker_status (kind TEXT PRIMARY KEY, updated REAL NOT NULL);
                 CREATE TABLE IF NOT EXISTS executions (
                     id TEXT PRIMARY KEY, student TEXT NOT NULL, offering TEXT NOT NULL,
                     session TEXT NOT NULL, generation TEXT NOT NULL, object_id TEXT NOT NULL, run_id INTEGER NOT NULL,
@@ -76,6 +77,7 @@ class Executions:
     def claim(self):
         with self.lock, self.db:
             self.db.execute('BEGIN IMMEDIATE')
+            self.db.execute("INSERT INTO worker_status VALUES ('execution',?) ON CONFLICT(kind) DO UPDATE SET updated=excluded.updated", (time.time(),))
             # The worker executes synchronously with an absolute 5-second limit.
             # A crashed worker's old job is never silently rerun as new evidence.
             stale = self.db.execute("SELECT container FROM executions WHERE state='running' AND updated<?", (time.time() - 30,)).fetchall()

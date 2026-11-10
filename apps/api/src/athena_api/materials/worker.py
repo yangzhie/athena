@@ -110,6 +110,8 @@ def main():
     signal.signal(signal.SIGTERM, terminate)
     try:
         while True:
+            with materials.lock, materials.db:
+                materials.db.execute("INSERT INTO worker_status VALUES ('indexing',?) ON CONFLICT(kind) DO UPDATE SET updated=excluded.updated", (time.time(),))
             processed = process_one(materials, LectureService(lecture_store))
             if args.once:
                 break

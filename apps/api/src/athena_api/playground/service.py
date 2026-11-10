@@ -8,6 +8,7 @@ import uuid
 from fastapi import HTTPException
 
 from ..execution.store import Executions
+from ..sessions.models import LearningSession
 from . import bridge
 
 
@@ -52,6 +53,15 @@ class Playgrounds:
                 raise HTTPException(404, 'Learning session not found') from None
             raise
 
+    def authorize_transaction(self, student, offering, session):
+        """Read on the current SQLite transaction; avoid cross-store lock inversion."""
+        row = self.db.execute('SELECT data FROM learning_sessions WHERE id=? AND student_id=? AND offering_id=?', (session, student, offering)).fetchone()
+        cleanup_exists = self.db.execute("SELECT 1 FROM sqlite_master WHERE name='private_cleanup'").fetchone()
+        deleting = cleanup_exists and self.db.execute('SELECT 1 FROM private_cleanup WHERE session=?', (session,)).fetchone()
+        if not row or deleting:
+            raise HTTPException(404, 'Learning session not found')
+        return LearningSession.model_validate_json(row[0])
+
     def _row(self, session):
         return self.db.execute('SELECT * FROM playgrounds WHERE session=?', (session,)).fetchone()
 
@@ -67,6 +77,7 @@ class Playgrounds:
     def get(self, student, offering, session):
         self.authorize(student, offering, session)
         with self.lock:
+            self.authorize_transaction(student, offering, session)
             self._reconcile(session)
             result = self._view(self._row(session))
             if self.db.execute("SELECT 1 FROM sqlite_master WHERE name='playground_replacements'").fetchone():
@@ -110,7 +121,7 @@ class Playgrounds:
                 actual = self._row(session)
                 if (actual['revision'] if actual else 0) != current:
                     raise HTTPException(409, 'Playground changed. Refresh its snapshot.')
-                self.authorize(student, offering, session)
+                self.authorize_transaction(student, offering, session)
                 self.db.execute('INSERT INTO playgrounds VALUES (?,?,?,?,?,?,?) ON CONFLICT(session) DO UPDATE SET generation=excluded.generation,revision=excluded.revision,checkpoint=excluded.checkpoint,updated=excluded.updated',
                                 (session, student, offering, generation, current + 1, encoded(data['checkpoint']), now))
                 actor = 'agent' if trusted else 'student'

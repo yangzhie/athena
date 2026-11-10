@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import sqlite3
 import threading
@@ -134,7 +135,7 @@ class Lifecycle:
     def sweep(self, now=None):
         now = time.time() if now is None else now
         days = float(os.environ.get('ATHENA_PRIVATE_RETENTION_DAYS', '30'))
-        if days <= 0:
+        if not math.isfinite(days) or days <= 0:
             raise ValueError('ATHENA_PRIVATE_RETENTION_DAYS must be positive')
         cutoff = now - days * 86400
         with self.lock:

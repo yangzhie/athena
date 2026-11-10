@@ -39,6 +39,7 @@ def test_queue_cancellation_and_fencing(tmp_path):
     ('while True: print("x"*8192)', '', 'OutputLimitExceeded'),
     ('import os\nprint(os.getuid())\nprint(os.path.exists("/app"))\nprint(os.environ.get("OPENAI_API_KEY"))\ntry:\n open("/escape", "w").write("bad")\nexcept OSError:\n print("readonly")\nimport socket\ns=socket.socket()\ns.settimeout(.5)\ntry:\n s.connect(("1.1.1.1", 443))\nexcept OSError:\n print("offline")', 'offline', None),
     ('raise ValueError("expected")', '', 'PythonError'),
+    ('import os; os.write(1, bytes([255])*65536)', '', 'OutputLimitExceeded'),
 ])
 def test_real_container_limits_and_cleanup(source, expected, error):
     name = 'athena-exec-test-' + uuid.uuid4().hex

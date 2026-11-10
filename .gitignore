@@ -50,3 +50,8 @@ venv/
 
 # Runtime databases, course material and indexing artifacts
 /data/
+
+# Browser acceptance artifacts and backups contain private runtime data
+/test-results/
+/playwright-report/
+/backups/

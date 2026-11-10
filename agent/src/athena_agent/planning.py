@@ -14,7 +14,7 @@ from .learning import LearningState
 from .llm import LLM, Model, InvalidOutputError, Message
 from .reliable_llm import ReliableLLM
 from .retrieval import RetrievalResult
-from .roadmap import Concept, ConceptGraph, EnrichedConcept, EnrichedGraph, ObjectiveBatch, Roadmap, RoadmapRevision, TopicScope
+from .roadmap import Concept, ConceptGraph, ConceptObjectives, EnrichedConcept, EnrichedGraph, ObjectiveBatch, Roadmap, RoadmapRevision, TopicScope
 
 
 class GoalInterpretation(Contract):
@@ -109,13 +109,17 @@ class PlanningService:
         state = LearningState.model_validate(learner_state.model_dump()) if learner_state else LearningState(goal=goal)
         if state.goal != goal:
             raise ConversationError('Learner evidence must belong to the requested goal.')
+        allowed_ids = Literal[tuple(concept.concept_id for concept in graph.concepts)]
+        objective_type = create_model('ExistingConceptObjectives', __base__=ConceptObjectives, concept_id=(allowed_ids, ...))
+        objective_batch = create_model('ObjectiveBatch', __base__=ObjectiveBatch,
+                                      concepts=(Annotated[list[objective_type], Field(min_length=len(graph.concepts), max_length=len(graph.concepts))], ...))
         objectives = await self._call(
             TopicContext(learning_state=state, knowledge=knowledge), goal,
             'For every supplied concept, return its existing ID, one or more concise '
             'observable learning objectives, and beginner/intermediate/advanced difficulty. '
             'Use supplied learner evidence where available, without inventing proficiency. '
             'Return each ID exactly once; do not add concepts or change their meanings.',
-            ObjectiveBatch, inputs={'graph': graph.model_dump()},
+            objective_batch, inputs={'graph': graph.model_dump()},
         )
         by_id = {item.concept_id: item for item in objectives.concepts}
         if set(by_id) != {concept.concept_id for concept in graph.concepts}:

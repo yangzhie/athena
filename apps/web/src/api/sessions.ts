@@ -1,30 +1,10 @@
-import type { AgentActivity, ChatMessage, KnowledgeOrigin, LearningSession, SourceReference } from '../types'
+import type { AgentActivity, ChatMessage, LearningSession, SourceReference } from '../types'
 import { call } from './client'
 import { operationCall, recoverPendingOperation } from './operations'
 
-/** Session as the API returns it (snake_case). */
-interface SessionDto {
-  id: string
-  offering_id: string
-  goal: string
-  title: string
-  created_at: string
-  updated_at: string
-  shared: boolean
-  shared_at: string | null
-  last_lecturer_reply_at: string | null
-}
-
-interface MessageDto {
-  id: string
-  role: 'tutor' | 'learner'
-  content: string
-  sources: Record<string, unknown>[]
-  knowledge_origin: KnowledgeOrigin | null
-  activity: AgentActivity | null
-  answer_for: string | null
-  created_at: string
-}
+import type { components } from '../../../../packages/shared/api'
+type SessionDto = components['schemas']['LearningSessionOut']
+type MessageDto = components['schemas']['Message']
 
 const toSession = (s: SessionDto): LearningSession => ({
   id: s.id,
@@ -73,9 +53,9 @@ const toMessage = (m: MessageDto): ChatMessage => ({
   id: m.id,
   role: m.role,
   content: m.content,
-  sources: toSourceList(m.sources),
+  sources: toSourceList(m.sources ?? []),
   knowledgeOrigin: m.knowledge_origin ?? undefined,
-  activity: m.activity ?? undefined,
+  activity: m.activity && typeof m.activity.activity_id === 'string' && typeof m.activity.kind === 'string' ? m.activity as unknown as AgentActivity : undefined,
   answerFor: m.answer_for ?? undefined,
   createdAt: m.created_at,
 })

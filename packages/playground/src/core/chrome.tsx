@@ -5,7 +5,7 @@ import type { Playground } from './store'
 const PROVENANCE: Record<Provenance, { label: string; className: string }> = {
   'real-run': { label: 'Real run', className: 'bg-good/15 text-good' },
   simulated: { label: 'Simulated', className: 'bg-warn/15 text-warn' },
-  'ai-estimate': { label: 'AI estimate · demo only', className: 'bg-warn/15 text-warn' },
+  'ai-estimate': { label: 'AI estimate', className: 'bg-warn/15 text-warn' },
   concept: { label: 'Concept sketch', className: 'bg-line text-muted' },
   material: { label: 'Unit material', className: 'bg-accent-soft text-accent' },
 }

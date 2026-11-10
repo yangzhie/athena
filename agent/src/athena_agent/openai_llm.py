@@ -33,6 +33,7 @@ class OpenAILLM:
 
     def __init__(self, settings: OpenAISettings, *, client: AsyncOpenAI | None = None):
         self.settings = settings.model_copy(deep=True)
+        self.usage: list[dict[str, int]] = []
         self._owns_client = client is None
         if client is None:
             key = settings.api_key.get_secret_value() if settings.api_key else ''
@@ -62,6 +63,8 @@ class OpenAILLM:
         except OpenAIError:
             raise DependencyError('The model service could not complete this request.') from None
 
+        if getattr(response, 'usage', None):
+            self.usage.append({'input_tokens': response.usage.input_tokens, 'output_tokens': response.usage.output_tokens, 'cached_input_tokens': getattr(response.usage.input_tokens_details, 'cached_tokens', 0)})
         for item in response.output:
             if item.type == 'message':
                 for content in item.content:

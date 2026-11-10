@@ -16,6 +16,8 @@ class AnonymousIdentity:
     async def __call__(self, scope, receive, send):
         if scope['type'] != 'http':
             return await self.app(scope, receive, send)
+        if scope['path'] in {'/health', '/ready', '/tutor/status'} and scope['method'] in {'GET', 'HEAD'}:
+            return await self.app(scope, receive, send)
         request = Request(scope)
         if request.method not in {'GET', 'HEAD', 'OPTIONS'}:
             origin = request.headers.get('origin')

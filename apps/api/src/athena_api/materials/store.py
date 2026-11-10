@@ -1,4 +1,5 @@
 import time
+import os
 import uuid
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from ..spaces.service import StudySpaces
 DOCUMENTS = {'.pdf', '.txt', '.md', '.docx', '.pptx'}
 RECORDINGS = {'.mp4', '.mkv', '.mov', '.webm', '.m4a', '.mp3', '.wav', '.flac', '.ogg'}
 SCHEMA = '''
+CREATE TABLE IF NOT EXISTS worker_status (kind TEXT PRIMARY KEY, updated REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS materials (
  id TEXT PRIMARY KEY, offering_id TEXT NOT NULL REFERENCES offerings(id), source_id TEXT NOT NULL,
  version INTEGER NOT NULL, filename TEXT NOT NULL, kind TEXT NOT NULL, suffix TEXT NOT NULL,
@@ -75,6 +77,15 @@ class Materials:
 
     def finish_upload(self, row, size):
         with self.lock, self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            total = self.db.execute('SELECT COALESCE(SUM(size),0) FROM materials WHERE offering_id=?', (row['offering_id'],)).fetchone()[0]
+            if total + size > int(os.environ.get('ATHENA_OFFERING_STORAGE_BYTES', str(5 * 1024**3))):
+                raise HTTPException(413, 'Offering storage quota reached')
+            global_total = self.db.execute('SELECT COALESCE(SUM(size),0) FROM materials').fetchone()[0]
+            if global_total + size > int(os.environ.get('ATHENA_TOTAL_STORAGE_BYTES', str(20 * 1024**3))):
+                raise HTTPException(413, 'Instance storage quota reached')
+            if self.db.execute("SELECT COUNT(*) FROM material_jobs WHERE status IN ('queued','processing')").fetchone()[0] >= int(os.environ.get('ATHENA_PROCESSING_QUEUE_LIMIT', '64')):
+                raise HTTPException(429, 'Material processing queue is full. Retry later.')
             self.db.execute('INSERT INTO materials (id,offering_id,source_id,version,filename,kind,suffix,storage_path,size,created_at) '
                             'VALUES (?,?,?,?,?,?,?,?,?,?)', (*[row[k] for k in ['id','offering_id','source_id','version','filename','kind','suffix','storage_path']], size, time.time()))
             self.db.execute('INSERT INTO material_jobs (material_id) VALUES (?)', (row['id'],))

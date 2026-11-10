@@ -30,7 +30,16 @@ def invoke(body):
 
 @lru_cache(maxsize=1)
 def catalog():
-    return invoke({'kind': 'contract'})
+    runtime = invoke({'kind': 'contract'})
+    schema_file = BUNDLE.parents[2] / 'shared/playground.json'
+    try:
+        generated = json.loads(schema_file.read_text())
+        if generated['catalog_version'] != runtime['catalog_version']:
+            raise ValueError()
+        runtime['schemas'] = generated['schemas']
+    except (OSError, ValueError, KeyError):
+        raise HTTPException(503, 'Playground schemas unavailable; regenerate shared contracts.') from None
+    return runtime
 
 
 def transition(checkpoint, command=None):

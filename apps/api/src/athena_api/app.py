@@ -3,11 +3,14 @@
 import os
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
+from .operations import OperationalLimits
 from .privacy.lifecycle import Lifecycle
 from .playground.service import Playgrounds
 from .playground.api import playground_router
@@ -67,6 +70,13 @@ def create_app(
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
+
+    request_logger = logging.getLogger('athena.requests')
+    if not request_logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter('%(levelname)s %(name)s %(message)s'))
+        request_logger.addHandler(handler)
+    request_logger.setLevel(logging.INFO)
 
     app = FastAPI(title="Athena API", version="0.1.0", lifespan=lifespan)
 
@@ -135,6 +145,25 @@ def create_app(
     else:
         # Explicit host/test adapters own their authentication and offering policy.
         resolve_lecturer = resolve_lecturer or dev_lecturer_resolver
+
+    app.add_middleware(OperationalLimits)
+
+    @app.get("/ready")
+    def readiness():
+        from .playground.bridge import BUNDLE
+        ai = getattr(sessions.tutor, "mode", "injected")
+        statuses = {}
+        if hasattr(app.state, 'spaces'):
+            with app.state.spaces.lock:
+                statuses = {r[0]: time.time() - r[1] < 60 for r in app.state.spaces.db.execute('SELECT kind,updated FROM worker_status')}
+                if app.state.spaces.db.execute("SELECT 1 FROM material_jobs WHERE status='processing' AND lease_until>?", (time.time(),)).fetchone():
+                    statuses['indexing'] = True
+        result = {"ready": ai == "ai" and BUNDLE.exists() and getattr(app.state, "retention_available", True) and statuses.get('execution', False) and statuses.get('indexing', False),
+                "tutor_mode": ai, "playground_engine": BUNDLE.exists(),
+                "retention": getattr(app.state, "retention_available", None),
+                "workers": {name: statuses.get(name, False) for name in ('execution', 'indexing')}}
+        return JSONResponse(result, status_code=200 if result["ready"] else 503)
+
 
     app.include_router(srs_router(srs, resolve_student))
     app.include_router(bank_router(BankAdmin(srs.store), resolve_lecturer))

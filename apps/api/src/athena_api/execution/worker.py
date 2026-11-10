@@ -96,6 +96,10 @@ def execute(source, name, cancelled=lambda: False, image=None):
             return None, 'Python execution container is unavailable. Check the worker and configured image.'
         stdout = output['stdout'].decode('utf-8', errors='replace')
         stderr = output['stderr'].decode('utf-8', errors='replace')
+        if len(stdout.encode()) + len(stderr.encode()) > OUTPUT_LIMIT:
+            reason = 'OutputLimitExceeded'
+            stdout = stdout.encode()[:OUTPUT_LIMIT].decode('utf-8', errors='ignore')
+            stderr = stderr.encode()[:OUTPUT_LIMIT - len(stdout.encode())].decode('utf-8', errors='ignore')
         result = {'ok': code == 0 and not reason, 'provenance': 'real-run', 'stdout': stdout,
                   'values': {}, 'trace': [], 'duration_ms': round((time.monotonic() - started) * 1000),
                   'capabilities': {'trace': False, 'variable_inspection': False}}
