@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react'
 import type { Rating, SrsAttemptResult } from '../../../api/srs'
 import { Button } from '../../../components/ui'
 import { cn } from '../../../lib/cn'
+import { formatTimestamp } from '../../../lib/format'
+import type { ClipSuggestion } from './clipSuggestions'
 
 const ratingLabel: Record<Rating, { label: string; hint: string }> = {
   again: { label: 'Again', hint: 'I didn’t know it' },
@@ -12,12 +14,15 @@ const ratingLabel: Record<Rating, { label: string; hint: string }> = {
 
 interface Props {
   result: SrsAttemptResult
+  /** Lecture clips to rewatch, shown when the answer was wrong (or self-assessed). */
+  suggestions: ClipSuggestion[]
+  onWatch: (s: ClipSuggestion) => void
   busy: boolean
   onRate: (rating: Rating) => void
   onNext: () => void
 }
 
-export function FeedbackPanel({ result, busy, onRate, onNext }: Props) {
+export function FeedbackPanel({ result, suggestions, onWatch, busy, onRate, onNext }: Props) {
   const heading = useRef<HTMLHeadingElement>(null)
   const { correct, feedback } = result
 
@@ -55,6 +60,33 @@ export function FeedbackPanel({ result, busy, onRate, onNext }: Props) {
         </div>
       )}
       <p className="text-sm text-muted">{feedback.explanation}</p>
+
+      {correct !== true && suggestions.length > 0 && (
+        <div className="rounded-lg border border-line p-3">
+          <p className="mb-2 text-sm font-medium">Rewatch the lecture</p>
+          <ul className="space-y-1.5">
+            {suggestions.map((sg) => (
+              <li key={sg.clip.id}>
+                <button
+                  type="button"
+                  onClick={() => onWatch(sg)}
+                  className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-line/40"
+                >
+                  <span aria-hidden>▶</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{sg.clip.title}</span>
+                    <span className="block text-xs text-muted">
+                      {sg.lecture.week > 0 && `Week ${sg.lecture.week} · `}
+                      {formatTimestamp(sg.clip.startS)}–{formatTimestamp(sg.clip.endS)}
+                      {sg.reason === 'linked' && ' · this question came from here'}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {result.needs_rating ? (
         <div>

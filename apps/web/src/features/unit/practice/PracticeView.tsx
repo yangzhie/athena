@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiUnavailable } from '../../../components/ApiUnavailable'
 import { asApiError, type ApiError } from '../../../api/client'
 import {
@@ -10,7 +10,13 @@ import {
   type SrsNext,
 } from '../../../api/srs'
 import { Badge, Card } from '../../../components/ui'
+import { listLectures } from '../../../api/lectures'
 import { formatRelative } from '../../../lib/format'
+import type { LectureRecording } from '../../../types'
+import { openInPanel } from '../panel/panelStore'
+import { studentView } from '../review/applyReview'
+import { useDecisions } from '../review/reviewStore'
+import { suggestClips } from './clipSuggestions'
 import { UnitHeader } from '../UnitHeader'
 import { useOffering } from '../useOffering'
 import { FeedbackPanel } from './FeedbackPanel'
@@ -40,6 +46,27 @@ export default function PracticeView() {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [busy, setBusy] = useState(false)
   const [tally, setTally] = useState({ answered: 0, right: 0 })
+  const [lectures, setLectures] = useState<LectureRecording[]>([])
+  const decisions = useDecisions()
+
+  // The unit's clips, as students see them (approved only), for "rewatch" suggestions.
+  useEffect(() => {
+    let cancelled = false
+    void listLectures(offering.id).then((l) => !cancelled && setLectures(l))
+    return () => {
+      cancelled = true
+    }
+  }, [offering.id])
+  const visible = useMemo(() => lectures.map((l) => studentView(l, decisions)), [lectures, decisions])
+
+  const suggestions =
+    state.phase === 'question' && state.result
+      ? suggestClips(visible, {
+          clipIds: state.result.feedback.clip_ids,
+          topicId: state.next.topic_id,
+          text: `${state.next.question.stem} ${state.result.feedback.explanation}`,
+        })
+      : []
 
   const load = useCallback(async () => {
     setState(await fetchState(offering.id))
@@ -129,7 +156,14 @@ export default function PracticeView() {
               onSubmit={(v) => void answer(v)}
             />
             {state.result && (
-              <FeedbackPanel result={state.result} busy={busy} onRate={(r) => void rate(r)} onNext={() => void load()} />
+              <FeedbackPanel
+                result={state.result}
+                suggestions={suggestions}
+                onWatch={(sg) => openInPanel(offering.id, { kind: 'clip', clip: sg.clip, lecture: sg.lecture })}
+                busy={busy}
+                onRate={(r) => void rate(r)}
+                onNext={() => void load()}
+              />
             )}
           </Card>
         </>

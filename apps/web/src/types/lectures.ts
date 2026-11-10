@@ -24,6 +24,8 @@ export interface LectureClip {
   recordingId: string
   title: string
   topic: string
+  /** The unit topic id (e.g. "insertion-sort"), used to match clips to questions. */
+  topicId?: string
   summary: string
   startS: number
   endS: number

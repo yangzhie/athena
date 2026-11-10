@@ -22,6 +22,7 @@ interface IndexedFile {
     recordingId: string
     title: string
     topic: string
+    topicId?: string
     summary: string
     startS: number
     endS: number
@@ -49,6 +50,7 @@ export const indexedLectures: LectureRecording[] = Object.values(files)
       recordingId: c.recordingId,
       title: c.title,
       topic: c.topic,
+      topicId: c.topicId,
       summary: c.summary,
       startS: c.startS,
       endS: c.endS,
