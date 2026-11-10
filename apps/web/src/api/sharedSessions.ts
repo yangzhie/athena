@@ -50,21 +50,31 @@ export async function listSharedSessions(offeringId: string) {
   return (await call<SummaryDto[]>(base(offeringId))).map(toSummary)
 }
 
+const toMessage = (m: MessageDto): ChatMessage => ({
+  id: m.id,
+  role: m.role,
+  content: m.content,
+  sources: toSourceList(m.sources),
+  knowledgeOrigin: m.knowledge_origin ?? undefined,
+  activity: m.activity ?? undefined,
+  answerFor: m.answer_for ?? undefined,
+  createdAt: m.created_at,
+})
+
+/** Reply in the thread; the student sees it in their chat. */
+export async function replyToSharedSession(offeringId: string, shareId: string, text: string) {
+  return toMessage(
+    await call<MessageDto>(`${base(offeringId)}/${encodeURIComponent(shareId)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+  )
+}
+
 export async function getSharedSession(offeringId: string, shareId: string) {
   const r = await call<{ session: SummaryDto; messages: MessageDto[] }>(`${base(offeringId)}/${encodeURIComponent(shareId)}`)
   return {
     session: toSummary(r.session),
-    messages: r.messages.map(
-      (m): ChatMessage => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        sources: toSourceList(m.sources),
-        knowledgeOrigin: m.knowledge_origin ?? undefined,
-        activity: m.activity ?? undefined,
-        answerFor: m.answer_for ?? undefined,
-        createdAt: m.created_at,
-      }),
-    ),
+    messages: r.messages.map(toMessage),
   }
 }

@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError
 
 from ..auth import LecturerResolver, StudentResolver, lecturer_dependency, student_dependency
-from .models import LearningSessionOut, Message, SharedSessionSummary, SharedSessionView
+from .models import LearningSessionOut, Message, SharedMessage, SharedSessionSummary, SharedSessionView
 from .service import NotFound, SessionService
 from .shared import NotShared, SharedSessions
 from .tutor import TutorError
@@ -137,6 +137,14 @@ def shared_sessions_router(shared: SharedSessions, resolve_lecturer: LecturerRes
     def view(offering_id: str, share_id: str, _: Lecturer):
         try:
             return shared.view(offering_id, share_id)
+        except NotShared as e:
+            raise HTTPException(404, str(e)) from None
+
+    @router.post("/{share_id}/messages", response_model=SharedMessage, status_code=201)
+    def reply(offering_id: str, share_id: str, body: MessageBody, _: Lecturer):
+        """Reply in the thread. Only while the student keeps sharing."""
+        try:
+            return shared.reply(offering_id, share_id, body.text)
         except NotShared as e:
             raise HTTPException(404, str(e)) from None
 

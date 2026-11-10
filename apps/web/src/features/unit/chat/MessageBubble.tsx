@@ -9,6 +9,7 @@ export function MessageBubble({
   offeringId,
   open = false,
   busy = false,
+  viewer = 'student',
   onAnswer,
   onContinue,
 }: {
@@ -20,11 +21,13 @@ export function MessageBubble({
   busy?: boolean
   onAnswer?: (input: { choiceId?: string; text?: string; shown: string }) => void
   onContinue?: () => void
+  /** Who is reading: labels change in a lecturer's view of a shared session. */
+  viewer?: 'student' | 'lecturer'
 }) {
   if (message.role === 'lecturer') {
     return (
       <div className="rounded-xl border border-accent/40 bg-accent-soft/50 px-4 py-3 text-[0.9375rem] leading-relaxed">
-        <p className="mb-1 text-xs font-medium text-accent">Your lecturer</p>
+        <p className="mb-1 text-xs font-medium text-accent">{viewer === 'lecturer' ? 'You (lecturer)' : 'Your lecturer'}</p>
         <p className="whitespace-pre-wrap">{message.content}</p>
       </div>
     )
@@ -32,7 +35,8 @@ export function MessageBubble({
 
   if (message.role === 'learner') {
     return (
-      <div className="flex justify-end">
+      <div className="flex flex-col items-end">
+        {viewer === 'lecturer' && <p className="mb-1 text-xs text-muted">Student</p>}
         <p className="max-w-[85%] rounded-2xl rounded-br-sm bg-accent-soft px-4 py-2.5 text-[0.9375rem] leading-relaxed whitespace-pre-wrap">
           {message.content}
         </p>

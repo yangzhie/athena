@@ -31,7 +31,8 @@ class LearningSession(Model):
 class Message(Model):
     id: NonBlank
     session_id: NonBlank
-    role: Literal["tutor", "learner"]
+    #: lecturer = a reply from the unit's lecturer while the student shares the session.
+    role: Literal["tutor", "learner", "lecturer"]
     content: NonBlank
     #: Tutor messages: the material the reply is based on (agent SourceReference dicts).
     sources: list[dict] = Field(default_factory=list)

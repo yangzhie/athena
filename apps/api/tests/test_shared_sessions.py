@@ -79,3 +79,39 @@ def test_only_lecturers_of_that_unit(client):
     client.who["lecturer"] = None
     assert client.get(SHARED).status_code == 403
     assert client.get(f"{SHARED}/{share_id}").status_code == 403
+
+
+def test_lecturer_reply_reaches_the_students_chat(client):
+    sid = start(client)
+    client.post(f"{MINE}/{sid}/share")
+    share_id = client.get(SHARED).json()[0]["share_id"]
+    r = client.post(f"{SHARED}/{share_id}/messages", json={"text": "Think of each fold as a turn being the test set."})
+    assert r.status_code == 201 and r.json()["role"] == "lecturer"
+    assert "alice-12345" not in r.text
+
+    mine = client.get(f"{MINE}/{sid}").json()["messages"]
+    assert mine[-1]["role"] == "lecturer" and mine[-1]["content"].startswith("Think of each fold")
+    assert client.get(f"{SHARED}/{share_id}").json()["messages"][-1]["role"] == "lecturer"
+
+
+def test_reply_doesnt_go_to_the_tutor_and_student_chat_continues(client):
+    sid = start(client)
+    client.post(f"{MINE}/{sid}/share")
+    share_id = client.get(SHARED).json()[0]["share_id"]
+    client.post(f"{SHARED}/{share_id}/messages", json={"text": "Nice question!"})
+    before = len(client.get(f"{MINE}/{sid}").json()["messages"])
+    assert before == 4  # opening, learner, tutor, lecturer: no tutor reply to the lecturer
+    learner, tutor = client.post(f"{MINE}/{sid}/messages", json={"text": "Thanks, and what about stratified folds?"}).json()
+    assert (learner["role"], tutor["role"]) == ("learner", "tutor")
+
+
+def test_no_replies_once_sharing_stops_or_from_non_lecturers(client):
+    sid = start(client)
+    client.post(f"{MINE}/{sid}/share")
+    share_id = client.get(SHARED).json()[0]["share_id"]
+    client.who["lecturer"] = None
+    assert client.post(f"{SHARED}/{share_id}/messages", json={"text": "hi"}).status_code == 403
+    client.who["lecturer"] = "dr-liu"
+    client.delete(f"{MINE}/{sid}/share")
+    assert client.post(f"{SHARED}/{share_id}/messages", json={"text": "hi"}).status_code == 404
+    assert client.post(f"{SHARED}/nope/messages", json={"text": " "}).status_code == 422

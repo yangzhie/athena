@@ -7,7 +7,10 @@ student id, no session id.
 """
 
 import hashlib
-from dataclasses import dataclass
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from .models import LearningSession, Message, SharedMessage, SharedSessionSummary, SharedSessionView
 from .store import SessionStore
@@ -25,6 +28,7 @@ def _message_id(token: str, message_id: str) -> str:
 @dataclass
 class SharedSessions:
     store: SessionStore
+    clock: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
 
     def _find(self, offering_id: str, share_id: str) -> LearningSession:
         s = next((s for s in self.store.shared(offering_id) if s.share_token == share_id), None)
@@ -42,17 +46,28 @@ class SharedSessions:
         sessions = sorted(self.store.shared(offering_id), key=lambda s: s.updated_at, reverse=True)
         return [self._summary(s) for s in sessions]
 
+    def reply(self, offering_id: str, share_id: str, text: str) -> SharedMessage:
+        """A lecturer's reply, added to the student's session (they see it in their chat).
+
+        It isn't sent to the tutor agent as the student's input: the agent's view of
+        what the student knows comes only from the student.
+        """
+        s = self._find(offering_id, share_id)
+        m = Message(id=uuid.uuid4().hex, session_id=s.id, role="lecturer", content=text.strip(), created_at=self.clock())
+        self.store.add_message(s.student_id, m)
+        self.store.put(s.model_copy(update={"updated_at": self.clock()}))  # surfaces the session in the student's list
+        return self._shared_message(share_id, m)
+
+    def _shared_message(self, share_id: str, m: Message) -> SharedMessage:
+        return SharedMessage(
+            id=_message_id(share_id, m.id), role=m.role, content=m.content, sources=m.sources,
+            knowledge_origin=m.knowledge_origin, activity=m.activity, answer_for=m.answer_for, created_at=m.created_at,
+        )
+
     def view(self, offering_id: str, share_id: str) -> SharedSessionView:
         s = self._find(offering_id, share_id)
         messages: list[Message] = self.store.messages(s.student_id, s.id)
         return SharedSessionView(
             session=self._summary(s),
-            messages=[
-                SharedMessage(
-                    id=_message_id(share_id, m.id), role=m.role, content=m.content, sources=m.sources,
-                    knowledge_origin=m.knowledge_origin, activity=m.activity, answer_for=m.answer_for,
-                    created_at=m.created_at,
-                )
-                for m in messages
-            ],
+            messages=[self._shared_message(share_id, m) for m in messages],
         )

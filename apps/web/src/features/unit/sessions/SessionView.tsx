@@ -13,8 +13,12 @@ export default function SessionView() {
   const { sessionId = '' } = useParams()
   const thread = useThread(sessionId)
 
+  // Fresh on open and whenever the tab regains focus, so a lecturer's reply shows up.
   useEffect(() => {
-    void loadThread(offering.id, sessionId)
+    void loadThread(offering.id, sessionId, { refresh: true })
+    const onFocus = () => void loadThread(offering.id, sessionId, { refresh: true })
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [offering.id, sessionId])
 
   if (thread.status === 'loading') {

@@ -19,11 +19,13 @@ const controllers = new Map<string, AbortController>()
 
 export const useThread = store.use
 
-export async function loadThread(offeringId: string, sessionId: string) {
+/** Fetch the session's messages. Without `refresh`, a thread already loaded is reused. */
+export async function loadThread(offeringId: string, sessionId: string, { refresh = false } = {}) {
   const current = store.get(sessionId)
-  if (current.status === 'ready' || current.sending) return
+  if (current.sending || (current.status === 'ready' && !refresh)) return
   try {
     const { session, messages } = await getSession(offeringId, sessionId)
+    if (store.get(sessionId).sending) return  // a turn started meanwhile; it brings its own messages
     store.set(sessionId, { status: 'ready', session, messages, sending: false })
   } catch (e) {
     const error = asApiError(e)
