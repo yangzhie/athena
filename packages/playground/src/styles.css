@@ -1,0 +1,28 @@
+/*
+ * Import after Tailwind in the host app's stylesheet. The host provides the
+ * design tokens (--color-surface, --color-accent, ...); this file makes
+ * Tailwind scan the package's classes and adds the canvas animations.
+ */
+@source "./";
+
+@keyframes pg-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pg-drop {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(108px);
+    opacity: 0.2;
+  }
+}
