@@ -7,6 +7,9 @@ from fastapi import FastAPI
 
 from .auth import LecturerResolver, StudentResolver, dev_lecturer_resolver, dev_student_resolver
 from .env import load_dotenv
+from .lectures.api import lectures_router
+from .lectures.service import LectureService
+from .lectures.store import SqliteLectureStore
 from .sessions.agent_tutor import agent_tutor_from_env
 from .sessions.api import sessions_router
 from .sessions.service import SessionService
@@ -24,6 +27,7 @@ def create_app(
     *,
     srs: SrsService | None = None,
     sessions: SessionService | None = None,
+    lectures: LectureService | None = None,
     resolve_student: StudentResolver = dev_student_resolver,
     resolve_lecturer: LecturerResolver = dev_lecturer_resolver,
 ) -> FastAPI:
@@ -33,14 +37,16 @@ def create_app(
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    if srs is None or sessions is None:
+    if srs is None or sessions is None or lectures is None:
         load_dotenv()
         db = Path(os.environ.get("ATHENA_DB", "data/athena.db"))
+        lectures = lectures or LectureService(SqliteLectureStore(db))
         srs = srs or SrsService(SqliteStore(db), rephraser=_rephraser())
         sessions = sessions or SessionService(SqliteSessionStore(db), tutor=agent_tutor_from_env() or PlaceholderTutor())
     app.include_router(srs_router(srs, resolve_student))
     app.include_router(bank_router(BankAdmin(srs.store), resolve_lecturer))
     app.include_router(sessions_router(sessions, resolve_student))
+    app.include_router(lectures_router(lectures, resolve_student, resolve_lecturer))
     return app
 
 

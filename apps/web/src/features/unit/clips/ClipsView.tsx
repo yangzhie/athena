@@ -5,16 +5,13 @@ import type { clipsLoader } from '../loader'
 import { UnitHeader } from '../UnitHeader'
 import { useOffering } from '../useOffering'
 import { openInPanel, usePanel } from '../panel/panelStore'
-import { studentView } from '../review/applyReview'
-import { useDecisions } from '../review/reviewStore'
 import { ClipRow } from './ClipRow'
 
 /** The unit's lecture clips: recordings split by topic by lecture indexing, newest week first. */
 export default function ClipsView() {
   const offering = useOffering()
-  const decisions = useDecisions()
-  // Students only ever see approved clips, with the lecturer's edits applied.
-  const lectures = useLoaderData<typeof clipsLoader>().lectures.map((l) => studentView(l, decisions))
+  // Approved clips only, with the lecturer's edits applied (filtered by the API).
+  const { lectures } = useLoaderData<typeof clipsLoader>()
   const clipCount = lectures.reduce((n, l) => n + l.clips.length, 0)
   const panel = usePanel(offering.id)
   const playingId = panel?.kind === 'clip' ? panel.clip.id : null

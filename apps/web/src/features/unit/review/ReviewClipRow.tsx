@@ -2,8 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Badge, Button, type Tone } from '../../../components/ui'
 import { cn } from '../../../lib/cn'
 import { formatTimestamp, parseTimestamp } from '../../../lib/format'
-import type { ReviewedClip, ReviewStatus } from './applyReview'
-import { decide, editClip, resetClip } from './reviewStore'
+import type { ReviewedClip, ReviewStatus } from './types'
 
 const statusMeta: Record<ReviewStatus, { label: string; icon: string; tone: Tone }> = {
   approved: { label: 'Approved', icon: '✓', tone: 'good' },
@@ -19,17 +18,22 @@ interface Props {
   /** Neighbouring clips' bounds, so edits can't overlap them. */
   prevEndS: number
   nextStartS: number
+  busy: boolean
   onPreview: () => void
+  onStatus: (status: ReviewStatus) => void
+  onReset: () => void
+  /** Returns an error message, or null when saved. */
+  onEdit: (edit: { title: string; startS: number; endS: number }) => Promise<string | null>
 }
 
-export function ReviewClipRow({ clip, durationS, prevEndS, nextStartS, onPreview }: Props) {
+export function ReviewClipRow({ clip, durationS, prevEndS, nextStartS, busy, onPreview, onStatus, onReset, onEdit }: Props) {
   const [editing, setEditing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const meta = statusMeta[clip.status]
   const edited =
     clip.title !== clip.original.title || clip.startS !== clip.original.startS || clip.endS !== clip.original.endS
 
-  function save(e: FormEvent<HTMLFormElement>) {
+  async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const data = new FormData(e.currentTarget)
     const title = String(data.get('title')).trim()
@@ -40,15 +44,15 @@ export function ReviewClipRow({ clip, durationS, prevEndS, nextStartS, onPreview
     if (endS <= startS) return setError('The end must be after the start.')
     if (endS > durationS) return setError(`The lecture ends at ${formatTimestamp(durationS)}.`)
     if (startS < prevEndS || endS > nextStartS) return setError('Clips can’t overlap their neighbours.')
-    editClip(clip.id, { title, startS, endS })
-    setError(null)
-    setEditing(false)
+    const failed = await onEdit({ title, startS, endS })
+    setError(failed)
+    if (!failed) setEditing(false)
   }
 
   return (
     <li id={`review-${clip.id}`} className={cn('scroll-mt-24 px-5 py-4', clip.status === 'rejected' && 'opacity-60')}>
       {editing ? (
-        <form onSubmit={save} className="space-y-3">
+        <form onSubmit={(e) => void save(e)} className="space-y-3">
           <input name="title" defaultValue={clip.title} aria-label="Clip title" className={cn(field, 'w-full font-medium')} />
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <input name="start" defaultValue={formatTimestamp(clip.startS)} aria-label="Start time" className={cn(field, 'w-24 tabular-nums')} />
@@ -79,13 +83,13 @@ export function ReviewClipRow({ clip, durationS, prevEndS, nextStartS, onPreview
             <Button variant="ghost" size="sm" onClick={onPreview}>▶ Preview</Button>
             <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>Edit</Button>
             {clip.status !== 'approved' && (
-              <Button variant="secondary" size="sm" onClick={() => decide(clip.id, 'approved')}>Approve</Button>
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => onStatus('approved')}>Approve</Button>
             )}
             {clip.status !== 'rejected' && (
-              <Button variant="secondary" size="sm" onClick={() => decide(clip.id, 'rejected')}>Reject</Button>
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => onStatus('rejected')}>Reject</Button>
             )}
             {clip.decided && (
-              <Button variant="ghost" size="sm" onClick={() => resetClip(clip.id)} title="Undo your decision and edits">Undo</Button>
+              <Button variant="ghost" size="sm" disabled={busy} onClick={onReset} title="Undo your decision and edits">Undo</Button>
             )}
           </div>
         </div>

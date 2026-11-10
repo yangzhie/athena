@@ -64,6 +64,28 @@ that lecturer for every unit; real roles come from SSO. No student data is retur
 | `PATCH …/srs/bank/items/{item}/variants/{variant}` | edit the wording's text and answer fields (validated; status unchanged) |
 | `POST …/srs/bank/approve-pending` | `{item_ids?}` → approve every pending wording |
 
+## Lectures
+
+Lectures come from `workers/indexer` and are imported into the API:
+
+```sh
+uv run athena-lectures import ../../workers/indexer/data/<recording>/clips.json
+```
+
+Each clip keeps the indexer's proposal and the lecturer's review separately. Clips
+start pending; re-importing a re-indexed lecture keeps the review of unchanged clips.
+
+| Route | Who | Does |
+| --- | --- | --- |
+| `GET /units/{offering}/lectures` | students | approved clips only, edits applied, **no transcripts** |
+| `GET /units/{offering}/lectures/review` | lecturers | every clip with status and the indexer's proposal |
+| `POST …/lectures/{lecture}/clips/{clip}/status` | lecturers | `{status: approved \| rejected \| pending}` |
+| `PATCH …/lectures/{lecture}/clips/{clip}` | lecturers | `{title, start_s, end_s}` rename/retime (validated; approves a pending clip) |
+| `DELETE …/lectures/{lecture}/clips/{clip}/review` | lecturers | undo the decision and edits |
+| `POST …/lectures/{lecture}/approve-pending` | lecturers | approve every pending clip |
+
+Only approved clips' transcripts are used as material for the tutor.
+
 ## Sessions API
 
 A student's learning sessions in a unit: each is one chat with a goal they chose.
