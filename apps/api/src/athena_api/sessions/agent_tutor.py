@@ -163,8 +163,14 @@ class AgentTutor:
                 if concept:
                     query += ' ' + concept.title
             if operation.kind == 'message':
-                query += ' ' + operation.payload['text'][:300]
-            items = self.material.for_goal(session.offering_id, query)
+                # The student's question is the primary retrieval query. A broad
+                # goal must not crowd its passages out of the five-item context.
+                question = operation.payload['text']
+                items = self.material.for_goal(session.offering_id, question)
+                if not items:
+                    items = self.material.for_goal(session.offering_id, query)
+            else:
+                items = self.material.for_goal(session.offering_id, query)
             knowledge = KnowledgeService(LearnerScopedMemory(staged, session.student_id))
             if items:
                 await knowledge.supply(context, RetrievalResult.model_validate({'items': items}))
@@ -226,7 +232,9 @@ class AgentTutor:
 
     async def message(self, session: LearningSession, text: str) -> list[TutorReply]:
         result = await self._run(self._orchestrator(session).message(self._context(session), text))
-        replies = [TutorReply(result.reply.text)]
+        replies = [TutorReply(result.reply.text,
+                              sources=[r.model_dump(mode='json') for r in result.reply.sources],
+                              knowledge_origin=result.reply.knowledge_origin)]
         if result.activity is not None:
             replies.append(activity_reply(result.activity))
         return replies

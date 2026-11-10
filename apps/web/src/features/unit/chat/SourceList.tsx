@@ -6,8 +6,8 @@ import { openInPanel } from '../panel/panelStore'
 
 const originNote: Record<KnowledgeOrigin, string | null> = {
   materials: null,
-  supplement: 'Includes general knowledge beyond your unit’s material.',
-  general: 'Not found in your unit’s material. General knowledge only.',
+  supplement: 'Combines cited material with labelled general-knowledge additions.',
+  general: 'General knowledge: I couldn’t verify this from the material retrieved for this question.',
 }
 
 function label(s: SourceReference) {

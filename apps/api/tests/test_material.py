@@ -119,6 +119,7 @@ def test_start_falls_back_to_no_materials_when_agent_finds_them_insufficient():
     [reply] = asyncio.run(tutor.start(session))
     assert calls[0] is not None and calls[1] is None
     assert reply.content == "What do you know about it?"
+    assert reply.knowledge_origin == 'general' and reply.sources == []
     assert TutorError  # imported for clarity: 409s trigger the fallback
 
 

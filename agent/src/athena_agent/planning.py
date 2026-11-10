@@ -52,7 +52,7 @@ class PlanningService:
             model,
             **({'additional_context': inputs} if inputs is not None else {}),
         )
-        return await generate_grounded(self._llm, self.context_builder, topic, messages, model)
+        return await generate_grounded(self._llm, self.context_builder, topic, messages, model, repair=True)
 
     async def interpret_goal(
         self, text: str, clarification_turns: Sequence[ConversationTurn] = (),

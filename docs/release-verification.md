@@ -40,6 +40,28 @@ ordinary course directions from rule overrides. The allowance was exhausted befo
 that prompt refinement could be checked live. Full live grounded session startup
 is still unverified; offline fixture success does not establish live model quality.
 
+Material coverage and general-knowledge answers (11 November): the host now
+retrieves against the current question before falling back to goal/Concept context.
+Comparison ranking rewards coverage of both subjects. A read-only check of the
+uploaded Data Mining slides selected pages 28, 29, 30 and 3 for the regression versus
+classification question; it made no model calls and did not modify the Offering.
+Topic changes retain the material selected for the current question, and ordinary
+chat replies preserve citations and knowledge origin through host storage.
+
+Chat can combine verified material-supported parts with server-labelled general
+additions. Missing coverage permits a general explanation after at most one
+grounded repair; teaching and hints have the same bounded fallback policy.
+Assessment evaluation, source conflicts, contradictions, invalid references,
+provider failures and source-instruction overrides never use that fallback.
+The general-answer badge describes an inability to verify against retrieved
+material rather than absence from the entire Offering. Regression tests cover
+the comparison, missing/partial coverage, retry replay, database reload, anonymous
+sharing, unchanged grading state and frontend provenance rendering. Verification
+of this change is offline; no additional paid calls were authorised or made.
+The completed checks passed: 739 agent/API tests (six opt-in skips), 57 frontend
+tests, frontend lint and the production build. Final targeted checks also verified
+that clarification questions do not receive a misleading general-answer badge.
+
 A bounded paid acceptance used 12 calls total with `gpt-4.1-mini` and SDK retries
 disabled. Mean model-call latency was about 2.54 seconds; token-based cost estimate
 was USD 0.005435 using the [published pricing](https://developers.openai.com/api/docs/models/gpt-4.1-mini).

@@ -2,13 +2,14 @@
 
 from typing import Literal, Self
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from ._schema import Contract, NonBlankString
 from .contracts import RequestContext
 from .memory import LearningMemoryStore
 from .context import ContextBuilder
-from .grounding import generate_grounded
+from .answers import answer_question
+from .retrieval import SourceReference
 from .conversation import (
     ConversationError, ConversationSession, ConversationTurn, InMemoryConversationStore,
     TopicContext,
@@ -35,6 +36,8 @@ class IntentDecision(Contract):
 class ConversationReply(Contract):
     text: NonBlankString
     discussion_focus: NonBlankString | None = None
+    sources: list[SourceReference] = Field(default_factory=list)
+    knowledge_origin: Literal['materials', 'supplement', 'general'] | None = None
 
 
 _ROUTE = '''Classify the learner's current message in the active learning discussion.
@@ -65,10 +68,12 @@ class ConversationManager:
 
     def _prepare_topic(self, session: ConversationSession, decision: IntentDecision) -> None:
         if decision.intent == 'topic_change':
+            knowledge = session.active_topic.knowledge if session.active_topic else None
             if session.active_topic is not None:
                 session.archived_topics.append(session.active_topic.model_copy(deep=True))
             session.active_topic = TopicContext(
                 learning_state=LearningState(goal=decision.new_goal),
+                knowledge=knowledge.model_copy(deep=True) if knowledge is not None else None,
             )
 
     async def send(self, context: RequestContext, text: str) -> ConversationReply:
@@ -89,10 +94,9 @@ class ConversationManager:
             else:
                 self._prepare_topic(session, decision)
                 topic = session.active_topic
-                reply = await generate_grounded(
-                    self._llm, self.context_builder, topic,
-                    self._messages(topic, incoming.content, _REPLY, ConversationReply), ConversationReply,
-                )
+                answer = await answer_question(self._llm, self.context_builder, topic, incoming.content, _REPLY)
+                reply = ConversationReply(text=answer.text, discussion_focus=answer.discussion_focus,
+                                          sources=answer.sources, knowledge_origin=answer.origin)
             turn = ConversationTurn(user_text=incoming.content, assistant_text=reply.text)
             session.history.append(turn)
             topic.history.append(turn.model_copy(deep=True))

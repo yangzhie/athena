@@ -8,7 +8,7 @@ from pydantic import Field, model_validator
 from ._schema import Contract, NonBlankString
 from .adaptation import adjust_learning
 from .context import ContextBuilder
-from .grounding import generate_grounded
+from .grounding import generate_grounded, generate_learning_content
 from .contracts import RequestContext
 from .memory import LearningMemoryStore
 from .conversation import ConversationError, InMemoryConversationStore, TopicContext
@@ -120,7 +120,7 @@ class TeachingService:
                     **({'reference_materials': topic.knowledge.model_dump()} if supplement else {}),
                 },
             )
-            draft = await generate_grounded(self._llm, self.context_builder, generation_topic, messages, ExplanationDraft)
+            draft = await generate_learning_content(self._llm, self.context_builder, generation_topic, messages, ExplanationDraft)
             if self.store.read(context).revision != session.revision:
                 raise ConversationError('The session changed; retry this interaction.')
             return ExplanationActivity(activity_id=str(uuid4()), concept_id=concept.concept_id, text=draft.text, sources=draft._source_references, knowledge_origin='supplement' if supplement else 'general', content=draft.content or TeachingContent(summary=draft.text))
@@ -148,7 +148,7 @@ class TeachingService:
                 'Do not infer mastery or reveal private assessment criteria.',
                 ExplanationDraft, additional_context={'concept': concept.model_dump(), 'question': question.model_dump()},
             )
-            draft = await generate_grounded(self._llm, self.context_builder, topic, messages, ExplanationDraft)
+            draft = await generate_learning_content(self._llm, self.context_builder, topic, messages, ExplanationDraft)
             if self.store.read(context).revision != session.revision:
                 raise ConversationError('The session changed; retry this interaction.')
             return HintActivity(activity_id=str(uuid4()), question_id=question_id, text=draft.text, sources=draft._source_references)

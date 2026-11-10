@@ -29,11 +29,11 @@ FIXTURE = json.loads((Path(__file__).parents[3] / "agent/tests/fixtures/api_jour
 BASE = "/units/cse5alg-2026-s2/sessions"
 
 
-def make_client(responses):
+def make_client(responses, host_store=None):
     agent_store = InMemoryConversationStore()
     tutor = AgentTutor(agent_store, ReliableLLM(MockLLM(responses), policy=RetryPolicy(max_attempts=1)))
     who = {"id": "alice"}
-    app = create_app(srs=SrsService(MemoryStore()), sessions=SessionService(MemorySessionStore(), tutor=tutor),
+    app = create_app(srs=SrsService(MemoryStore()), sessions=SessionService(host_store or MemorySessionStore(), tutor=tutor),
                      resolve_student=lambda _r: who["id"])
     return TestClient(app), agent_store, who
 
@@ -86,6 +86,54 @@ def test_agent_failure_on_start_leaves_no_half_session():
     r = client.post(BASE, json={"goal": "Bubble Sort"})
     assert r.status_code == 503 and "unavailable" in r.json()["detail"]
     assert client.get(BASE).json() == []
+
+
+@pytest.mark.parametrize('mixed', [False, True])
+def test_question_first_answers_preserve_sources_through_retry_restart_and_share(tmp_path, mixed):
+    from types import SimpleNamespace
+    from athena_api.sessions.store import SqliteSessionStore
+    from athena_api.sessions.shared import SharedSessions
+    parts = [{'text': 'Regression predicts numbers; classification predicts labels.', 'origin': 'materials'}]
+    if mixed:
+        parts.append({'text': 'House price prediction is a regression example.', 'origin': 'general'})
+    check = {'supported': True, 'evidence': [{'source_index': 0, 'quote_index': 0}]}
+    responses = [*FIXTURE['responses'][:4], {'intent': 'continue'}, {'parts': parts}, check]
+    path = tmp_path / 'host.db'
+    client, _, _ = make_client(responses, host_store=SqliteSessionStore(path))
+    service = client.app.state.sessions
+    opening = client.post(BASE, json={'goal': 'Bubble Sort'}).json()
+    sid = opening['session']['id']
+    queries = []
+    source = dict(kind='document', source_id='slides-v1', passage_id='page-28', title='Prediction', page=28,
+                  text='Regression predicts numbers.\nClassification predicts labels.')
+    def retrieve(offering, query):
+        queries.append(query)
+        return [source]
+    service.tutor.material = SimpleNamespace(for_goal=retrieve)
+    url = f'{BASE}/{sid}/messages'
+    question = 'What is the difference between regression and classification?'
+    headers = {'Idempotency-Key': 'comparison'}
+    response = client.post(url, json={'text': question}, headers=headers)
+    assert response.status_code == 200, response.json()
+    reply = response.json()[1]
+    assert reply['knowledge_origin'] == ('supplement' if mixed else 'materials')
+    assert reply['sources'][0]['page'] == 28 and reply['sources'][0]['quote'] == source['text']
+    assert queries == [question]
+    if mixed:
+        assert '**General-knowledge addition:**' in reply['content']
+    call_count = len(service.tutor.llm._llm.calls)
+    service.store = SqliteSessionStore(path)  # Reload persisted messages and receipts.
+    assert client.post(url, json={'text': question}, headers=headers).json() == response.json()
+    assert len(service.tutor.llm._llm.calls) == call_count and queries == [question]
+    stored = client.get(f'{BASE}/{sid}').json()['messages']
+    assert next(m for m in stored if m['id'] == reply['id']) == reply
+    assert len([m for m in stored if m['role'] == 'learner']) == 1
+    service.share('alice', 'cse5alg-2026-s2', sid)
+    token = service.store.get('alice', sid).share_token
+    shared = SharedSessions(service.store).view('cse5alg-2026-s2', token)
+    shared_reply = next(m for m in shared.messages if m.content == reply['content'])
+    assert shared_reply.sources == reply['sources'] and shared_reply.knowledge_origin == reply['knowledge_origin']
+    assert shared_reply.id != reply['id']
 
 
 @pytest.mark.parametrize('kind', ['document', 'video'])

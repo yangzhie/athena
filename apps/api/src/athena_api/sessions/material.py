@@ -21,7 +21,8 @@ ABOUT_WEIGHT = 3.0
 
 _STOP = set(
     "a an and are as at be but by do does for from how i in is it its me of on or so that the this to was what when "
-    "which why will with you your about learn understand explain help want know".split()
+    "which why will with you your about learn understand explain help want know "
+    "between difference differ versus vs compare tell give".split()
 )
 
 
@@ -137,7 +138,11 @@ class OfferingMaterial:
                               transcript=text, start_seconds=clip['start_s'], end_seconds=clip['end_s']))
         about = _scaled(rank(goal, [i['title'] for i in items]))
         body = _scaled(rank(goal, [i.get('text', i.get('transcript', '')) for i in items]))
-        scored = sorted(zip([ABOUT_WEIGHT * a + b for a, b in zip(about, body, strict=True)], items, strict=True), key=lambda pair: -pair[0])
+        # Reward coverage of the question's distinct terms before repetition of
+        # one term. Comparisons need both subjects in the selected passages.
+        terms = set(_terms(goal))
+        scored = sorted(zip([ABOUT_WEIGHT * a + b for a, b in zip(about, body, strict=True)], items, strict=True),
+                        key=lambda pair: (-len(terms.intersection(_terms(pair[1]['title'] + ' ' + pair[1].get('text', pair[1].get('transcript', ''))))), -pair[0]))
         result = []
         for score, item in scored[:self.max_results]:
             if score <= 0:

@@ -42,6 +42,22 @@ def test_unified_retrieval_selects_only_published_offering_versions(tmp_path):
     assert 'Original' in materials.passages(id, first['id'])[0]['text']
 
 
+def test_comparison_retrieval_prefers_both_subjects_over_repetition():
+    class Material:
+        def list(self, offering, manager=False):
+            return [dict(id='slides', source_id='slides', version=1, kind='document', status='ready',
+                         published=True, filename='Lecture slides')]
+        def passages(self, offering, id):
+            return [dict(id='comparison', page=28, section=None,
+                         text='Regression predicts numerical values; classification predicts discrete labels.'),
+                    *[dict(id=f'repeated-{i}', page=i, section=None, text='Regression ' * 50) for i in range(8)]]
+    from types import SimpleNamespace
+    selected = OfferingMaterial(Material(), SimpleNamespace(approved_material=lambda _: [])).for_goal(
+        'offering', 'What is the difference between regression and classification?')
+    assert selected[0]['passage_id'] == 'comparison'
+    assert len(selected) == 5
+
+
 def test_cited_passages_resolve_original_version_with_scope_authorisation(tmp_path):
     _, materials, owner, student, id = setup(tmp_path)
     material = upload(owner, id, 'lecture.txt', b'Exact attributable passage.').json()
@@ -120,7 +136,7 @@ def test_material_refresh_uses_current_concept_and_retries_preserve_original_evi
     session = LearningSession(id='session', student_id='student', offering_id='offering', goal='Machine learning', title='Learning', created_at=now, updated_at=now)
     first = Operation(id='message:one', kind='message', session=session, payload={'text': 'Explain validation.'})
     replies = asyncio.run(tutor.operation(first))
-    assert 'Overfitting' in provider.queries[0][1] and provider.queries[0][0] == 'offering'
+    assert provider.queries[0] == ('offering', 'Explain validation.')
     assert replies[0].sources[0]['source_id'] == 'version-1'
     provider.version = 2
     replay = asyncio.run(tutor.operation(first))

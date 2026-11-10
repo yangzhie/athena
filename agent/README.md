@@ -569,15 +569,18 @@ max_results=5)` accepts host-authorized external results through the same typed
 selection contract, scope validation, topic storage, and snapshot copying.
 It requires no retriever. Malformed or out-of-scope supplied data is an invalid
 request; unavailable retrieval is a dependency failure. An empty external result
-remains an explicit empty selection rather than silently enabling general knowledge.
+remains an explicit empty selection. Explanations may answer it as labelled general
+knowledge; assessment evaluation retains strict source checks.
 
 Selected materials now enter the bounded planning, teaching, and assessment
 context. Source-based generation requests only supported domain content and runs
 a second structured support check requiring quote references resolving to selected
-passages/transcripts. Unsupported content or fabricated evidence fails before
-state publication; empty selections cannot silently produce general-knowledge
-content. Semantic support still depends on model judgement, while quote/reference
-integrity is deterministic. General-knowledge calls keep their original call path.
+passages/transcripts. Fabricated evidence fails before state publication.
+Planning and question generation permit one grounded repair for insufficient
+support. Chat explanations, teaching and hints can answer gaps with explicitly
+labelled general knowledge after at most one grounded repair. Assessment evaluation
+never uses this fallback. Semantic support still depends on model judgement,
+while quote/reference integrity is deterministic.
 `orchestrator.start(..., materials=retrieval_result)` can select materials before
 planning a new session. Selection and private criteria remain backend data.
 
@@ -600,18 +603,21 @@ Internal generation provenance is excluded from schemas and serialization.
 Source-based generation reports `insufficient_evidence` when selected materials
 cannot support the requested content and `conflicting_sources` when the support
 check identifies conflicting supplied evidence. Conflict reports must resolve exact
-quotes in at least two selected items. These safe, nonretryable errors preserve
-learning state and ask for more relevant materials or source clarification; the
-agent never silently picks a source winner. Retrieval unavailability remains a
+quotes in at least two selected items. Conflicts, contradictions, invalid references
+and instruction overrides never trigger general-knowledge fallback; the agent
+never silently picks a source winner. Retrieval unavailability remains a
 separate `dependency_unavailable` failure and preserves the previous selection.
 
 Activities, assessments, and roadmaps label `knowledge_origin` as `general`,
-`materials`, or `supplement`. Verified citations imply `materials`; supplements
-cannot claim material citations. With no selection, learning uses general knowledge.
+`materials`, or `supplement`. Ordinary chat replies carry verified citations too.
+Mixed chat answers use `supplement`, with server-rendered labels separating
+material-supported parts from general additions and citations only for the former.
+Wholly general answers carry no citations. The UI describes an inability to verify
+against retrieved material, rather than asserting absence from the entire Offering.
 `await teaching.supplement(context, assessment_id)` explicitly requests a bounded
 general-knowledge supplement to selected materials, keeps the selection intact,
-and labels its result without citations. It is never an automatic response to
-insufficient evidence. `await knowledge.use_general_knowledge(context)` explicitly
+and labels its result without citations. Automatic explanatory fallback also keeps
+the selected material intact for later questions. `await knowledge.use_general_knowledge(context)` explicitly
 clears selection when the host chooses to leave source-only learning.
 
 Source commands, role markers, grading requests, and instructions to reveal
@@ -670,8 +676,8 @@ neither media files nor rendering code.
 activity into its complete explanation without model calls, preserving identity,
 source attribution, and text. Rich generation whose parameters remain invalid
 after normal bounded retries gets one separate validated text-generation fallback.
-That fallback still uses selected-source checks; insufficient/conflicting evidence,
-refusals, cancellation, or stale state are not silently bypassed.
+That fallback still checks source support, allowing a labelled general explanation
+for missing coverage. Conflicts, refusals, cancellation and stale state remain errors.
 
 ## FastAPI service shell
 

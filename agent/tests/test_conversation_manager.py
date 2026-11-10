@@ -55,6 +55,7 @@ def test_ambiguous_intent_asks_without_changing_focus():
     before = store.read(context)
     reply = asyncio.run(manager.send(context, 'What about that other thing?'))
     assert reply.text == 'Do you mean graphs or sorting?'
+    assert reply.knowledge_origin is None and reply.sources == []
     after = store.read(context)
     assert after.active_topic.learning_state == before.active_topic.learning_state
     assert after.active_topic.discussion_focus == 'Sorting passes'
