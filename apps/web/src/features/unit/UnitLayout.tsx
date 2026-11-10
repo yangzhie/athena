@@ -1,10 +1,12 @@
-import { Link, Outlet, useLoaderData } from 'react-router'
+import { Link, Outlet, useLoaderData, useMatch } from 'react-router'
 import type { unitLoader } from './loader'
 import { SidePanel } from './panel/SidePanel'
 
-/** Shared frame for a unit's views (chat, clips): the view on the left, the side panel on the right. */
+/** Shared frame for a unit's views (chat, clips, Playground): the view on the left, the side panel on the right. */
 export default function UnitLayout() {
   const { offering } = useLoaderData<typeof unitLoader>()
+  // The Playground brings its own tutor column instead of the side panel.
+  const onPlayground = useMatch('/units/:offeringId/playground')
 
   if (!offering) {
     return (
@@ -23,7 +25,7 @@ export default function UnitLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Outlet />
       </div>
-      <SidePanel key={offering.id} offering={offering} />
+      {!onPlayground && <SidePanel key={offering.id} offering={offering} />}
     </div>
   )
 }

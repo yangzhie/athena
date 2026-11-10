@@ -1,4 +1,5 @@
-import type { ChatMessage, KnowledgeOrigin, Offering, SourceReference } from '../types'
+import type { ChatMessage, KnowledgeOrigin, Offering, PlaygroundOffer, SourceReference } from '../types'
+import { generateScene } from './playground'
 import { documentPassages } from '../mocks/documents'
 import { lectureRecordings } from '../mocks/lectures'
 
@@ -7,6 +8,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 export type TutorEvent =
   | { type: 'text'; text: string }
   | { type: 'sources'; sources: SourceReference[]; knowledgeOrigin: KnowledgeOrigin }
+  | { type: 'playground'; offer: PlaygroundOffer }
 
 const STOPWORDS = new Set('the and for are but not you your how why what when who which can does did should would could use over with from into about this that quiz explain tell know model'.split(' '))
 
@@ -60,6 +62,19 @@ export async function* streamTutorReply(
   signal?: AbortSignal,
 ): AsyncGenerator<TutorEvent> {
   const question = history.at(-1)?.content ?? ''
+
+  // Easier to try than to read: the tutor sets up a Playground instead of a long answer.
+  const offer = await generateScene(offering, question)
+  if (offer) {
+    await sleep(400)
+    for (const word of `This is easier to see by trying it, so I've set up a Playground: ${offer.goal.charAt(0).toLowerCase()}${offer.goal.slice(1)}.`.split(/(\s+)/)) {
+      if (signal?.aborted) return
+      yield { type: 'text', text: word }
+      await sleep(word.trim() ? 25 : 0)
+    }
+    yield { type: 'playground', offer }
+    return
+  }
   const sources = findSources(offering, question)
   const grounded = sources.length > 0
 

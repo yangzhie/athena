@@ -1,4 +1,5 @@
 import type { KnowledgeOrigin, SourceReference } from './sources'
+import type { PlaygroundOffer } from './playground'
 
 /** A global idea that topics map to, e.g. "subnetting" or "overfitting". */
 export interface Concept {
@@ -41,5 +42,9 @@ export interface ChatMessage {
   /** Material the reply is based on. Tutor messages only. */
   sources?: SourceReference[]
   knowledgeOrigin?: KnowledgeOrigin
+  /** The tutor set up a Playground for this question. */
+  playground?: PlaygroundOffer
+  /** Written while the learner was on the Playground (by them, or by the tutor about it). */
+  via?: 'playground'
   createdAt: string
 }
