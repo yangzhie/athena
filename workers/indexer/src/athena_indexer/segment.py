@@ -238,6 +238,36 @@ def segment_lines(
     return out
 
 
+class FixedSegmenter:
+    """No AI: cuts the lecture into parts of about `every_s`, all labelled with one topic.
+
+    For trying the rest of the pipeline (and playback) without an LLM. Titles say
+    the lecture wasn't segmented, so nobody mistakes these for real topic clips.
+    """
+
+    def __init__(self, topic_id: str, every_s: float = 600.0):
+        self.topic_id = topic_id
+        self.every_s = every_s
+
+    def split(self, lines: list[Line]) -> list[ProposedSegment]:
+        out: list[ProposedSegment] = []
+        first = 0
+        for line in lines:
+            if line.end_s - lines[first].start_s >= self.every_s:
+                out.append(self._part(len(out) + 1, first, line.index))
+                first = line.index + 1
+        if first < len(lines):
+            out.append(self._part(len(out) + 1, first, len(lines) - 1))
+        return out
+
+    def _part(self, n: int, first: int, last: int) -> ProposedSegment:
+        return ProposedSegment(
+            first_line=first, last_line=last, topic_id=self.topic_id,
+            title=f"Part {n} (not segmented)",
+            summary="A fixed-length part of the lecture. Run AI segmentation for topic clips.",
+        )
+
+
 def load_topics(path: Path) -> list[Topic]:
     data = json.loads(path.read_text())
     return [Topic.model_validate(t) for t in data["topics"]]

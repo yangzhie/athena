@@ -3,16 +3,18 @@ import { useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent }
 interface ComposerProps {
   placeholder: string
   streaming: boolean
+  /** The local demo tutor is busy; unlike an API reply, it has no cancellation control. */
+  disabled?: boolean
   onSend: (text: string) => void
   onStop: () => void
 }
 
 const MAX_HEIGHT = 200
 
-export function Composer({ placeholder, streaming, onSend, onStop }: ComposerProps) {
+export function Composer({ placeholder, streaming, disabled = false, onSend, onStop }: ComposerProps) {
   const [text, setText] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
-  const canSend = text.trim() !== '' && !streaming
+  const canSend = text.trim() !== '' && !streaming && !disabled
 
   // Grow with the content up to MAX_HEIGHT, then scroll inside.
   useLayoutEffect(() => {
@@ -45,6 +47,7 @@ export function Composer({ placeholder, streaming, onSend, onStop }: ComposerPro
       <textarea
         ref={ref}
         value={text}
+        disabled={disabled}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={onKeyDown}
         rows={1}

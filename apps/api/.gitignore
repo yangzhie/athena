@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# Local databases: hold student review history (private), never committed.
+*.db
+*.sqlite3
+data/

@@ -12,6 +12,7 @@ or a change (e.g. new topics) only redoes what's needed:
 """
 
 import json
+import os
 import re
 import time
 from collections.abc import Callable
@@ -21,7 +22,7 @@ from .cleanup import build_clips
 from .lines import to_lines
 from .models import IndexResult, Topic
 from .audio import AudioError
-from .segment import SegmentationError, SegmentModel, segment_lines
+from .segment import FixedSegmenter, SegmentationError, SegmentModel, segment_lines
 from .transcribe import Transcriber, transcribe_recording
 
 Log = Callable[[str], None]
@@ -36,7 +37,7 @@ def index_lecture(
     workdir: Path,
     topics: list[Topic],
     transcriber: Transcriber,
-    segmenter: SegmentModel,
+    segmenter: SegmentModel | FixedSegmenter,
     *,
     recording_id: str,
     title: str,
@@ -58,15 +59,20 @@ def index_lecture(
     lines = to_lines(transcript)
     step(f"{len(transcript.segments)} transcript segments → {len(lines)} lines")
 
-    step("segmenting by topic (cached windows are reused)")
-    segments = segment_lines(
-        lines, topics, segmenter, cache_dir=workdir / "segments",
-        on_progress=lambda d, n: step(f"  window {d}/{n}"),
-    )
+    if isinstance(segmenter, FixedSegmenter):
+        step(f"splitting into fixed {segmenter.every_s / 60:.0f}-minute parts (no AI)")
+        segments = segmenter.split(lines)
+    else:
+        step("segmenting by topic (cached windows are reused)")
+        segments = segment_lines(
+            lines, topics, segmenter, cache_dir=workdir / "segments",
+            on_progress=lambda d, n: step(f"  window {d}/{n}"),
+        )
 
     result = build_clips(
         segments, lines, topics, recording_id=recording_id, title=title, duration_s=transcript.duration_s,
         offering_id=offering_id, week=week,
+        media=os.path.relpath(recording.resolve(), workdir.resolve()),
     )
     (workdir / "clips.json").write_text(result.to_json())
     (workdir / "video_segments.json").write_text(json.dumps([c.to_video_segment() for c in result.clips], indent=2))
@@ -91,6 +97,8 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--out", type=Path, help="working folder (default: data/<recording name>/)")
     p.add_argument("--whisper-model", default="small", help="tiny, base, small, medium, large-v3 (default: small)")
     p.add_argument("--llm-model", help="OpenAI model id (default: OPENAI_MODEL)")
+    p.add_argument("--no-llm", metavar="TOPIC_ID",
+                   help="skip AI segmentation: cut 10-minute parts labelled with this topic (for testing)")
     args = p.parse_args(argv)
 
     load_dotenv()
@@ -109,9 +117,16 @@ def _run(args, workdir: Path, topics: list[Topic]) -> IndexResult:
     from .segment import OpenAISegmentModel
     from .transcribe import WhisperTranscriber
 
+    if args.no_llm:
+        if args.no_llm not in {t.id for t in topics}:
+            raise RuntimeError(f"--no-llm topic {args.no_llm!r} isn't in {args.topics}")
+        segmenter = FixedSegmenter(args.no_llm)
+    else:
+        segmenter = OpenAISegmentModel(args.llm_model)
+
     return index_lecture(
         args.recording, workdir, topics,
-        WhisperTranscriber(args.whisper_model), OpenAISegmentModel(args.llm_model),
+        WhisperTranscriber(args.whisper_model), segmenter,
         recording_id=args.recording_id or slug(args.recording.stem),
         title=args.title or args.recording.stem,
         offering_id=args.offering,

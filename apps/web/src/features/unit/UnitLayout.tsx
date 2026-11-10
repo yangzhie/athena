@@ -6,7 +6,7 @@ import { SidePanel } from './panel/SidePanel'
 export default function UnitLayout() {
   const { offering } = useLoaderData<typeof unitLoader>()
   // The Playground brings its own tutor column instead of the side panel.
-  const onPlayground = useMatch('/units/:offeringId/playground')
+  const onPlayground = useMatch('/units/:offeringId/s/:sessionId/playground')
 
   if (!offering) {
     return (

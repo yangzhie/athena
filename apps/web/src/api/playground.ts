@@ -2,8 +2,9 @@ import type { Scene, TutorRequest, TutorResponse } from '@athena/playground'
 import { demoScenes, mockAsk, prepareScene } from '@athena/playground/fixtures'
 import type { Offering, PlaygroundOffer } from '../types'
 
-/** Scenes generated in this session, by id. They belong to the learner's environment only. */
-const generated = new Map<string, Scene>()
+/** Demo scenes are local to a learning session, not shared across an offering's chats. */
+const generated = new Map<string, Map<string, Scene>>()
+const scope = (offering: Offering, sessionId: string) => JSON.stringify([offering.id, sessionId])
 
 /**
  * A Playground scene for the learner's question, or null when trying things
@@ -11,15 +12,22 @@ const generated = new Map<string, Scene>()
  * agent to compose one from the component catalog and the unit's material;
  * the agent validates it (`validateScene`) and repairs it before returning.
  */
-export async function generateScene(_offering: Offering, question: string): Promise<PlaygroundOffer | null> {
+export async function generateScene(offering: Offering, question: string, sessionId: string): Promise<PlaygroundOffer | null> {
   const scene = prepareScene(question)
   if (!scene) return null
-  generated.set(scene.id, scene)
+  const key = scope(offering, sessionId)
+  const scenes = generated.get(key) ?? new Map<string, Scene>()
+  scenes.set(scene.id, scene)
+  generated.set(key, scenes)
   return { sceneId: scene.id, title: scene.title, goal: scene.goal }
 }
 
-export async function getScene(_offering: Offering, sceneId: string): Promise<Scene | null> {
-  return generated.get(sceneId) ?? demoScenes.find((d) => d.scene.id === sceneId)?.scene ?? null
+export async function getScene(offering: Offering, sceneId: string, sessionId: string): Promise<Scene | null> {
+  return generated.get(scope(offering, sessionId))?.get(sceneId) ?? demoScenes.find((d) => d.scene.id === sceneId)?.scene ?? null
+}
+
+export function forgetScenes(offering: Offering, sessionId: string) {
+  generated.delete(scope(offering, sessionId))
 }
 
 /**

@@ -24,10 +24,18 @@ Roles: **lecturers** create study spaces, upload material, approve lecture clips
 Students must trust that they can ask honest questions. In every feature, endpoint and query:
 
 1. An environment belongs to exactly one (student, offering) pair, and only that student can read it.
-2. Chats, individual quiz answers and memory notes never reach any lecturer-facing view or API.
+2. Chats, individual quiz answers and memory notes never reach any lecturer-facing view or API, except a learning session the student has explicitly shared (rule 6).
 3. Lecturers see class-level aggregates by default; individual insight only with the student's opt-in for that offering, which they can withdraw.
 4. A lecturer of one unit never sees anything from the student's other units, even in aggregate.
 5. Learner identity comes from trusted authentication on the server, never from client-supplied data.
+6. **Sharing a session with a lecturer** is the only way a chat leaves the student's environment:
+   - Only the student can share, one session at a time. It is off by default; lecturers cannot request it.
+   - Sharing covers the whole session (earlier and later messages), shown to the student in a preview before they confirm.
+   - Only lecturers of that session's unit can see it. Other students never can.
+   - It is **anonymous**: lecturer-facing views and APIs never include the student's identity. Each share gets a new pseudonym, so separate shares (or re-sharing) can't be linked. The preview warns that anything the student wrote that identifies them stays visible.
+   - The lecturer can read it and reply in the thread; the student sees the replies.
+   - The student can stop sharing at any time; the lecturer's access ends immediately.
+   - Shared sessions never feed lecturer analytics or insights as individual data.
 
 ## Core Learning Experience
 
@@ -79,10 +87,10 @@ Athena should not simply provide information. It should understand what the lear
 
 A single page:
 
-- **Left sidebar:** the units the student is enrolled in (hardcoded in the proof of concept: CSE5DMI Data Mining and CSE5ALG Data Structures and Algorithms), a switch between the open unit's chat and its lecture clips, and a lecturer button to create a study space.
-- **Main area:** the open unit's tutor chat (replies above, prompt box at the bottom, sources under each reply), or its lecture clips grouped by week.
+- **Left sidebar:** the units the student is enrolled in (hardcoded in the proof of concept: CSE5DMI Data Mining and CSE5ALG Data Structures and Algorithms); for the open unit, the student's learning sessions, Lecture clips and Practice (spaced repetition); and a lecturer button to create a study space.
+- **Main area:** a unit's **learning sessions**: the student starts one per thing they want to learn (e.g. "k-fold cross-validation"), and each is its own tutor chat with that goal (replies above, prompt box at the bottom, sources under each reply). Also the unit's lecture clips grouped by week, and Practice.
 - **Right side panel:** one item opened from the chat or clips: a lecture clip, a cited source passage, or an interactive sandbox.
-- **Playground view** (`units/:offeringId/playground`): a canvas the tutor sets up when trying something beats reading about it (e.g. a code graph, a lab bench), with the unit's chat thread beside it instead of the side panel. The tutor offers it from a chat reply.
+- **Playground view** (`units/:offeringId/s/:sessionId/playground`): a canvas for one learning session, with that session's chat beside it instead of the side panel. The tutor offers it from a chat reply. The canvas still uses a demo tutor: its messages and experiments are local to the browser tab, clearly labelled, and never saved or shared. Agent activity answers still go to the session API.
 - **Lecturer view** (a demo "Viewing as" switch in the sidebar until SSO provides roles): create study spaces and review the clips lecture indexing proposes. Students only see clips a lecturer has approved.
 
 ## Repository
@@ -98,4 +106,6 @@ A single page:
 
 Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`, `style:`, `docs:`). Never commit `.env` files, API keys, or course material and lecture recordings.
 
-**Open:** the agent's sessions are organised by learning goal, not by unit. How a unit maps to agent sessions (for example one session per unit, with the unit's material supplied as `materials`) is not yet decided.
+**Decided:** a unit holds many learning sessions, each created by the student with a goal (e.g. "k-fold cross-validation"). Each one is one agent session with that goal, run in-process by `apps/api` (`sessions/agent_tutor.py`), with the learner id taken from server-side auth.
+
+**Open:** which unit material is supplied to each agent session (e.g. the unit's approved lecture clips matching the goal), and whether students can share a session with their lecturer (see Privacy).
