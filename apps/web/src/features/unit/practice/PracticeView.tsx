@@ -32,7 +32,7 @@ async function fetchState(offeringId: string): Promise<State> {
   void refreshSrsSummary(offeringId)
   try {
     const next = await getNextQuestion(offeringId)
-    return next.done ? { phase: 'done', nextDueAt: next.next_due_at } : { phase: 'question', next, result: null }
+    return next.done ? { phase: 'done', nextDueAt: next.next_due_at } : { phase: 'question', next, result: next.restored_attempt ?? null }
   } catch (e) {
     return { phase: 'error', error: asApiError(e) }
   }
@@ -48,7 +48,7 @@ export default function PracticeView() {
   // The unit's clips as students see them (approved only), for "rewatch" suggestions.
   useEffect(() => {
     let cancelled = false
-    void listLectures(offering.id).then((l) => !cancelled && setLectures(l))
+    void listLectures(offering.id).then((l) => !cancelled && setLectures(l)).catch(() => { /* Practice remains available if optional clip suggestions cannot load. */ })
     return () => {
       cancelled = true
     }

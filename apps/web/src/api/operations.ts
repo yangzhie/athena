@@ -53,7 +53,7 @@ export async function recoverPendingOperation(path: string, sessionsBase: string
   const key = `athena-operation:${path}`
   const pending = read(key)
   if (!pending) return
-  const kind = path.endsWith('/messages') ? 'message' : 'start'
+  const kind = sessionsBase.endsWith('/srs') ? (path.endsWith('/rating') ? 'rating' : 'answer') : path.endsWith('/messages') ? 'message' : 'start'
   try {
     await call(`${sessionsBase}/operations/${encodeURIComponent(`${kind}:${pending.id}`)}/retry`, { method: 'POST' })
     if (read(key)?.id === pending.id) write(key)
@@ -63,5 +63,24 @@ export async function recoverPendingOperation(path: string, sessionsBase: string
       if (error.status === 404) return // The original request never arrived, or its session was deleted.
     }
     throw error
+  }
+}
+
+/** Recover committed Practice submissions without storing their private inputs in the tab. */
+export async function recoverPracticeOperations(base: string) {
+  const keys = new Set(memory.keys())
+  try {
+    for (let index = 0; index < sessionStorage.length; index++) {
+      const key = sessionStorage.key(index)
+      if (key) keys.add(key)
+    }
+  } catch { /* Memory fallback remains available. */ }
+  for (const key of keys) {
+    const prefix = 'athena-operation:'
+    if (!key.startsWith(prefix)) continue
+    const path = key.slice(prefix.length)
+    if (path === `${base}/attempts` || path.startsWith(`${base}/attempts/`) && path.endsWith('/rating')) {
+      await recoverPendingOperation(path, base)
+    }
   }
 }

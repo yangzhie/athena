@@ -5,6 +5,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from .learning.service import LearningMemory
+from .learning.api import learning_router
 from .materials.store import Materials
 from .materials.api import materials_router
 from .spaces.service import StudySpaces
@@ -54,6 +56,10 @@ def create_app(
             tutor = agent_tutor_from_env(material=LectureMaterial(lectures))
             sessions = SessionService(SqliteSessionStore(db), tutor=tutor)
 
+    app.state.sessions = sessions
+    app.state.srs = srs
+    app.state.lectures = lectures
+
     @app.get("/tutor/status")
     def tutor_status() -> dict:
         return {"mode": getattr(sessions.tutor, "mode", "injected"),
@@ -83,6 +89,15 @@ def create_app(
             sessions.tutor.material = OfferingMaterial(materials, lectures)
         app.state.materials = materials
         app.include_router(materials_router(materials))
+        memory = LearningMemory(spaces, sessions.tutor)
+        app.state.learning = memory
+        sessions.evidence_sink = memory.sync
+        srs.private_items = memory.practice_items
+        srs.private_item_writer = memory.save_practice
+        srs.practice_sink = memory.practice_event
+        if getattr(sessions.tutor, 'mode', None) == 'ai':
+            sessions.tutor.profile_provider = memory.profile
+        app.include_router(learning_router(memory))
     else:
         # Explicit host/test adapters own their authentication and offering policy.
         resolve_lecturer = resolve_lecturer or dev_lecturer_resolver

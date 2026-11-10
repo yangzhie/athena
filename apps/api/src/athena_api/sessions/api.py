@@ -3,7 +3,7 @@
 import sqlite3
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError
 
 from ..auth import LecturerResolver, StudentResolver, lecturer_dependency, student_dependency
@@ -12,7 +12,7 @@ from .service import NotFound, SessionService
 from .shared import NotShared, SharedSessions
 from .tutor import TutorError
 
-OperationId = Annotated[str | None, Header(alias="Idempotency-Key", min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")]
+from ..request_types import OperationId
 
 Text = Annotated[str, StringConstraints(min_length=1, pattern=r"\S")]
 

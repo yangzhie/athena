@@ -26,6 +26,7 @@ class SessionService:
     clock: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
 
     environment_resolver: Callable[[str, str], str] | None = None
+    evidence_sink: Callable | None = None
 
     def _get(self, student_id: str, session_id: str, offering_id: str) -> LearningSession:
         s = self.store.get(student_id, session_id)
@@ -39,6 +40,8 @@ class SessionService:
         except LookupError:
             raise NotFound("no such session") from None
         if operation.complete:
+            if self.evidence_sink:
+                self.evidence_sink(operation)
             return operation
         s = operation.session
         try:
@@ -69,7 +72,10 @@ class SessionService:
             last_activity = r.activity or last_activity
         operation.messages = messages
         try:
-            return self.store.complete_operation(operation, self.clock())
+            complete = self.store.complete_operation(operation, self.clock())
+            if self.evidence_sink:
+                self.evidence_sink(complete)
+            return complete
         except LookupError:
             raise NotFound("no such session") from None
 
@@ -149,6 +155,10 @@ class SessionService:
         if previous is not None:
             if not previous.same_submission(submitted):
                 raise TutorError("This question already has an answer; request a fresh question.", 409)
+            if self.evidence_sink:
+                operation = self.store.operation(student_id, offering_id, 'answer:' + question_id)
+                self.evidence_sink(operation or Operation(id='answer:' + question_id, kind='answer', session=s,
+                                                        payload=submitted.model_dump(exclude={'messages'}), complete=True))
             return previous.messages
         if answered:
             # Pre-receipt chats don't retain the submitted choice/hint metadata.

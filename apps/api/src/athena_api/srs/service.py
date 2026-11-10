@@ -24,7 +24,7 @@ from .models import (
 )
 from .rephrase import Rephraser, RephraseError, rephrase
 from .scheduler import base_for_rephrase, fallback_variant, grade, make_scheduler, new_card, pick_variant, review
-from .store import Attempt, SrsStore
+from .store import Attempt, SrsStore, CommandConflict
 
 #: New items introduced per student, per unit, per day.
 NEW_PER_DAY = 10
@@ -73,8 +73,15 @@ class SrsService:
     #: Writes a new wording when a student runs out of fresh ones. None disables it.
     rephraser: Rephraser | None = None
 
-    def _bank(self, offering_id: str) -> Bank:
+    private_items: Callable[[str, str], list[Item]] | None = None
+    private_item_writer: Callable[[str, Item], None] | None = None
+    practice_sink: Callable | None = None
+
+    def _bank(self, offering_id: str, student_id: str | None = None) -> Bank:
         bank = self.store.get_bank(offering_id)
+        private = self.private_items(student_id, offering_id) if self.private_items and student_id else []
+        if self.private_items is not None:
+            return Bank(offering_id=offering_id, items=[*(bank.items if bank else []), *private])
         if bank is None:
             raise NotFound("this unit has no question bank yet")
         return bank
@@ -89,7 +96,7 @@ class SrsService:
 
     def next(self, student_id: str, offering_id: str) -> dict:
         now = self.clock()
-        bank = self._bank(offering_id)
+        bank = self._bank(offering_id, student_id)
         items = {i.id: i for i in bank.items}
         cards = {c.item_id: c for c in self.store.list_cards(student_id, offering_id) if c.item_id in items}
 
@@ -123,7 +130,15 @@ class SrsService:
                 variant = None
             if variant is not None:
                 updated = item.model_copy(update={"variants": [*item.variants, variant]})
-                self.store.put_bank(bank.model_copy(update={"items": [updated if i.id == item.id else i for i in bank.items]}))
+                if item.id.startswith('private:'):
+                    if self.private_item_writer is None:
+                        return fallback_variant(item, card)
+                    self.private_item_writer(card.student_id, updated)
+                else:
+                    # Never persist the merged learner-only bank into the public bank.
+                    public = self.store.get_bank(bank.offering_id)
+                    if public is not None:
+                        self.store.put_bank(public.model_copy(update={"items": [updated if i.id == item.id else i for i in public.items]}))
                 # Remember it on the student's card, so a page refresh reuses it instead of writing another.
                 if self.store.get_card(card.student_id, item.id) is not None:
                     mine = card.model_copy(update={"live_variant_ids": [*card.live_variant_ids, variant.id]})
@@ -133,9 +148,19 @@ class SrsService:
 
     # --- answering ------------------------------------------------------------------------
 
-    def answer(self, student_id: str, offering_id: str, item_id: str, variant_id: str, answer: int | float | str | None) -> dict:
+    def answer(self, student_id: str, offering_id: str, item_id: str, variant_id: str, answer: int | float | str | None, operation_id: str | None = None) -> dict:
+        bank = self._bank(offering_id, student_id)  # Private projection reads happen before the store transaction.
+        try:
+            result = self.store.command(student_id, offering_id, 'answer:' + operation_id if operation_id else None,
+                                        {'item_id': item_id, 'variant_id': variant_id, 'answer': answer},
+                                        lambda: self._answer(student_id, offering_id, item_id, variant_id, answer, bank))
+        except CommandConflict as error:
+            raise Conflict(str(error)) from None
+        self._practice_projection(student_id, offering_id, result['attempt_id'])
+        return result
+
+    def _answer(self, student_id, offering_id, item_id, variant_id, answer, bank):
         now = self.clock()
-        bank = self._bank(offering_id)
         item = self._item(bank, item_id)
         variant = item.variant(variant_id)
         if variant is None:
@@ -160,13 +185,55 @@ class SrsService:
             out["rating_options"] = ["hard", "good", "easy"] if correct else ["again", "hard", "good", "easy"]
         return out
 
-    def rate(self, student_id: str, offering_id: str, attempt_id: str, rating: Rating) -> dict:
+    def rate(self, student_id: str, offering_id: str, attempt_id: str, rating: Rating, operation_id: str | None = None) -> dict:
+        bank = self._bank(offering_id, student_id)
+        try:
+            result = self.store.command(student_id, offering_id, 'rating:' + operation_id if operation_id else None,
+                                        {'attempt_id': attempt_id, 'rating': rating},
+                                        lambda: self._rate(student_id, offering_id, attempt_id, rating, bank))
+        except CommandConflict as error:
+            raise Conflict(str(error)) from None
+        self._practice_projection(student_id, offering_id, attempt_id)
+        return result
+
+    def recover(self, student_id, offering_id, operation_id):
+        saved = self.store.get_command(student_id, offering_id, operation_id)
+        if saved is None:
+            raise NotFound('This Practice operation did not commit.')
+        payload, result = saved
+        attempt_id = result.get('attempt_id') or payload.get('attempt_id')
+        if attempt_id:
+            self._practice_projection(student_id, offering_id, attempt_id)
+        return result
+
+    def pending(self, student_id, offering_id):
+        attempt = self.store.pending_attempt(student_id, offering_id)
+        if attempt is None:
+            return None
+        item = self._item(self._bank(offering_id, student_id), attempt.item_id)
+        variant = item.variant(attempt.variant_id)
+        if variant is None:
+            raise NotFound('The saved question wording is unavailable.')
+        summary = self.summary(student_id, offering_id)
+        return dict(done=False, item_id=item.id, topic_id=item.topic_id,
+                    is_new=self.store.get_card(student_id, item.id) is None, question=question_view(variant),
+                    remaining={'due': summary['due_now'], 'new': summary['new_available']},
+                    restored_attempt=dict(attempt_id=attempt.id, correct=attempt.correct, feedback=feedback_view(variant, item),
+                                          needs_rating=True, rating_options=['hard', 'good', 'easy'] if attempt.correct else ['again', 'hard', 'good', 'easy']))
+
+    def _practice_projection(self, student_id, offering_id, attempt_id):
+        if self.practice_sink:
+            attempt = self.store.get_attempt(student_id, attempt_id)
+            if attempt and attempt.rated:
+                self.practice_sink(student_id, offering_id, attempt_id, None, attempt.correct)
+
+    def _rate(self, student_id, offering_id, attempt_id, rating, bank):
         attempt = self.store.get_attempt(student_id, attempt_id)
         if attempt is None or attempt.offering_id != offering_id:
             raise NotFound("no such attempt")
         if attempt.rated:
             raise Conflict("this attempt is already rated")
-        item = self._item(self._bank(offering_id), attempt.item_id)
+        item = self._item(bank, attempt.item_id)
         return {"next_due_at": self._record(student_id, offering_id, item, attempt, rating)}
 
     def _record(self, student_id: str, offering_id: str, item: Item, attempt: Attempt, rating: Rating) -> datetime:
@@ -187,7 +254,7 @@ class SrsService:
 
     def summary(self, student_id: str, offering_id: str) -> dict:
         now = self.clock()
-        bank = self._bank(offering_id)
+        bank = self._bank(offering_id, student_id)
         cards = self.store.list_cards(student_id, offering_id)
         known = {c.item_id for c in cards}
         today = _start_of_day(now)

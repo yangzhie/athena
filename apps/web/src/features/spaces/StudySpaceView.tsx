@@ -1,3 +1,4 @@
+import TopicManager from './TopicManager'
 import MaterialManager from './MaterialManager'
 import { useState } from 'react'
 import { useRevalidator } from 'react-router'
@@ -27,6 +28,7 @@ export default function StudySpaceView() {
       {offering.status === 'draft' && <Button className="mt-4" disabled={busy} onClick={publish}>{busy ? 'Publishing…' : 'Publish study space'}</Button>}
       {error && <p role="alert" className="mt-3 text-sm text-bad">{error}</p>}
     </Card>
-    <MaterialManager offeringId={offering.id} />
+    <TopicManager key={`topics-${offering.id}`} offeringId={offering.id} />
+    <MaterialManager key={offering.id} offeringId={offering.id} />
   </section>
 }

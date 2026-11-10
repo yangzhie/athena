@@ -73,6 +73,7 @@ class AgentTutor:
         self.llm = llm
         #: Picks the unit's approved lecture clips for each session's goal.
         self.material = material
+        self.profile_provider = None
         self.context_budget = ContextBudget(
             context_window=context_bytes or int(os.environ.get("ATHENA_AGENT_CONTEXT_BYTES", DEFAULT_CONTEXT_BYTES))
         )
@@ -148,6 +149,11 @@ class AgentTutor:
             staged.create(context, snapshot=original)
         worker = copy.copy(self)
         worker.store = staged
+        if self.profile_provider and self.mode == 'ai':
+            from ..learning.service import LearnerAwareLLM
+            profile = self.profile_provider(session.student_id)
+            if profile:
+                worker.llm = LearnerAwareLLM(self.llm, profile)
         if original and original.active_topic and self.material is not None:
             from athena_agent.knowledge import KnowledgeService
             topic = original.active_topic

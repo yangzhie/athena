@@ -6,6 +6,10 @@ and implementations must filter by it: one student never reads another's data.
 """
 
 import sqlite3
+import json
+import copy
+import time
+from fastapi.encoders import jsonable_encoder
 import threading
 from dataclasses import dataclass
 from datetime import datetime
@@ -29,7 +33,14 @@ class Attempt:
     rated: bool = False
 
 
+class CommandConflict(ValueError):
+    pass
+
+
 class SrsStore(Protocol):
+    def command(self, student_id, offering_id, operation_id, payload, action): ...
+    def get_command(self, student_id, offering_id, operation_id): ...
+    def pending_attempt(self, student_id, offering_id): ...
     def get_bank(self, offering_id: str) -> Bank | None: ...
     def put_bank(self, bank: Bank) -> None: ...
 
@@ -56,6 +67,40 @@ class MemoryStore:
         self.cards: dict[tuple[str, str], tuple[CardState, str, datetime]] = {}
         self.attempts: dict[str, Attempt] = {}
         self.logs: list[tuple[ReviewLogEntry, str]] = []
+        self.receipts = {}
+        self._lock = threading.RLock()
+
+    def command(self, student_id, offering_id, operation_id, payload, action):
+        try:
+            signature = json.dumps(payload, sort_keys=True, allow_nan=False)
+        except ValueError:
+            raise CommandConflict('Practice input must be finite JSON data.') from None
+        key = (student_id, offering_id, operation_id)
+        with self._lock:
+            previous = self.receipts.get(key) if operation_id else None
+            if previous:
+                if previous[0] != signature:
+                    raise CommandConflict('Practice operation identifier was reused with different input.')
+                return copy.deepcopy(previous[1])
+            backup = copy.deepcopy((self.banks, self.cards, self.attempts, self.logs, self.receipts))
+            try:
+                result = action()
+                if operation_id:
+                    self.receipts[key] = (signature, jsonable_encoder(result), time.time())
+                return result
+            except BaseException:
+                self.banks, self.cards, self.attempts, self.logs, self.receipts = backup
+                raise
+
+    def get_command(self, student_id, offering_id, operation_id):
+        with self._lock:
+            row = self.receipts.get((student_id, offering_id, operation_id))
+            return (json.loads(row[0]), copy.deepcopy(row[1])) if row else None
+
+    def pending_attempt(self, student_id, offering_id):
+        with self._lock:
+            pending = [attempt for attempt in self.attempts.values() if attempt.student_id == student_id and attempt.offering_id == offering_id and not attempt.rated]
+            return max(pending, key=lambda attempt: (attempt.created_at, attempt.id)) if pending else None
 
     def get_bank(self, offering_id):
         return self.banks.get(offering_id)
@@ -129,6 +174,10 @@ CREATE TABLE IF NOT EXISTS review_logs (
     reviewed_at TEXT NOT NULL,
     data TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS srs_commands (
+ student_id TEXT NOT NULL, offering_id TEXT NOT NULL, id TEXT NOT NULL, payload TEXT NOT NULL, result TEXT NOT NULL, created_at REAL NOT NULL,
+ PRIMARY KEY(student_id,offering_id,id)
+);
 CREATE INDEX IF NOT EXISTS logs_by_student ON review_logs (student_id, offering_id, reviewed_at);
 """
 
@@ -144,9 +193,50 @@ class SqliteStore:
         if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(str(path), check_same_thread=False)
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._local = threading.local()
         with self._lock, self._db:
             self._db.executescript(_SCHEMA)
+            if 'created_at' not in {r[1] for r in self._db.execute('PRAGMA table_info(srs_commands)')}:
+                self._db.execute('ALTER TABLE srs_commands ADD COLUMN created_at REAL NOT NULL DEFAULT 0')
+
+    def command(self, student_id, offering_id, operation_id, payload, action):
+        try:
+            signature = json.dumps(payload, sort_keys=True, allow_nan=False)
+        except ValueError:
+            raise CommandConflict('Practice input must be finite JSON data.') from None
+        with self._lock:
+            try:
+                self._db.execute('BEGIN IMMEDIATE')
+                if operation_id:
+                    previous = self._db.execute('SELECT payload,result FROM srs_commands WHERE student_id=? AND offering_id=? AND id=?',
+                                                (student_id, offering_id, operation_id)).fetchone()
+                    if previous:
+                        if previous[0] != signature:
+                            raise CommandConflict('Practice operation identifier was reused with different input.')
+                        self._db.commit()
+                        return json.loads(previous[1])
+                self._local.in_command = True
+                result = action()
+                if operation_id:
+                    self._db.execute('INSERT INTO srs_commands VALUES (?,?,?,?,?,?)',
+                                      (student_id, offering_id, operation_id, signature, json.dumps(jsonable_encoder(result)), time.time()))
+                self._db.commit()
+                return result
+            except BaseException:
+                self._db.rollback()
+                raise
+            finally:
+                self._local.in_command = False
+
+    def get_command(self, student_id, offering_id, operation_id):
+        row = self._one('SELECT payload,result FROM srs_commands WHERE student_id=? AND offering_id=? AND id=?',
+                        (student_id, offering_id, operation_id))
+        return (json.loads(row[0]), json.loads(row[1])) if row else None
+
+    def pending_attempt(self, student_id, offering_id):
+        row = self._one('SELECT id FROM attempts WHERE student_id=? AND offering_id=? AND rated=0 ORDER BY created_at DESC,id DESC LIMIT 1', (student_id, offering_id))
+        return self.get_attempt(student_id, row[0]) if row else None
 
     def close(self) -> None:
         self._db.close()
@@ -160,8 +250,12 @@ class SqliteStore:
             return self._db.execute(sql, args).fetchall()
 
     def _write(self, sql: str, args: tuple) -> None:
-        with self._lock, self._db:
-            self._db.execute(sql, args)
+        with self._lock:
+            if getattr(self._local, 'in_command', False):
+                self._db.execute(sql, args)
+            else:
+                with self._db:
+                    self._db.execute(sql, args)
 
     def get_bank(self, offering_id):
         row = self._one("SELECT data FROM banks WHERE offering_id = ?", (offering_id,))

@@ -291,3 +291,37 @@ reclaim expired jobs; stale workers cannot publish a later worker’s result.
 Recording transcription keeps its existing per-chunk cache for retries. Failed
 jobs remain visible with a safe explanation; retry is explicit. Keep database,
 material storage and indexing caches on persistent storage and out of Git.
+
+## Learner profile, Practice and class aggregates
+
+`GET /learner/profile` returns only the caller’s cross-unit Concept record.
+`GET /units/{offering}/progress` and `/progress/evidence` project that caller’s
+Concept status, concise notes and traceable assessment references. Fresh sessions
+have fresh conversations; prior Concept knowledge can inform diagnosis but cannot
+replace independent assessment. Unknown/developing/mastered states come from the
+agent’s evidence-based mastery rules, never from a scheduled review or canvas click.
+Scripted demo/placeholder output does not create learning evidence or analytics.
+
+A small explicit canonical Concept catalogue supports safe cross-unit identity.
+Unknown Concepts stay scoped to the Offering and meaning; arbitrary generated
+Concept IDs are not aggregated together. Creators can define `/units/{offering}/topics`
+and map them to `/concepts/catalogue` or an explicit course Concept. Those Topics
+also guide subsequent recording indexing. Private generated titles never become
+lecturer-facing labels; analytics use an “Other course concepts” category instead.
+
+Tutor assessment evidence creates private Practice items per learner/Offering/Concept.
+These and their live rewordings never enter the lecturer’s public bank. Practice
+uses the existing FSRS scheduler; only the owning learner can answer or inspect its
+feedback. `Idempotency-Key` on attempts and ratings stores the original result
+atomically with the attempt/card/log. Identical retries replay it; conflicting input
+returns 409. A failed transaction publishes no partial grade or schedule. Saved
+unrated feedback is restored after refresh. Recovery endpoints return committed
+results without asking the browser to retain private answer text.
+
+`GET /units/{offering}/insights` requires this Offering’s creator grant. It reads
+only offering-local events: canonical Concept, outcome, fixed gap category and
+internal contribution references. It never reads chat text, learner answers,
+private Practice questions or profile notes. Metrics require at least five distinct
+Environments, with the same suppression per Concept/category. Counts describe
+anonymous Environments and sessions, not verified individual students. Insufficient
+real data yields an explicit empty state, without silently mixing in sample data.
