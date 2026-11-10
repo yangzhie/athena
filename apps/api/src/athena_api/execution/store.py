@@ -56,6 +56,7 @@ class Executions:
     def public(row):
         return {k: row[k] for k in ('id', 'object_id', 'run_id', 'actor', 'state', 'created', 'error')} | {
             'result': json.loads(row['result']) if row['result'] else None,
+            'source': row['source'],
             'capabilities': {'trace': False, 'variable_inspection': False},
         }
 

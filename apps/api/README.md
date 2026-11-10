@@ -366,3 +366,18 @@ successful or simulated Python result. To exercise real isolation locally:
 ```sh
 ATHENA_TEST_DOCKER=1 uv run pytest tests/test_execution_worker.py
 ```
+
+The normal web Playground uses the AI tutor and persisted session state. It no
+longer loads prepared scenes or the demo `mockAsk`. Open the session's Playground
+and ask for an experiment; the model composes a scene from the live component
+catalogue and Offering material. Validation permits two repair attempts before a
+text explanation. All tools run through TypeScript validation and actual outcomes
+are returned to the model before its reply is published. Student-modified work
+requires confirmation before config resets or whole-scene replacement.
+
+Playground turns have durable operation IDs and resume after interrupted host
+writes. Questions and tutor explanations enter the same private session transcript,
+including when shared explicitly. Lecturer replies are excluded from model input
+and never execute tools. Completed Python jobs are interpreted once using their
+actual source/output; that interpretation and canvas checks never create mastery
+or Practice evidence. Use the session's independent assessments for that evidence.

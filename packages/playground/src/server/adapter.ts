@@ -8,7 +8,7 @@ import { actionSchemas, CATALOG_VERSION } from './contract'
 
 export type Checkpoint = ReturnType<Playground['checkpoint']>
 export type Command =
-  | { kind: 'open'; scene: Scene }
+  | { kind: 'open' | 'replace_confirmed'; scene: Scene }
   | { kind: 'action'; action: Action }
   | { kind: 'tool'; call: ToolCall }
   | { kind: 'accept' | 'reject'; proposal_id: string }
@@ -60,8 +60,8 @@ export async function transition(checkpoint: Checkpoint | null, command?: Comman
   if (checkpoint) pg.restore(checkpoint)
   const start = pg.getEvents().at(-1)?.seq ?? 0
   let result: ToolResult = { ok: true, status: 'done' }
-  if (command?.kind === 'open') {
-    check(!checkpoint || !Object.values(pg.getState().objects).some((o) => o.modifiedBy === 'student'), 'Replacing student work requires an accepted replacement proposal')
+  if (command?.kind === 'open' || command?.kind === 'replace_confirmed') {
+    check(command.kind === 'replace_confirmed' || !checkpoint || !Object.values(pg.getState().objects).some((o) => o.modifiedBy === 'student'), 'Replacing student work requires an accepted replacement proposal')
     safeScene(command.scene)
     result = pg.open(command.scene)
   } else if (command?.kind === 'action') {
@@ -77,7 +77,7 @@ export async function transition(checkpoint: Checkpoint | null, command?: Comman
   } else if (command?.kind === 'accept' || command?.kind === 'reject') {
     check(pg.getState().proposals.some((p) => p.id === command.proposal_id), 'Unknown proposal')
     if (command.kind === 'accept') await pg.acceptProposal(command.proposal_id)
-    else pg.rejectProposal(command.proposal_id)
+    else await pg.rejectProposal(command.proposal_id)
   } else if (command?.kind === 'tool') {
     const call = command.call
     check(call && call.input && typeof call.input === 'object' && !Array.isArray(call.input), 'Invalid tool call')
@@ -117,5 +117,7 @@ export async function transition(checkpoint: Checkpoint | null, command?: Comman
     const s = obj.state as { running: boolean; runId: number; source: string }
     return s.running ? [{ object_id: obj.id, run_id: s.runId, source: s.source }] : []
   })
-  return { catalog_version: CATALOG_VERSION, checkpoint: pg.checkpoint(), snapshot: pg.snapshot(), events: pg.getEvents().filter((e) => e.seq > start), result, pending_runs }
+  const snapshot = pg.snapshot()
+  check(new TextEncoder().encode(JSON.stringify(snapshot)).length <= 65536, 'Canvas snapshot exceeds 64 KiB')
+  return { catalog_version: CATALOG_VERSION, checkpoint: pg.checkpoint(), snapshot, events: pg.getEvents().filter((e) => e.seq > start), result, pending_runs }
 }

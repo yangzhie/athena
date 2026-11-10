@@ -47,6 +47,8 @@ export interface HandState {
   pressed: boolean
 }
 
+export type CommittedCommand = { kind: 'action'; action: Action } | { kind: 'accept' | 'reject'; proposal_id: string }
+
 type DispatchOptions = {
   /** Intermediate demonstration frame: applied but not recorded or checked. */
   transient?: boolean
@@ -95,6 +97,9 @@ export class Playground {
   private unmeasured = new Set<ObjectId>()
   private modules: Record<string, AnyModule>
   private runtimes: Runtimes
+
+  private commitHandler: ((command: CommittedCommand) => Promise<void>) | null = null
+  setCommitHandler(handler: ((command: CommittedCommand) => Promise<void>) | null) { this.commitHandler = handler }
 
   private headless: boolean
 
@@ -243,6 +248,10 @@ export class Playground {
 
   /** Apply an action. Records it, runs checks for student actions and starts effects. */
   async dispatch(action: Action, actor: Actor = 'student', opts: DispatchOptions = {}): Promise<void> {
+    if (this.commitHandler && actor === 'student' && !opts.transient) {
+      await this.commitHandler({ kind: 'action', action })
+      return
+    }
     const obj = this.state.objects[action.objectId]
     if (!obj) return
     const mod = this.modules[obj.type]
@@ -386,6 +395,7 @@ export class Playground {
   }
 
   async acceptProposal(id: string) {
+    if (this.commitHandler) return this.commitHandler({ kind: 'accept', proposal_id: id })
     const p = this.state.proposals.find((x) => x.id === id)
     if (!p) return
     this.set({ proposals: this.state.proposals.filter((x) => x.id !== id) })
@@ -395,7 +405,8 @@ export class Playground {
     if (p.thenDemonstrate?.length) await this.demonstrate(p.objectId, p.thenDemonstrate)
   }
 
-  rejectProposal(id: string) {
+  async rejectProposal(id: string) {
+    if (this.commitHandler) return this.commitHandler({ kind: 'reject', proposal_id: id })
     const p = this.state.proposals.find((x) => x.id === id)
     if (!p) return
     this.set({ proposals: this.state.proposals.filter((x) => x.id !== id) })
@@ -687,15 +698,17 @@ export class Playground {
         const { objectId, actions } = call.input
         const obj = this.state.objects[objectId]
         if (!obj) return { ok: false, error: `unknown object '${objectId}'` }
-        const resets = this.modules[obj.type].resets ?? []
-        // Replaying on top of the student's own work would throw it away: ask first.
-        if (obj.modifiedBy === 'student' && actions.some((a) => resets.includes(a.type))) {
-          return this.propose({
-            objectId,
-            summary: 'show you the technique on a fresh start (this clears your current attempt)',
-            actions: [],
-            thenDemonstrate: actions,
-          })
+        for (const a of actions) {
+          const target = this.state.objects[a.objectId ?? objectId]
+          if (!target) return { ok: false, error: 'unknown demonstration target' }
+          if (target.modifiedBy === 'student' && (this.modules[target.type].resets ?? []).includes(a.type)) {
+            return this.propose({
+              objectId: target.id,
+              summary: 'show you the technique on a fresh start (this clears your current attempt)',
+              actions: [],
+              thenDemonstrate: actions.map((step) => ({ ...step, objectId: step.objectId ?? objectId })),
+            })
+          }
         }
         return this.demonstrate(objectId, actions)
       }

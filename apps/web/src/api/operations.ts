@@ -84,3 +84,16 @@ export async function recoverPracticeOperations(base: string) {
     }
   }
 }
+
+export async function recoverPlaygroundTurn(path: string) {
+  const key = `athena-operation:${path}`
+  const pending = read(key)
+  if (!pending) return
+  try {
+    await call(`${path}/${encodeURIComponent(pending.id)}/retry`, { method: 'POST' })
+    write(key)
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) { write(key); return }
+    throw error
+  }
+}

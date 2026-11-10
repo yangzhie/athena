@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getScene } from '../../../api/playground'
+import { getCanvas } from '../../../api/playground'
 import type { LearningSession, Offering } from '../../../types'
 import { forgetThread, getThread, seedThread } from '../chat/chatStore'
 import { forgetPlayground, openScene, sessionFor } from './session'
 
 vi.mock('../../../api/playground', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../../api/playground')>(),
-  getScene: vi.fn(),
+  getCanvas: vi.fn(),
 }))
 
 const offering: Offering = { id: 'offering-a', unit: { code: 'TEST', title: 'Test' }, year: 2026, semester: 'Semester 1', suggestions: [] }
@@ -41,13 +41,13 @@ describe('session-scoped Playground', () => {
     expect(() => sessionFor({ ...offering, id: 'other-offering' }, 'canvas-a')).toThrow('Load this learning session')
   })
 
-  it('allows retrying an unavailable scene and confines errors to its own chat', async () => {
-    vi.mocked(getScene).mockResolvedValue(null)
+  it('keeps unavailable state visible and never invents browser-local tutor messages', async () => {
+    vi.mocked(getCanvas).mockRejectedValue(new Error('Playground unavailable'))
     await openScene(offering, 'canvas-a', 'missing-scene')
     await openScene(offering, 'canvas-a', 'missing-scene')
-    expect(getScene).toHaveBeenCalledTimes(2)
+    expect(getCanvas).toHaveBeenCalledTimes(2)
     expect(sessionFor(offering, 'canvas-a').sceneId).toBeNull()
-    expect(getThread('canvas-a').messages.at(-1)?.content).toContain('unavailable')
+    expect(getThread('canvas-a').messages).toEqual([])
     expect(getThread('canvas-b').messages).toEqual([])
   })
 

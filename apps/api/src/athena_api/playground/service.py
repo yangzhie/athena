@@ -68,7 +68,12 @@ class Playgrounds:
         self.authorize(student, offering, session)
         with self.lock:
             self._reconcile(session)
-            return self._view(self._row(session))
+            result = self._view(self._row(session))
+            if self.db.execute("SELECT 1 FROM sqlite_master WHERE name='playground_replacements'").fetchone():
+                for job in result['executions']:
+                    job['interpreted'] = bool(self.db.execute("SELECT 1 FROM playground_turns WHERE session=? AND operation=? AND state='complete'", (session, 'execution:' + job['id'])).fetchone())
+                result['replacements'] = [dict(r) | {'scene': json.loads(r['scene'])} for r in self.db.execute("SELECT id,scene FROM playground_replacements WHERE session=? AND status='pending'", (session,))]
+            return result
 
     def command(self, student, offering, session, operation, revision, command, *, trusted=False):
         self.authorize(student, offering, session)
@@ -92,7 +97,7 @@ class Playgrounds:
                 raise HTTPException(409, 'Open a scene first')
             checkpoint = json.loads(row['checkpoint']) if row else None
             data = bridge.transition(checkpoint, command)
-            generation = uuid.uuid4().hex if command.get('kind') == 'open' or command.get('call', {}).get('name') == 'open_playground' else row['generation']
+            generation = uuid.uuid4().hex if command.get('kind') in ('open', 'replace_confirmed') or command.get('call', {}).get('name') == 'open_playground' else row['generation']
             now = time.time()
             with self.db:
                 self.db.execute('BEGIN IMMEDIATE')

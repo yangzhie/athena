@@ -49,7 +49,7 @@ export function ShareDialog({ open, messageCount, onConfirm, onClose }: Props) {
             👁 Your lecturer will see <strong>the whole session</strong>: all {messageCount} message
             {messageCount === 1 ? '' : 's'} so far, and anything added while it stays shared.
           </li>
-          <li>🧪 Demo Playground messages and canvas changes stay in your browser tab; they are not saved or shared.</li>
+          <li>🧪 Saved Playground discussion is included. Canvas snapshots, private grading criteria and internal tool data are excluded.</li>
           <li>💬 They can reply here, and you’ll see their replies in this chat.</li>
           <li>
             🕶 It’s <strong>anonymous</strong>: they won’t see your name. But anything you wrote that identifies you (like

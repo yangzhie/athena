@@ -3,7 +3,7 @@ import type { LearningSession, Offering } from '../../../types'
 import { bumpSession } from '../sessions/sessionStore'
 import { Composer } from './Composer'
 import { MessageBubble } from './MessageBubble'
-import { answer, continueLearning, sendMessage, stopWaiting, suggestPlayground, useThread } from './chatStore'
+import { answer, continueLearning, sendMessage, stopWaiting, useThread } from './chatStore'
 import { openActivityId } from './activity'
 
 function nearBottom() {
@@ -29,9 +29,7 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
 
   const send = (text: string) => {
     bumpSession(session)
-    void sendMessage(offering.id, session.id, text).then((saved) => {
-      if (saved) return suggestPlayground(offering, session.id, text)
-    })
+    void sendMessage(offering.id, session.id, text)
   }
 
   return (

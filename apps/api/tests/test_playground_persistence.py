@@ -118,7 +118,7 @@ def test_execution_is_enqueued_atomically_and_only_worker_result_applies(tmp_pat
     assert command(client, base, 'run-python', 1, action).json() == first.json()
     jobs = client.get(base + '/executions').json()
     assert len(jobs) == 1 and jobs[0]['state'] == 'queued'
-    assert 'source' not in jobs[0] and 'student' not in jobs[0] and 'token' not in jobs[0]
+    assert jobs[0]['source'] == 'print(6 * 7)' and 'student' not in jobs[0] and 'token' not in jobs[0]
     job, _ = service.executions.claim()
     result = {'ok': True, 'provenance': 'real-run', 'stdout': '42\n', 'values': {}, 'trace': []}
     service.executions.finish(job, result)

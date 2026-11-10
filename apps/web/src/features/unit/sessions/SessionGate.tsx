@@ -4,7 +4,7 @@ import { useRole } from '../../../app/role'
 import { ApiUnavailable } from '../../../components/ApiUnavailable'
 import { Card } from '../../../components/ui'
 import type { LearningSession } from '../../../types'
-import { loadThread, suggestPlayground, useThread } from '../chat/chatStore'
+import { loadThread, useThread } from '../chat/chatStore'
 import { useOffering } from '../useOffering'
 import { markSeen } from './seenStore'
 
@@ -29,13 +29,6 @@ export function SessionGate({ children }: { children: (session: LearningSession)
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [offering.id, sessionId, role])
-
-  const goal = session?.goal
-  useEffect(() => {
-    if (role === 'student' && ownsRoute && thread.status === 'ready' && goal) {
-      void suggestPlayground(offering, sessionId, goal)
-    }
-  }, [offering, sessionId, goal, ownsRoute, role, thread.status])
 
   if (role !== 'student') {
     return (
