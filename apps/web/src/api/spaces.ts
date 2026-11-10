@@ -1,11 +1,23 @@
 import type { Offering } from '../types'
-import { enrolledOfferings } from '../mocks/spaces'
+import { ApiError, call } from './client'
 
-/** Offerings the current student is enrolled in. */
-export async function listEnrolledOfferings(): Promise<Offering[]> {
-  return enrolledOfferings
+/** Published Offerings, plus drafts this anonymous browser can manage. */
+export function listEnrolledOfferings(): Promise<Offering[]> {
+  return call('/offerings')
 }
 
 export async function getEnrolledOffering(id: string): Promise<Offering | undefined> {
-  return enrolledOfferings.find((o) => o.id === id)
+  try { return await call(`/offerings/${encodeURIComponent(id)}`) }
+  catch (error) {
+    if (error instanceof ApiError && error.status === 404) return undefined
+    throw error
+  }
+}
+
+export function createStudySpace(input: { code: string; title: string; year: number; semester: string }): Promise<Offering> {
+  return call('/offerings', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function publishStudySpace(id: string): Promise<Offering> {
+  return call(`/offerings/${encodeURIComponent(id)}/publish`, { method: 'POST' })
 }

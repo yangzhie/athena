@@ -24,7 +24,7 @@ offline model fixtures, run `uv run pytest tests/test_answer_retries.py`.
 
 ```sh
 uv run athena-srs load-starter    # once: CSE5ALG and CSE5DMI starter banks
-ATHENA_TUTOR=demo ATHENA_DEV_STUDENT_ID=dev-student ATHENA_DEV_LECTURER_ID=dev-lecturer uv run uvicorn athena_api.app:create_app --factory --reload
+ATHENA_TUTOR=demo uv run uvicorn athena_api.app:create_app --factory --reload
 ```
 
 Live rephrasing turns on when `OPENAI_API_KEY` and `OPENAI_MODEL` are set (the
@@ -33,8 +33,24 @@ Without them, items fall back to existing wordings and never repeat one the
 student got wrong.
 
 Data goes to `data/athena.db` (gitignored; override with `ATHENA_DB`). Interactive
-docs at http://127.0.0.1:8000/docs. `ATHENA_DEV_STUDENT_ID` stands in for SSO: every
-request is that student. Without it, SRS routes return 401.
+docs at http://127.0.0.1:8000/docs. Normal operation uses an opaque HTTP-only,
+SameSite browser cookie, with the bearer secret stored only as a hash on the server.
+Cookies are Secure on HTTPS; set `ATHENA_SECURE_COOKIES=1` behind a trusted HTTPS proxy.
+No registration or login is required. Keep the creator browser’s cookies: there is
+no identity recovery or capability transfer in this first version.
+
+`GET /offerings` discovers published Offerings and the caller’s own drafts.
+`POST /offerings` accepts `{code,title,year,semester}` and creates a private draft
+and a server-owned management grant for that browser. `POST /offerings/{id}/publish`
+makes it discoverable; `DELETE /offerings/{id}` makes it unavailable. Unknown and
+unpublished Offerings return 404; deleted Offerings return 410. A published Offering
+has exactly one Environment per browser identity, shared by that learner’s sessions.
+The UI role switch and client-supplied identity headers grant no authority.
+
+`create_app(resolve_student=..., resolve_lecturer=...)` remains an explicit trusted
+host/testing seam. Only such injected adapters can opt into the old development
+resolvers. The normal application ignores `ATHENA_DEV_STUDENT_ID` and
+`ATHENA_DEV_LECTURER_ID`; do not use these variables for deployed authorisation.
 
 ## Generate questions from a lecture
 
@@ -61,8 +77,7 @@ them until a lecturer approves them.
 
 ## Lecturer: question bank review
 
-Lecturer-only (403 otherwise). In dev, `ATHENA_DEV_LECTURER_ID` makes every request
-that lecturer for every unit; real roles come from SSO. No student data is returned.
+Creator-management only (403 otherwise), using the server-side grant for this Offering. No student data is returned.
 
 | Route | Does |
 | --- | --- |

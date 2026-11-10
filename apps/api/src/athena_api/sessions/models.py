@@ -15,6 +15,7 @@ class LearningSession(Model):
 
     id: NonBlank
     student_id: NonBlank
+    environment_id: str | None = None
     offering_id: NonBlank
     goal: Annotated[str, StringConstraints(min_length=1, max_length=200, pattern=r"\S")]
     title: Annotated[str, StringConstraints(min_length=1, max_length=80, pattern=r"\S")]
@@ -75,7 +76,7 @@ class LearningSessionOut(BaseModel):
 
     @classmethod
     def of(cls, s: LearningSession) -> "LearningSessionOut":
-        return cls(**s.model_dump(exclude={"student_id", "share_token"}))
+        return cls(**s.model_dump(exclude={"student_id", "share_token", "environment_id"}))
 
 
 # --- Lecturer-facing (shared sessions): never the student id or the session id ---------

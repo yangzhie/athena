@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
-import { useRole } from '../../app/role'
+import { useNavigate, useRevalidator } from 'react-router'
+import { createStudySpace } from '../../api/spaces'
 import { Button } from '../../components/ui'
 
 const SEMESTERS = ['Semester 1', 'Semester 2', 'Summer'] as const
@@ -9,26 +10,33 @@ const field =
 
 /**
  * Lecturer action: create a study space for a unit offering (e.g. CSE5DMI, Sem 2 2026).
- * Dummy for now: nothing is saved. Shown only in the lecturer view.
+ * The server grants management to this browser identity when it creates the draft.
  */
 export function CreateSpaceButton() {
   const dialog = useRef<HTMLDialogElement>(null)
   const [submitted, setSubmitted] = useState<string | null>(null)
-  const role = useRole()
+  const navigate = useNavigate()
+  const revalidator = useRevalidator()
+  const [busy, setBusy] = useState(false)
 
   function open() {
     setSubmitted(null)
     dialog.current?.showModal()
   }
 
-  function submit(e: FormEvent<HTMLFormElement>) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const data = new FormData(e.currentTarget)
-    setSubmitted(`${String(data.get('code')).toUpperCase()} · ${data.get('semester')} ${data.get('year')}`)
-    e.currentTarget.reset()
+    setBusy(true)
+    try {
+      const offering = await createStudySpace({ code: String(data.get('code')).toUpperCase(), title: String(data.get('title')), year: Number(data.get('year')), semester: String(data.get('semester')) })
+      dialog.current?.close()
+      void revalidator.revalidate()
+      navigate(`/units/${offering.id}/manage`)
+    } catch (error) { setSubmitted(error instanceof Error ? error.message : 'Study space could not be created.') }
+    finally { setBusy(false) }
   }
 
-  if (role !== 'lecturer') return null
 
   return (
     <>
@@ -46,13 +54,13 @@ export function CreateSpaceButton() {
             New study space
           </h2>
           <p className="mt-1 text-sm text-muted">
-            For lecturers. Create a space for one offering of a unit, then upload its material and enrol students.
+            Create a study space for one Offering. It starts as a private draft. You can upload material and choose when to publish it.
           </p>
 
           {submitted ? (
             <div className="mt-5 space-y-4">
               <p className="rounded-lg bg-warn/15 px-3 py-2 text-sm">
-                <span className="font-medium">{submitted}</span> was not created. The backend isn't connected yet.
+                <span role="alert">{submitted}</span>
               </p>
               <div className="flex justify-end">
                 <Button variant="secondary" onClick={() => dialog.current?.close()}>
@@ -106,7 +114,7 @@ export function CreateSpaceButton() {
                 <Button variant="ghost" onClick={() => dialog.current?.close()}>
                   Cancel
                 </Button>
-                <Button type="submit">Create study space</Button>
+                <Button type="submit" disabled={busy}>{busy ? 'Creating…' : 'Create study space'}</Button>
               </div>
             </form>
           )}

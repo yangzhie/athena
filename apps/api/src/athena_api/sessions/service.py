@@ -25,6 +25,8 @@ class SessionService:
     tutor: Tutor = field(default_factory=lambda: UnavailableTutor("No tutor was configured."))
     clock: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
 
+    environment_resolver: Callable[[str, str], str] | None = None
+
     def _get(self, student_id: str, session_id: str, offering_id: str) -> LearningSession:
         s = self.store.get(student_id, session_id)
         if s is None or s.offering_id != offering_id:
@@ -79,7 +81,8 @@ class SessionService:
         clean = " ".join(goal.split())
         session = LearningSession(
             id=uuid.uuid4().hex, student_id=student_id, offering_id=offering_id,
-            goal=clean, title=_title(clean), created_at=now, updated_at=now,
+            goal=clean, title=_title(clean),
+            environment_id=self.environment_resolver(student_id, offering_id) if self.environment_resolver else None, created_at=now, updated_at=now,
         )
         operation_id = "start:" + (operation_id or uuid.uuid4().hex)
         previous = self.store.operation(student_id, offering_id, operation_id)

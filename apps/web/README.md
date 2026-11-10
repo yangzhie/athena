@@ -1,6 +1,6 @@
 # apps/web
 
-React + TypeScript + Vite + Tailwind v4 frontend. Learning sessions, lecture clips and spaced repetition use `apps/api`; unit enrolments and the Playground tutor still use mocks. Run the API on port 8000 (see `../api/README.md`); Vite proxies `/api` to it.
+React + TypeScript + Vite + Tailwind v4 frontend. Learning sessions, lecture clips and spaced repetition use `apps/api`; Offering discovery and study-space creation/publication also use the API; the Playground tutor still uses mocks. Run the API on port 8000 (see `../api/README.md`); Vite proxies `/api` to it.
 
 ```sh
 npm run dev      # from the repo root, or from this folder
@@ -44,3 +44,11 @@ session picker rather than choosing an arbitrary session.
 
 1. Create `src/features/<name>/` with a page and a `routes.tsx` exporting a `Feature`.
 2. Add one line to `src/app/features.ts`.
+
+## Study spaces and anonymous identity
+
+Anyone can create a private draft from the sidebar, then publish its material for
+other learners. Published Offerings are discovered from the API. The creator’s
+management capability is bound to their anonymous browser cookie; the demo role
+switch changes presentation only. Sessions stay private to each browser identity.
+Empty, unpublished, deleted and unavailable states do not fall back to mock Offerings.

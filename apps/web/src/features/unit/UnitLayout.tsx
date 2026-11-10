@@ -12,7 +12,7 @@ export default function UnitLayout() {
     return (
       <section className="pb-10">
         <h1 className="text-2xl font-semibold tracking-tight">Unit not found</h1>
-        <p className="mt-2 text-muted">You're not enrolled in this unit, or it doesn't exist.</p>
+        <p className="mt-2 text-muted">This Offering is unavailable or has not been published.</p>
         <Link to="/" className="mt-2 inline-block text-accent hover:underline">
           Back to your units
         </Link>
@@ -23,6 +23,8 @@ export default function UnitLayout() {
   return (
     <div className="flex flex-1 gap-8">
       <div className="flex min-w-0 flex-1 flex-col">
+        {offering.can_manage && <Link to={`/units/${offering.id}/manage`} className="mb-4 text-sm text-accent hover:underline">Manage study space</Link>}
+        {offering.status === 'draft' && <p className="mb-4 rounded-lg bg-warn/15 p-3 text-sm">Draft study space. Publish it before starting a learning session.</p>}
         <Outlet />
       </div>
       {!onPlayground && <SidePanel key={offering.id} offering={offering} />}
