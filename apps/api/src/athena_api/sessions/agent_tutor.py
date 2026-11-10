@@ -272,7 +272,7 @@ def agent_tutor_from_env(material: MaterialProvider | None = None):
         llm = ReliableLLM(OpenAILLM(OpenAISettings.from_env()))
     except LLMError:
         return UnavailableTutor("Configure OPENAI_API_KEY and OPENAI_MODEL for the AI tutor.")
-    path = Path(os.environ.get("ATHENA_AGENT_DB", "data/agent.db"))
+    path = Path(os.environ.get("ATHENA_AGENT_DB", str(Path(os.environ.get("ATHENA_DB", "data/athena.db")).parent / "agent.db")))
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         return AgentTutor(SQLiteLearningMemory(path), llm, material=material)

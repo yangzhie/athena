@@ -30,6 +30,7 @@ class SQLiteLearningMemory(InMemoryConversationStore):
         self._db_lock = RLock()
         try:
             self._db = sqlite3.connect(str(path), isolation_level=None, check_same_thread=False, timeout=5)
+            self._db.execute('PRAGMA secure_delete=ON')
             self._db.execute('CREATE TABLE IF NOT EXISTS learning_sessions (learner_id TEXT NOT NULL, session_id TEXT NOT NULL, revision INTEGER NOT NULL, version INTEGER NOT NULL, conversation_json TEXT NOT NULL, learning_json TEXT NOT NULL, PRIMARY KEY (learner_id, session_id))')
             columns = {row[1] for row in self._db.execute('PRAGMA table_info(learning_sessions)')}
             if 'operations_json' not in columns:
@@ -66,6 +67,13 @@ class SQLiteLearningMemory(InMemoryConversationStore):
         except sqlite3.Error:
             raise MemoryUnavailableError() from None
         return session.model_copy(deep=True)
+
+    def delete(self, context: RequestContext) -> None:
+        try:
+            with self._db_lock:
+                self._db.execute('DELETE FROM learning_sessions WHERE learner_id=? AND session_id=?', self._key(context))
+        except sqlite3.Error:
+            raise MemoryUnavailableError() from None
 
     def read(self, context: RequestContext) -> ConversationSession:
         key = self._key(context)

@@ -118,6 +118,12 @@ def execute(source, name, cancelled=lambda: False, image=None):
 
 
 def run_once(store):
+    with store.lock:
+        cleanup_queue = [r[0] for r in store.db.execute('SELECT container FROM execution_cleanup')]
+    for name in cleanup_queue:
+        if cleanup(name):
+            with store.lock, store.db:
+                store.db.execute('DELETE FROM execution_cleanup WHERE container=?', (name,))
     job, stale = store.claim()
     with store.lock:
         terminal = store.db.execute("SELECT container FROM executions WHERE container IS NOT NULL AND state NOT IN ('queued','running')").fetchall()

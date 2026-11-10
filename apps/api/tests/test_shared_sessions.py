@@ -117,3 +117,25 @@ def test_no_replies_once_sharing_stops_or_from_non_lecturers(client):
     client.delete(f"{MINE}/{sid}/share")
     assert client.post(f"{SHARED}/{share_id}/messages", json={"text": "hi"}).status_code == 404
     assert client.post(f"{SHARED}/nope/messages", json={"text": " "}).status_code == 422
+
+
+def test_nested_question_and_activity_ids_change_on_reshare(client):
+    from athena_api.sessions.models import Message
+    from datetime import datetime, UTC
+    sid = start(client)
+    store = client.app.state.sessions.store
+    store.add_message(client.who['student'], Message(id='stable-message', session_id=sid, role='tutor', content='Why?',
+        activity={'kind': 'question', 'activity_id': 'stable-activity', 'question': {'question_id': 'stable-question',
+                  'concept_id': 'stable-concept', 'kind': 'multiple_choice', 'choices': [{'choice_id': 'stable-choice', 'text': 'First'}]},
+                  'rubric': 'PRIVATE'}, created_at=datetime.now(UTC)))
+    store.add_message(client.who['student'], Message(id='stable-answer', session_id=sid, role='learner', content='First', answer_for='stable-question', created_at=datetime.now(UTC)))
+    views = []
+    for _ in range(2):
+        client.post(f'{MINE}/{sid}/share')
+        token = client.get(SHARED).json()[0]['share_id']
+        view = client.get(f'{SHARED}/{token}').json()['messages']
+        views.append(view)
+        assert view[-1]['answer_for'] == view[-2]['activity']['question']['question_id']
+        assert 'stable-question' not in str(view) and 'stable-activity' not in str(view) and 'PRIVATE' not in str(view)
+        client.delete(f'{MINE}/{sid}/share')
+    assert views[0][-1]['answer_for'] != views[1][-1]['answer_for']

@@ -27,10 +27,12 @@ class SessionService:
 
     environment_resolver: Callable[[str, str], str] | None = None
     evidence_sink: Callable | None = None
+    cleanup: Callable | None = None
+    unavailable: Callable[[str], bool] | None = None
 
     def _get(self, student_id: str, session_id: str, offering_id: str) -> LearningSession:
         s = self.store.get(student_id, session_id)
-        if s is None or s.offering_id != offering_id:
+        if s is None or s.offering_id != offering_id or (self.unavailable and self.unavailable(session_id)):
             raise NotFound("no such session")  # same answer for "missing" and "someone else's"
         return s
 
@@ -80,7 +82,7 @@ class SessionService:
             raise NotFound("no such session") from None
 
     def list(self, student_id: str, offering_id: str) -> list[LearningSession]:
-        return self.store.list(student_id, offering_id)
+        return [s for s in self.store.list(student_id, offering_id) if not self.unavailable or not self.unavailable(s.id)]
 
     async def create(self, student_id: str, offering_id: str, goal: str, operation_id: str | None = None) -> tuple[LearningSession, list[Message]]:
         now = self.clock()
@@ -114,24 +116,35 @@ class SessionService:
         s = self._get(student_id, session_id, offering_id)
         updated = s.model_copy(update={"title": " ".join(title.split())[:80]})
         LearningSession.model_validate(updated.model_dump())  # reject a blank title
-        self.store.put(updated)
+        try:
+            updated = self.store.update_existing(updated, {'title'})
+        except LookupError:
+            raise NotFound('no such session') from None
         return updated
 
     def share(self, student_id: str, offering_id: str, session_id: str) -> LearningSession:
         """Share with the unit's lecturers, anonymously. A new token every time (unlinkable)."""
         s = self._get(student_id, session_id, offering_id)
         updated = s.model_copy(update={"shared": True, "shared_at": self.clock(), "share_token": uuid.uuid4().hex})
-        self.store.put(updated)
+        try:
+            updated = self.store.update_existing(updated, {'shared', 'shared_at', 'share_token'})
+        except LookupError:
+            raise NotFound('no such session') from None
         return updated
 
     def unshare(self, student_id: str, offering_id: str, session_id: str) -> LearningSession:
         """Stop sharing. Lecturer access ends at once: their routes look the session up by its token."""
         s = self._get(student_id, session_id, offering_id)
         updated = s.model_copy(update={"shared": False, "shared_at": None, "share_token": None})
-        self.store.put(updated)
+        try:
+            updated = self.store.update_existing(updated, {'shared', 'shared_at', 'share_token'})
+        except LookupError:
+            raise NotFound('no such session') from None
         return updated
 
     def delete(self, student_id: str, offering_id: str, session_id: str) -> None:
+        if self.cleanup:
+            return self.cleanup(student_id, offering_id, session_id)
         self._get(student_id, session_id, offering_id)
         self.store.delete(student_id, session_id)
 

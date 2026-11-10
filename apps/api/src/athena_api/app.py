@@ -1,10 +1,14 @@
 """FastAPI application factory. Each module (SRS, sessions) adds its router here."""
 
 import os
+import asyncio
+import logging
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI
 
+from .privacy.lifecycle import Lifecycle
 from .playground.service import Playgrounds
 from .playground.api import playground_router
 from .learning.service import LearningMemory
@@ -43,7 +47,28 @@ def create_app(
     resolve_lecturer: LecturerResolver | None = None,
     spaces: StudySpaces | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Athena API", version="0.1.0")
+    @asynccontextmanager
+    async def lifespan(app):
+        async def retain():
+            while True:
+                lifecycle = getattr(app.state, 'lifecycle', None)
+                if lifecycle:
+                    try:
+                        await asyncio.to_thread(lifecycle.sweep)
+                        app.state.retention_available = True
+                    except Exception:
+                        app.state.retention_available = False
+                        logging.getLogger('athena.privacy').error('Private-content cleanup unavailable; pending cleanup remains recoverable')
+                await asyncio.sleep(60)
+        task = asyncio.create_task(retain())
+        try:
+            yield
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+    app = FastAPI(title="Athena API", version="0.1.0", lifespan=lifespan)
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -96,6 +121,10 @@ def create_app(
         app.include_router(materials_router(materials))
         memory = LearningMemory(spaces, sessions.tutor)
         app.state.learning = memory
+        lifecycle = Lifecycle(spaces, sessions, memory)
+        app.state.lifecycle = lifecycle
+        sessions.cleanup = lifecycle.delete
+        sessions.unavailable = lifecycle.unavailable
         sessions.evidence_sink = memory.sync
         srs.private_items = memory.practice_items
         srs.private_item_writer = memory.save_practice

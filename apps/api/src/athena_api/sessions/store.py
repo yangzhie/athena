@@ -79,6 +79,23 @@ class MemorySessionStore:
     def put(self, session):
         self.sessions[session.id] = session
 
+    def update_existing(self, session, fields=None):
+        with self._answer_lock:
+            if self.get(session.student_id, session.id) is None:
+                raise LookupError('no such session')
+            current = self.get(session.student_id, session.id)
+            updated = current.model_copy(update={k: getattr(session, k) for k in fields}) if fields else session
+            self.sessions[session.id] = updated
+            return updated
+
+    def reply_shared(self, token, message, now):
+        with self._answer_lock:
+            session = next((s for s in self.sessions.values() if s.id == message.session_id and s.shared and s.share_token == token), None)
+            if session is None:
+                raise LookupError('share revoked')
+            self.msgs.setdefault(session.id, []).append(message)
+            self.sessions[session.id] = session.model_copy(update={'updated_at': now, 'last_lecturer_reply_at': now})
+
     def delete(self, student_id, session_id):
         with self._answer_lock:
             if not self.get(student_id, session_id):
@@ -214,6 +231,31 @@ class SqliteSessionStore:
                    WHERE learning_sessions.student_id = excluded.student_id""",
                 (s.id, s.student_id, s.offering_id, s.updated_at.isoformat(), s.model_dump_json()),
             )
+
+    def update_existing(self, session, fields=None):
+        with self._lock, self._db:
+            self._db.execute('BEGIN IMMEDIATE')
+            if self._db.execute("SELECT 1 FROM sqlite_master WHERE name='private_cleanup'").fetchone() and self._db.execute('SELECT 1 FROM private_cleanup WHERE session=?', (session.id,)).fetchone():
+                raise LookupError('session deletion is pending')
+            row = self._db.execute('SELECT data FROM learning_sessions WHERE id=? AND student_id=?', (session.id, session.student_id)).fetchone()
+            if not row:
+                raise LookupError('no such session')
+            current = LearningSession.model_validate_json(row[0])
+            updated = current.model_copy(update={k: getattr(session, k) for k in fields}) if fields else session
+            self._db.execute('UPDATE learning_sessions SET data=?,updated_at=? WHERE id=? AND student_id=?',
+                             (updated.model_dump_json(), updated.updated_at.isoformat(), session.id, session.student_id))
+            return updated
+
+    def reply_shared(self, token, message, now):
+        with self._lock, self._db:
+            self._db.execute('BEGIN IMMEDIATE')
+            row = self._db.execute('SELECT data FROM learning_sessions WHERE id=?', (message.session_id,)).fetchone()
+            session = LearningSession.model_validate_json(row[0]) if row else None
+            if not session or not session.shared or session.share_token != token:
+                raise LookupError('share revoked')
+            self._db.execute('INSERT INTO session_messages(session_id,data) VALUES (?,?)', (session.id, message.model_dump_json()))
+            session = session.model_copy(update={'updated_at': now, 'last_lecturer_reply_at': now})
+            self._db.execute('UPDATE learning_sessions SET data=?,updated_at=? WHERE id=?', (session.model_dump_json(), now.isoformat(), session.id))
 
     def delete(self, student_id, session_id):
         with self._lock, self._db:

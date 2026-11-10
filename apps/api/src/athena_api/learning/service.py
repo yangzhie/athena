@@ -42,6 +42,13 @@ CREATE TABLE IF NOT EXISTS private_practice (
  student_id TEXT NOT NULL, offering_id TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL,
  PRIMARY KEY(student_id,offering_id,id)
 );
+CREATE TABLE IF NOT EXISTS learner_evidence_state (
+ id TEXT PRIMARY KEY, status TEXT NOT NULL, note TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS private_practice_provenance (
+ student_id TEXT NOT NULL, offering_id TEXT NOT NULL, item TEXT NOT NULL, variant TEXT NOT NULL,
+ session TEXT NOT NULL, PRIMARY KEY(student_id,offering_id,item,variant)
+);
 CREATE TABLE IF NOT EXISTS aggregate_events (
  id TEXT PRIMARY KEY, offering_id TEXT NOT NULL, environment_id TEXT NOT NULL, session_id TEXT NOT NULL,
  concept_id TEXT, outcome TEXT NOT NULL, category TEXT NOT NULL, created_at REAL NOT NULL
@@ -102,6 +109,9 @@ class LearningMemory:
             snapshot = self.tutor.store.read(context)
         now = time.time()
         with self.lock, self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            if not self.db.execute('SELECT 1 FROM learning_sessions WHERE id=? AND student_id=?', (session.id, session.student_id)).fetchone():
+                return  # Deletion won a race with a completed agent transition.
             self._event('start:' + session.id, session, None, 'started', 'none')
             if not snapshot or not snapshot.active_topic:
                 return
@@ -142,6 +152,7 @@ class LearningMemory:
                             status, note = current
                     self.db.execute('UPDATE learner_concepts SET status=?,note=?,evidence_count=evidence_count+1,updated_at=? WHERE student_id=? AND concept_id=?',
                                     (status, note, now, session.student_id, canonical))
+                    self.db.execute('INSERT OR REPLACE INTO learner_evidence_state VALUES (?,?,?)', (event, mastery.get(assessment.concept_id, 'developing') if decisive else 'unknown', 'Independent checks support mastery.' if decisive and mastery.get(assessment.concept_id) == 'mastered' else 'Practise applying this Concept independently.' if decisive else 'More evidence is needed.'))
                     category = ('uncertain_evidence' if not decisive else 'needs_independent_reasoning' if record.hint_used else
                                 'prerequisite_gap' if assessment.prerequisite_gaps else 'needs_practice' if assessment.outcome != 'correct' else 'none')
                     self._event(event, session, canonical, assessment.outcome, category)
@@ -168,6 +179,7 @@ class LearningMemory:
         item = Item(id=id, offering_id=session.offering_id, topic_id=canonical, concept=self.db.execute('SELECT title FROM concepts WHERE id=?', (canonical,)).fetchone()[0],
                     difficulty={'beginner': 1, 'intermediate': 3, 'advanced': 5}[q.difficulty], bloom='apply', variants=variants,
                     clip_ids=[s.segment_id for s in record.sources if s.kind == 'video'])
+        self.db.execute('INSERT OR IGNORE INTO private_practice_provenance VALUES (?,?,?,?,?)', (session.student_id, session.offering_id, id, variant_id, session.id))
         self.db.execute('INSERT INTO private_practice VALUES (?,?,?,?) ON CONFLICT(student_id,offering_id,id) DO UPDATE SET data=excluded.data',
                         (session.student_id, session.offering_id, id, item.model_dump_json()))
 

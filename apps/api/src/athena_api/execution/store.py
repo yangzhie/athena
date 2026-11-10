@@ -26,6 +26,7 @@ class Executions:
                     container TEXT, result TEXT, error TEXT,
                     UNIQUE(session, generation, object_id, run_id)
                 );
+                CREATE TABLE IF NOT EXISTS execution_cleanup (container TEXT PRIMARY KEY);
                 CREATE INDEX IF NOT EXISTS execution_queue ON executions(state, created);
             ''')
 

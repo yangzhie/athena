@@ -381,3 +381,27 @@ including when shared explicitly. Lecturer replies are excluded from model input
 and never execute tools. Completed Python jobs are interpreted once using their
 actual source/output; that interpretation and canvas checks never create mastery
 or Practice evidence. Use the session's independent assessments for that evidence.
+
+### Private-content retention and deletion
+
+The API's lifespan task sweeps private content every minute. Set
+`ATHENA_PRIVATE_RETENTION_DAYS` (positive number, default 30). A session expires
+30 days after creation, even if it is still being used; Practice receipts, attempts,
+review logs and scheduling state also have bounded retention. Course material is
+shared Offering content and survives private-session expiry.
+
+Deletion first persists a cleanup request and revokes sharing. Pending cleanup
+hides the session immediately, resumes after failure/restart, removes host chat,
+agent snapshots/receipts, Playground history/proposals/turns, execution source and
+output, and the session's private evidence. Related Practice variants and scheduling
+state are reset; remaining Concepts are rebuilt from surviving independent evidence.
+Container names enter a durable cleanup queue consumed by the execution worker;
+no Docker privileges are granted to the API. Neither raw content nor individual-linked
+analytics events are retained after deletion. Historical aggregate rollups are not
+retained in this first version, so metrics reflect surviving events.
+
+Shared conversations include saved Playground discussion. Each share remaps message,
+activity, question, choice and Concept references, and revocation takes effect on
+subsequent access immediately. Lecturer replies are atomic with current share checks.
+Private rubrics/internal state are excluded. Apply the same retention policy to
+backups; deleting active SQLite rows cannot erase older operator-managed backups.

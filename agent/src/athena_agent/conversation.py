@@ -117,6 +117,10 @@ class InMemoryConversationStore:
         self._sessions[key] = session
         return session.model_copy(deep=True)
 
+    def delete(self, context: RequestContext) -> None:
+        """Erase a private session; stale CAS writers cannot recreate it."""
+        self._sessions.pop(self._key(context), None)
+
     def read(self, context: RequestContext) -> ConversationSession:
         session = self._sessions.get(self._key(context))
         if session is None:
