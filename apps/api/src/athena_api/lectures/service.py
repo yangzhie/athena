@@ -1,6 +1,7 @@
 """Lecture use cases: import from the indexer, student view, lecturer review, agent material."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from .models import (
     ClipReview,
@@ -36,11 +37,12 @@ class LectureService:
 
     # --- import ---------------------------------------------------------------------------
 
-    def import_indexer_file(self, data: dict, offering_id: str | None = None) -> Lecture:
+    def import_indexer_file(self, data: dict, offering_id: str | None = None, base_dir: Path | None = None) -> Lecture:
         """Add or replace a lecture from the indexer's clips.json.
 
         A re-indexed lecture keeps the lecturer's review of clips that are unchanged
         (same id, times, title, topic and summary). Changed or new clips start pending.
+        `base_dir` is the clips.json folder, to find the recording it points to.
         """
         f = IndexerFile.model_validate(data)
         offering = offering_id or f.offering_id
@@ -51,9 +53,11 @@ class LectureService:
             StoredClip(proposed=p, review=old[p.id].review if p.id in old and _same(old[p.id].proposed, p) else ClipReview())
             for p in sorted(f.clips, key=lambda c: c.start_s)
         ]
+        media = (base_dir / f.media).resolve() if base_dir and f.media else None
         lecture = Lecture(
             id=f.recording_id, offering_id=offering, title=f.title, week=f.week if f.week and f.week > 0 else None,
             duration_s=f.duration_s, status=f.status, clips=clips,
+            media_path=str(media) if media and media.is_file() else None,
         )
         self.store.put(lecture)
         return lecture
@@ -68,6 +72,7 @@ class LectureService:
                 status=l.status,
                 clips=sorted((StudentClip(**c.effective()) for c in l.clips if c.status == "approved"), key=lambda c: c.start_s),
                 under_review=any(c.status == "pending" for c in l.clips),
+                has_media=self._playable(l, for_students=True) is not None,
             )
             for l in self.store.list(offering_id)
         ]
@@ -97,9 +102,30 @@ class LectureService:
                     )
                     for c in l.clips
                 ],
+                has_media=self._playable(l, for_students=False) is not None,
             )
             for l in self.store.list(offering_id)
         ]
+
+    # --- media ----------------------------------------------------------------------------
+
+    @staticmethod
+    def _playable(lecture: Lecture, *, for_students: bool) -> Path | None:
+        """The recording, if it exists and this audience may watch it.
+        Students only once the lecturer has approved at least one clip."""
+        if not lecture.media_path:
+            return None
+        if for_students and not any(c.status == "approved" for c in lecture.clips):
+            return None
+        path = Path(lecture.media_path)
+        return path if path.is_file() else None
+
+    def media(self, offering_id: str, lecture_id: str, *, for_students: bool) -> Path:
+        lecture = self.store.get(offering_id, lecture_id)
+        path = self._playable(lecture, for_students=for_students) if lecture else None
+        if path is None:
+            raise NotFound("no recording to play")
+        return path
 
     def _update(self, offering_id: str, lecture_id: str, clip_id: str, fn) -> None:
         lecture = self.store.get(offering_id, lecture_id)

@@ -1,8 +1,10 @@
 """Lecture routes. Students: approved clips, no transcripts. Lecturers: review."""
 
+import mimetypes
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..auth import LecturerResolver, StudentResolver, lecturer_dependency, student_dependency
@@ -38,6 +40,18 @@ def lectures_router(service: LectureService, resolve_student: StudentResolver, r
     @router.get("", response_model=list[StudentLecture])
     def for_students(offering_id: str, _: Student):
         return service.for_students(offering_id)
+
+    @router.get("/{lecture_id}/media")
+    def media(offering_id: str, lecture_id: str, request: Request):
+        """Stream the recording (supports seeking via Range). Lecturers always; students
+        once at least one clip is approved."""
+        if resolve_lecturer(request, offering_id):
+            path = run(service.media, offering_id, lecture_id, for_students=False)
+        elif resolve_student(request):
+            path = run(service.media, offering_id, lecture_id, for_students=True)
+        else:
+            raise HTTPException(401, "sign in required")
+        return FileResponse(path, media_type=mimetypes.guess_type(path.name)[0] or "application/octet-stream")
 
     @router.get("/review", response_model=list[LecturerLecture])
     def for_lecturers(offering_id: str, _: Lecturer):

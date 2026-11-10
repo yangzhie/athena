@@ -64,6 +64,7 @@ def test_index_lecture_end_to_end_and_rerun_is_cached(tmp_path):
     clips = json.loads((work / "clips.json").read_text())
     assert clips["recordingId"] == "alg-w2" and len(clips["clips"]) == 2
     assert (clips["offeringId"], clips["week"]) == ("cse5alg-2026-s2", 2)
+    assert (work / clips["media"]).resolve() == rec.resolve()
     video = json.loads((work / "video_segments.json").read_text())
     assert video[0]["kind"] == "video" and video[0]["source_id"] == "alg-w2"
     assert any("clips →" in m for m in logs)
@@ -75,3 +76,18 @@ def test_index_lecture_end_to_end_and_rerun_is_cached(tmp_path):
     )
     assert seg2.calls == 0
     assert again == result
+
+
+@needs_ffmpeg
+def test_fixed_segmenter_needs_no_llm(tmp_path):
+    from athena_indexer.segment import FixedSegmenter
+
+    rec = tmp_path / "lecture.mp4"
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-f", "lavfi", "-i", "sine=duration=120", str(rec)], check=True)
+    result = index_lecture(
+        rec, tmp_path / "w", TOPICS, FakeTranscriber(), FixedSegmenter("sort", every_s=50),
+        recording_id="r", title="t",
+    )
+    # 120 s in ~50 s parts; the short ~18 s remainder folds into part 2 (cleanup minimum is 45 s).
+    assert [c.title for c in result.clips] == ["Part 1 (not segmented)", "Part 2 (not segmented)"]
+    assert all(c.topic == "Insertion Sort" for c in result.clips)

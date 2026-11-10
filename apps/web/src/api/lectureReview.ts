@@ -1,6 +1,7 @@
 /** Lecturer-only: review the clips lecture indexing proposed. See apps/api README. */
 import type { ReviewedClip, ReviewedLecture } from '../features/unit/review/types'
 import { call } from './client'
+import { mediaUrl } from './lectures'
 
 interface LecturerClipDto {
   id: string
@@ -24,6 +25,7 @@ interface LecturerLectureDto {
   duration_s: number
   status: ReviewedLecture['status']
   clips: LecturerClipDto[]
+  has_media: boolean
 }
 
 const toLecture = (l: LecturerLectureDto): ReviewedLecture => ({
@@ -33,6 +35,7 @@ const toLecture = (l: LecturerLectureDto): ReviewedLecture => ({
   week: l.week ?? 0,
   durationS: l.duration_s,
   status: l.status,
+  mediaUrl: l.has_media ? mediaUrl(l.offering_id, l.id) : undefined,
   clips: l.clips.map((c) => ({
     id: c.id,
     recordingId: c.recording_id,

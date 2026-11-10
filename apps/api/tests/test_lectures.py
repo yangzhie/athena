@@ -108,3 +108,47 @@ def test_cli_imports(tmp_path, capsys):
     f.write_text(json.dumps(FILE))
     lectures_cli(["--db", str(tmp_path / "a.db"), "import", str(f)])
     assert "3 clips (3 pending review)" in capsys.readouterr().out
+
+
+
+def test_media_streams_with_seeking_and_respects_approval(tmp_path):
+    video = tmp_path / "rec.mp4"
+    video.write_bytes(bytes(range(256)) * 40)  # 10 KiB stand-in
+    service = LectureService(MemoryLectureStore())
+    service.import_indexer_file({**FILE, "media": "rec.mp4"}, base_dir=tmp_path)
+    who = {"student": "alice", "lecturer": None}
+    client = TestClient(create_app(srs=SrsService(MemoryStore()), sessions=SessionService(MemorySessionStore()), lectures=service,
+                                   resolve_student=lambda _r: who["student"], resolve_lecturer=lambda _r, _o: who["lecturer"]))
+    media = f"{URL}/rec/media"
+
+    # Students: nothing until a clip is approved.
+    assert client.get(URL).json()[0]["has_media"] is False
+    assert client.get(media).status_code == 404
+    service.set_status(OFF, "rec", "rec-01", "approved")
+    assert client.get(URL).json()[0]["has_media"] is True
+
+    r = client.get(media, headers={"Range": "bytes=100-199"})
+    assert r.status_code == 206 and r.content == (bytes(range(256)) * 40)[100:200]
+    assert r.headers["content-type"] == "video/mp4"
+    assert client.get(media).status_code == 200
+
+    who["student"] = None
+    assert client.get(media).status_code == 401
+    who["lecturer"] = "dr-liu"
+    assert client.get(f"{URL}/review").json()[0]["has_media"] is True
+
+
+def test_media_path_is_never_sent_to_clients(tmp_path):
+    (tmp_path / "rec.mp4").write_bytes(b"x")
+    service = LectureService(MemoryLectureStore())
+    service.import_indexer_file({**FILE, "media": "rec.mp4"}, base_dir=tmp_path)
+    service.approve_pending(OFF, "rec")
+    client = TestClient(create_app(srs=SrsService(MemoryStore()), sessions=SessionService(MemorySessionStore()), lectures=service,
+                                   resolve_student=lambda _r: "alice", resolve_lecturer=lambda _r, _o: "dr-liu"))
+    assert str(tmp_path) not in client.get(URL).text and str(tmp_path) not in client.get(f"{URL}/review").text
+
+
+def test_missing_recording_means_no_playback(tmp_path):
+    service = LectureService(MemoryLectureStore())
+    lecture = service.import_indexer_file({**FILE, "media": "gone.mp4"}, base_dir=tmp_path)
+    assert lecture.media_path is None

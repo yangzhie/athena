@@ -76,7 +76,7 @@ export function ClipPlayer({ src, startS, endS, title }: Props) {
       />
       {error ? (
         <p className="px-4 py-3 text-sm text-white/80">
-          The recording couldn’t be loaded. It only plays in the dev server (npm run dev) on the machine that indexed it.
+          The recording couldn’t be loaded. Check the Athena API is running, then try again.
         </p>
       ) : (
         <div className="flex items-center gap-3 px-3 py-2 text-white">

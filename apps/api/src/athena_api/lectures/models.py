@@ -74,6 +74,9 @@ class Lecture(Model):
     duration_s: Seconds
     status: Literal["processing", "ready", "failed"]
     clips: list[StoredClip] = Field(default_factory=list)
+    #: Where the recording is on the server (set on import). Streamed by the media route;
+    #: never sent to clients.
+    media_path: str | None = None
 
     @model_validator(mode="after")
     def _unique(self) -> Self:
@@ -94,6 +97,8 @@ class IndexerFile(BaseModel):
     status: Literal["processing", "ready", "failed"]
     offering_id: NonBlank | None = None
     week: int | None = None
+    #: Recording path relative to the clips.json file.
+    media: str | None = None
     clips: list[ProposedClip] = Field(default_factory=list)
 
 
@@ -123,6 +128,8 @@ class StudentLecture(BaseModel):
     clips: list[StudentClip]
     #: Some clips are still waiting for the lecturer.
     under_review: bool
+    #: The recording can be played (GET …/lectures/{id}/media).
+    has_media: bool
 
 
 class LecturerClip(StudentClip):
@@ -140,3 +147,4 @@ class LecturerLecture(BaseModel):
     duration_s: float
     status: str
     clips: list[LecturerClip]
+    has_media: bool

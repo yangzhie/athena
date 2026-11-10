@@ -25,13 +25,16 @@ def main(argv: list[str] | None = None) -> None:
 
     store = SqliteLectureStore(args.db)
     try:
-        lecture = LectureService(store).import_indexer_file(json.loads(args.file.read_text()), args.offering)
+        lecture = LectureService(store).import_indexer_file(
+            json.loads(args.file.read_text()), args.offering, base_dir=args.file.resolve().parent
+        )
     except Invalid as e:
         raise SystemExit(f"athena-lectures: {e}") from None
     finally:
         store.close()
     pending = sum(1 for c in lecture.clips if c.status == "pending")
-    print(f"{lecture.offering_id}: “{lecture.title}”, {len(lecture.clips)} clips ({pending} pending review) → {args.db}")
+    media = "recording found" if lecture.media_path else "no recording (playback unavailable)"
+    print(f"{lecture.offering_id}: “{lecture.title}”, {len(lecture.clips)} clips ({pending} pending review), {media} → {args.db}")
 
 
 if __name__ == "__main__":

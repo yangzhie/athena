@@ -11,6 +11,7 @@ interface StudentLectureDto {
   duration_s: number
   status: LectureRecording['status']
   under_review: boolean
+  has_media: boolean
   clips: { id: string; recording_id: string; topic_id: string; topic: string; title: string; summary: string; start_s: number; end_s: number }[]
 }
 
@@ -27,6 +28,10 @@ export function toClip(c: StudentLectureDto['clips'][number]): LectureClip {
   }
 }
 
+/** The API streams the recording (with seeking) to signed-in students and lecturers. */
+export const mediaUrl = (offeringId: string, lectureId: string) =>
+  `/api/units/${encodeURIComponent(offeringId)}/lectures/${encodeURIComponent(lectureId)}/media`
+
 const toLecture = (l: StudentLectureDto): LectureRecording => ({
   id: l.id,
   offeringId: l.offering_id,
@@ -35,6 +40,7 @@ const toLecture = (l: StudentLectureDto): LectureRecording => ({
   durationS: l.duration_s,
   status: l.status,
   draft: l.under_review,
+  mediaUrl: l.has_media ? mediaUrl(l.offering_id, l.id) : undefined,
   clips: l.clips.map(toClip),
 })
 
