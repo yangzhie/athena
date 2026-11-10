@@ -40,7 +40,7 @@ No registration or login is required. Keep the creator browser’s cookies: ther
 no identity recovery or capability transfer in this first version.
 
 `GET /offerings` discovers published Offerings and the caller’s own drafts.
-`POST /offerings` accepts `{code,title,year,semester}` and creates a private draft
+`POST /offerings` requires a server-issued lecturer grant, accepts `{code,title,year,semester}`, and creates a private draft
 and a server-owned management grant for that browser. `POST /offerings/{id}/publish`
 makes it discoverable; `DELETE /offerings/{id}` makes it unavailable. Unknown and
 unpublished Offerings return 404; deleted Offerings return 410. A published Offering
@@ -318,7 +318,7 @@ returns 409. A failed transaction publishes no partial grade or schedule. Saved
 unrated feedback is restored after refresh. Recovery endpoints return committed
 results without asking the browser to retain private answer text.
 
-`GET /units/{offering}/insights` requires this Offering’s creator grant. It reads
+`GET /units/{offering}/insights` requires a server-issued lecturer grant and this Offering’s management grant. It reads
 only offering-local events: canonical Concept, outcome, fixed gap category and
 internal contribution references. It never reads chat text, learner answers,
 private Practice questions or profile notes. Metrics require at least five distinct
@@ -405,3 +405,26 @@ activity, question, choice and Concept references, and revocation takes effect o
 subsequent access immediately. Lecturer replies are atomic with current share checks.
 Private rubrics/internal state are excluded. Apply the same retention policy to
 backups; deleting active SQLite rows cannot erase older operator-managed backups.
+
+
+### Lecturer-only course management
+
+Anonymous identities start as students. Only server-authorised lecturers can create
+Units/Offerings. Uploads, publishing, Topics, clip review, question review and
+Offering analytics additionally require management permission for that Offering.
+A browser role switch, request header, or legacy creator grant is insufficient.
+Students can discover published Offerings, read published material and approved
+clips, and use private sessions, Practice, progress and Playground.
+
+The local administrator issues a one-use invite, using the API's database:
+
+```sh
+# From the repository root; match ATHENA_DB if configured differently.
+apps/api/.venv/bin/python -m athena_api.spaces.cli create-lecturer-invite
+```
+
+The lecturer enters it under **Lecturer access** in the sidebar. The code expires
+after 24 hours, is stored only as a hash, and cannot be redeemed twice. There is
+no registration/login account or student-supplied role/identity. Existing creator
+browsers must also redeem an invite before managing their previous Offerings.
+Keep browser cookies; the lecturer grant and Offering ownership are server-owned.

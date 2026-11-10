@@ -1,13 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getCanvas } from '../../../api/playground'
+import { getCanvas, playgroundTurn } from '../../../api/playground'
 import type { LearningSession, Offering } from '../../../types'
 import { forgetThread, getThread, seedThread } from '../chat/chatStore'
-import { forgetPlayground, openScene, sessionFor } from './session'
+import { forgetPlayground, openScene, sessionFor, restoreCanvas, sendFromPlayground } from './session'
 
 vi.mock('../../../api/playground', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../../api/playground')>(),
   getCanvas: vi.fn(),
+  playgroundTurn: vi.fn().mockResolvedValue({ messages: [] }),
 }))
+
+vi.mock('../../../api/sessions', async (importOriginal) => ({ ...await importOriginal<typeof import('../../../api/sessions')>(), getSession: vi.fn(async () => ({ session, messages: [] })) }))
 
 const offering: Offering = { id: 'offering-a', unit: { code: 'TEST', title: 'Test' }, year: 2026, semester: 'Semester 1', suggestions: [] }
 const session: LearningSession = {
@@ -56,4 +59,20 @@ describe('session-scoped Playground', () => {
     forgetPlayground('canvas-a')
     expect(sessionFor(offering, 'canvas-a')).not.toBe(before)
   })
+})
+
+
+it('queues a submitted message behind an in-flight snapshot instead of dropping it', async () => {
+  const view = { catalog_version: '1.0.0', revision: 0, checkpoint: null, snapshot: null }
+  let release!: (value: typeof view) => void
+  vi.mocked(getCanvas).mockImplementationOnce(() => new Promise((resolve) => { release = resolve })).mockResolvedValue(view)
+  const loading = restoreCanvas(offering, session.id)
+  await Promise.resolve()
+  const sending = sendFromPlayground(offering, session.id, 'Build an experiment')
+  expect(playgroundTurn).not.toHaveBeenCalled()
+  release(view)
+  await loading
+  await sending
+  expect(playgroundTurn).toHaveBeenCalledOnce()
+  expect(playgroundTurn).toHaveBeenCalledWith(offering, session.id, 'Build an experiment', 'scene')
 })

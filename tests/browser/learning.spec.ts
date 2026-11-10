@@ -1,7 +1,14 @@
+import { execFileSync } from 'node:child_process'
 import { test, expect } from '@playwright/test'
 
 test('two identities share material and retain private sessions, Playground and revocable sharing', async ({ page, browser }) => {
   await page.goto('/')
+  await expect(page.getByRole('button', { name: '+ New study space' })).toHaveCount(0)
+  expect((await page.request.post('/api/offerings', { data: { code: 'FORGED', title: 'Forbidden', year: 2026, semester: 'Semester 2' } })).status()).toBe(403)
+  const invite = execFileSync('apps/api/.venv/bin/python', ['-m', 'athena_api.spaces.cli', 'create-lecturer-invite'], { env: { ...process.env, ATHENA_DB: process.env.ATHENA_E2E_DB! } }).toString().trim()
+  await page.getByText('Lecturer access', { exact: true }).click()
+  await page.getByLabel('Lecturer invite code').fill(invite)
+  await page.getByRole('button', { name: 'Enable lecturer access' }).click()
   await page.getByRole('button', { name: '+ New study space' }).click()
   await page.getByLabel('Unit code', { exact: true }).fill(`E2E${Date.now()}`)
   await page.getByLabel('Unit title', { exact: true }).fill('Synthetic browser acceptance')
@@ -12,6 +19,7 @@ test('two identities share material and retain private sessions, Playground and 
   await expect(page.getByRole('button', { name: 'Publish document' })).toBeVisible({ timeout: 20000 })
   await page.getByRole('button', { name: 'Publish document' }).click()
   await page.getByRole('button', { name: 'Publish study space' }).click()
+  await page.getByRole('radio', { name: 'Student', exact: true }).click()
   await page.goto(`/units/${offering}`)
   await page.getByLabel('What do you want to learn?').fill('Bubble Sort')
   await page.getByRole('button', { name: 'Start session', exact: true }).click()
@@ -19,6 +27,8 @@ test('two identities share material and retain private sessions, Playground and 
   const sessionURL = page.url()
   const other = await browser.newContext()
   const outsider = await other.newPage()
+  await outsider.goto('/')
+  await expect(outsider.getByRole('button', { name: '+ New study space' })).toHaveCount(0)
   await outsider.goto(sessionURL)
   await expect(outsider.getByRole('heading', { name: 'Session not found' })).toBeVisible()
   await outsider.goto(`/units/${offering}`)
@@ -53,8 +63,9 @@ test('two identities share material and retain private sessions, Playground and 
   await expect(page.getByText('Bubble Sort compares adjacent values and swaps them when out of order.', { exact: false })).toBeVisible()
   await page.goto(sessionURL)
   await page.getByRole('link', { name: /Playground/ }).click()
+  await expect(page.getByText('The Playground is empty. Ask the tutor a question and it will set up an experiment here.', { exact: true })).toBeVisible()
   await page.getByLabel('Message Athena').fill('Build a Python experiment')
-  await page.getByLabel('Message Athena').press('Enter')
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Python multiplication' })).toBeVisible({ timeout: 20000 })
   await expect(page.getByText('Experiment is ready. Explain why the output is 42.', { exact: false })).toBeVisible()
   await page.getByRole('button', { name: '▶ Run', exact: true }).click()

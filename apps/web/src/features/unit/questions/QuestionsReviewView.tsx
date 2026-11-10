@@ -84,8 +84,7 @@ export default function QuestionsReviewView() {
       {error?.status === 403 && (
         <Card title="The API doesn’t recognise you as a lecturer">
           <p className="text-sm text-muted">
-            The “Viewing as” switch only changes this page. Start the API with <code>ATHENA_DEV_LECTURER_ID=dev-lecturer</code>{' '}
-            to act as a lecturer in development.
+            The view switch does not grant permissions. You need server-issued lecturer access and management permission for this Offering.
           </p>
         </Card>
       )}

@@ -28,6 +28,12 @@ SCHEMA = '''
 CREATE TABLE IF NOT EXISTS anonymous_identities (
     token_hash TEXT PRIMARY KEY, student_id TEXT NOT NULL UNIQUE, expires_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS lecturer_grants (
+    student_id TEXT PRIMARY KEY, granted_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS lecturer_invites (
+    token_hash TEXT PRIMARY KEY, expires_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS units (code TEXT PRIMARY KEY, title TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS offerings (
     id TEXT PRIMARY KEY, code TEXT NOT NULL REFERENCES units(code),
@@ -77,9 +83,34 @@ class StudySpaces:
                             (hashlib.sha256(token.encode()).hexdigest(), student, now + 30 * 86400))
             return student, token
 
+    def is_lecturer(self, student: str) -> bool:
+        with self.lock:
+            return bool(self.db.execute('SELECT 1 FROM lecturer_grants WHERE student_id=?', (student,)).fetchone())
+
+    def require_lecturer(self, student: str):
+        if not self.is_lecturer(student):
+            raise HTTPException(403, 'Only an authorised lecturer can create or manage study spaces.')
+
+    def create_lecturer_invite(self):
+        """Administrator-only local operation. Store only the hash of a one-use code."""
+        token = secrets.token_urlsafe(32)
+        with self.lock, self.db:
+            self.db.execute('DELETE FROM lecturer_invites WHERE expires_at<=?', (time.time(),))
+            self.db.execute('INSERT INTO lecturer_invites VALUES (?,?)', (hashlib.sha256(token.encode()).hexdigest(), time.time() + 86400))
+        return token
+
+    def redeem_lecturer_invite(self, student, token):
+        with self.lock, self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            deleted = self.db.execute('DELETE FROM lecturer_invites WHERE token_hash=? AND expires_at>?',
+                                      (hashlib.sha256(token.encode()).hexdigest(), time.time())).rowcount
+            if not deleted:
+                raise HTTPException(403, 'Invalid or expired lecturer invite.')
+            self.db.execute('INSERT OR IGNORE INTO lecturer_grants VALUES (?,?)', (student, time.time()))
+
     def manages(self, student: str, offering: str) -> bool:
         with self.lock:
-            return bool(self.db.execute('SELECT 1 FROM management_grants WHERE offering_id=? AND student_id=?',
+            return bool(self.db.execute('SELECT 1 FROM management_grants g JOIN lecturer_grants l ON l.student_id=g.student_id WHERE g.offering_id=? AND g.student_id=?',
                                         (offering, student)).fetchone())
 
     def _view(self, row, student):
@@ -101,12 +132,14 @@ class StudySpaces:
             rows = self.db.execute('SELECT o.id,u.code,u.title,o.year,o.semester,o.status,o.suggestions FROM offerings o '
                                    'JOIN units u ON u.code=o.code WHERE o.status="published" OR '
                                    '(o.status="draft" AND EXISTS (SELECT 1 FROM management_grants g '
-                                   'WHERE g.offering_id=o.id AND g.student_id=?)) ORDER BY o.year DESC,u.code,o.id', (student,)).fetchall()
+                                   'WHERE g.offering_id=o.id AND g.student_id=? AND EXISTS (SELECT 1 FROM lecturer_grants l WHERE l.student_id=g.student_id))) ORDER BY o.year DESC,u.code,o.id', (student,)).fetchall()
             return [self._view(row, student) for row in rows]
 
     def create(self, student: str, body: CreateOffering):
         offering = uuid.uuid4().hex
         with self.lock, self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            self.require_lecturer(student)
             existing = self.db.execute('SELECT title FROM units WHERE code=?', (body.code,)).fetchone()
             if existing and existing[0].casefold() != body.title.casefold():
                 raise HTTPException(409, 'This Unit code already has a different title.')
@@ -119,6 +152,7 @@ class StudySpaces:
         return self.get(student, offering)
 
     def require_manager(self, student: str, offering: str):
+        self.require_lecturer(student)
         self.get(student, offering)
         if not self.manages(student, offering):
             raise HTTPException(403, 'Only this study space’s creator can manage it.')

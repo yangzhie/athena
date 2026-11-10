@@ -107,7 +107,8 @@ export async function openScene(offering: Offering, sessionId: string, _sceneId:
 }
 export async function sendFromPlayground(offering: Offering, sessionId: string, text: string) {
   const session = sessionFor(offering, sessionId)
-  if (busy.get(sessionId) || getThread(sessionId).sending) return
+  if (getThread(sessionId).sending) return
+  // A snapshot refresh may start between rendering and submission; queue the message behind it.
   return serial(sessionId, async () => {
     await playgroundTurn(offering, sessionId, text, session.sceneId ? 'question' : 'scene')
     if (!session.active) return

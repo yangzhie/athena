@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     // Dev: /api/* goes to the FastAPI service in apps/api (uvicorn on port 8000).
     proxy: {
-      '/api': { target: 'http://127.0.0.1:8000', rewrite: (path) => path.replace(/^\/api/, '') },
+      '/api': { target: process.env.ATHENA_API_URL || 'http://127.0.0.1:8000', rewrite: (path) => path.replace(/^\/api/, '') },
     },
   },
 })

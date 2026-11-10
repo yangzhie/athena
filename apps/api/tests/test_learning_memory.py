@@ -35,7 +35,8 @@ def browser(tmp_path):
     app = create_app(spaces=spaces, srs=srs, sessions=SessionService(SqliteSessionStore(path), tutor=tutor),
                      lectures=LectureService(SqliteLectureStore(path)))
     tutor.material = None  # Explicit test-only fixture supply, not normal retrieval.
-    return TestClient(app), spaces, app.state.learning, tutor, srs, llm
+    from .lecturer_access import make_lecturer
+    return make_lecturer(TestClient(app)), spaces, app.state.learning, tutor, srs, llm
 
 
 def journey(client, spaces, tutor, offering, retry=False):

@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/identity/lecturer-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lecturer Access */
+        post: operations["lecturer_access_identity_lecturer_access_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/learner/profile": {
         parameters: {
             query?: never;
@@ -1033,6 +1050,19 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** IdentityOut */
+        IdentityOut: {
+            /**
+             * Anonymous
+             * @default true
+             */
+            anonymous: boolean;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "student" | "lecturer";
+        };
         /**
          * Item
          * @description One idea to remember, with several wordings of the question.
@@ -1117,6 +1147,11 @@ export interface components {
             topic: string;
             /** Topic Id */
             topic_id: string;
+        };
+        /** LecturerInviteBody */
+        LecturerInviteBody: {
+            /** Code */
+            code: string;
         };
         /** LecturerLecture */
         LecturerLecture: {
@@ -1549,7 +1584,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["IdentityOut"];
+                };
+            };
+        };
+    };
+    lecturer_access_identity_lecturer_access_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LecturerInviteBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

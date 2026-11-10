@@ -44,16 +44,20 @@ def bundle():
     assert BUNDLE.exists()
 
 
-def browser(path):
+def browser(path, lecturer=False):
     spaces = StudySpaces(path)
     sessions = SessionService(SqliteSessionStore(path), tutor=ScriptedDemoTutor(Path(__file__).parents[3] / 'agent/tests/fixtures/api_journey.json'))
     app = create_app(spaces=spaces, sessions=sessions, srs=SrsService(SqliteStore(path)),
                      lectures=LectureService(SqliteLectureStore(path)))
-    return TestClient(app), app.state.playgrounds
+    client = TestClient(app)
+    if lecturer:
+        from .lecturer_access import make_lecturer
+        make_lecturer(client)
+    return client, app.state.playgrounds
 
 
 def setup(tmp_path):
-    client, service = browser(tmp_path / 'host.db')
+    client, service = browser(tmp_path / 'host.db', lecturer=True)
     offering = client.post('/offerings', json=BODY).json()['id']
     client.post(f'/offerings/{offering}/publish')
     session = client.post(f'/units/{offering}/sessions', json={'goal': 'Forces'}).json()['session']['id']

@@ -1,8 +1,9 @@
 import { redirect } from 'react-router'
-import { listEnrolledOfferings } from '../api/spaces'
+import { getIdentity, listEnrolledOfferings } from '../api/spaces'
 
 export async function layoutLoader() {
-  return { offerings: await listEnrolledOfferings() }
+  const identity = await getIdentity()
+  return { identity, offerings: await listEnrolledOfferings() }
 }
 
 /** "/" goes straight to the first enrolled unit, or shows "No units yet". */

@@ -9,6 +9,7 @@ from athena_api.spaces.service import StudySpaces
 from athena_api.srs.service import SrsService
 from athena_api.srs.store import MemoryStore
 from .http_client import TestClient
+from .lecturer_access import make_lecturer
 
 BODY = {'code': 'CSE5DMI', 'title': 'Data Mining', 'year': 2026, 'semester': 'Semester 2'}
 
@@ -18,7 +19,7 @@ def clients(tmp_path):
     sessions = SessionService(SqliteSessionStore(tmp_path / 'host.db'), tutor=PlaceholderTutor())
     app = create_app(spaces=spaces, sessions=sessions, srs=SrsService(MemoryStore()),
                      lectures=LectureService(SqliteLectureStore(tmp_path / 'host.db')))
-    return spaces, sessions, TestClient(app), TestClient(app)
+    return spaces, sessions, make_lecturer(TestClient(app)), TestClient(app)
 
 
 def test_creator_drafts_publication_and_management_are_persistent(tmp_path):
@@ -28,7 +29,7 @@ def test_creator_drafts_publication_and_management_are_persistent(tmp_path):
     item = draft.json()
     assert item['status'] == 'draft' and item['can_manage'] is True
     assert 'student_id' not in draft.text and 'capability' not in draft.text
-    cookie = draft.headers['set-cookie']
+    cookie = alice.identity_cookie
     assert 'HttpOnly' in cookie and 'SameSite=lax' in cookie
     id = item['id']
     assert bob.get('/offerings').json() == []
@@ -75,6 +76,7 @@ def test_unit_roles_and_forged_cookies_never_grant_management(tmp_path, monkeypa
     monkeypatch.setenv('ATHENA_DEV_LECTURER_ID', 'invented')
     assert bob.get(f'/units/{id}/lectures/review', headers={'X-Role': 'lecturer'}).status_code == 403
     assert alice.get(f'/units/{id}/lectures/review').status_code == 200
+    make_lecturer(bob)
     other = bob.post('/offerings', json={**BODY, 'code': 'CSE5ALG', 'title': 'Algorithms'}).json()['id']
     bob.post(f'/offerings/{other}/publish')
     assert alice.get(f'/units/{other}/lectures/review').status_code == 403

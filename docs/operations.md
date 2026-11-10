@@ -17,7 +17,7 @@ Persistent volume layout:
 Override paths with `ATHENA_DB`, `ATHENA_AGENT_DB`, `ATHENA_MATERIAL_ROOT` or set
 `ATHENA_DATA_ROOT` for the launcher. Configure `OPENAI_API_KEY` and `OPENAI_MODEL`
 in `.env`; no file contents or credentials are logged. The API reads `.env` upward
-from its working directory. No account registration or UI role switch grants authority.
+from its working directory. Anonymous identities start as students. Issue a one-use lecturer invite with `apps/api/.venv/bin/python -m athena_api.spaces.cli create-lecturer-invite`, using the same `ATHENA_DB`. Lecturers redeem it in the sidebar before creating Units or uploading material. Invites expire after 24 hours. Old creator grants alone no longer authorise management. No account registration or UI role switch grants authority.
 Behind HTTPS set `ATHENA_SECURE_COOKIES=1` and preserve the original host. Serve web
 and `/api` through the same trusted origin; localhost Vite proxy is for development.
 

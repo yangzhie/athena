@@ -21,3 +21,7 @@ export function createStudySpace(input: { code: string; title: string; year: num
 export function publishStudySpace(id: string): Promise<Offering> {
   return call(`/offerings/${encodeURIComponent(id)}/publish`, { method: 'POST' })
 }
+
+export interface ServerIdentity { anonymous: boolean; role: 'student' | 'lecturer' }
+export const getIdentity = () => call<ServerIdentity>('/identity')
+export const enableLecturerAccess = (code: string) => call<ServerIdentity>('/identity/lecturer-access', { method: 'POST', body: JSON.stringify({ code }) })

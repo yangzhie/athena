@@ -22,7 +22,19 @@ bash scripts/setup.sh
 npm run dev:all
 ```
 
-Open http://127.0.0.1:5173. Create a study space, upload material, publish ready
+Open http://127.0.0.1:5173. An administrator first issues a one-time lecturer invite:
+
+```sh
+apps/api/.venv/bin/python -m athena_api.spaces.cli create-lecturer-invite
+```
+
+Use the same `ATHENA_DB` as the running API (default `data/athena.db` from the root).
+The lecturer enters the code under **Lecturer access** in the sidebar. Invites expire
+after 24 hours and work once. Students cannot create Units/Offerings or upload material,
+even by calling the API or changing their browser role preference. Existing creators
+also need an explicit lecturer grant; old creator permissions alone are insufficient.
+
+As an authorised lecturer, create a study space, upload material, publish ready
 documents and the Offering, then start a learning session. Recording processing
 proposes clips; approve them before students use them. The creator's browser owns
 management access. Keep its cookies; identity recovery is not implemented.

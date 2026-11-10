@@ -193,6 +193,28 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "IdentityOut": {
+        "properties": {
+          "anonymous": {
+            "default": true,
+            "title": "Anonymous",
+            "type": "boolean"
+          },
+          "role": {
+            "enum": [
+              "student",
+              "lecturer"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "IdentityOut",
+        "type": "object"
+      },
       "Item": {
         "additionalProperties": false,
         "description": "One idea to remember, with several wordings of the question.",
@@ -423,6 +445,22 @@
           "decided"
         ],
         "title": "LecturerClip",
+        "type": "object"
+      },
+      "LecturerInviteBody": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 128,
+            "minLength": 32,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "LecturerInviteBody",
         "type": "object"
       },
       "LecturerLecture": {
@@ -1443,13 +1481,56 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityOut"
+                }
               }
             },
             "description": "Successful Response"
           }
         },
         "summary": "Identity",
+        "tags": [
+          "study spaces"
+        ]
+      }
+    },
+    "/identity/lecturer-access": {
+      "post": {
+        "operationId": "lecturer_access_identity_lecturer_access_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LecturerInviteBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lecturer Access",
         "tags": [
           "study spaces"
         ]

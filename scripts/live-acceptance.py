@@ -59,6 +59,7 @@ async def main():
             path = Path(directory)
             spaces = StudySpaces(path / 'host.db')
             student, _ = spaces.identity(None)
+            spaces.redeem_lecturer_invite(student, spaces.create_lecturer_invite())
             offering = spaces.create(student, CreateOffering(code='LIVE', title='Synthetic Python course', year=2026, semester='Semester 2'))['id']
             spaces.publish(student, offering)
             tutor = AgentTutor(SQLiteLearningMemory(path / 'agent.db'), ReliableLLM(counted, policy=RetryPolicy(max_attempts=1)))

@@ -1,3 +1,4 @@
+import { useRole } from '../../app/role'
 import TopicManager from './TopicManager'
 import MaterialManager from './MaterialManager'
 import { useState } from 'react'
@@ -7,6 +8,7 @@ import { Button, Card } from '../../components/ui'
 import { useOffering } from '../unit/useOffering'
 
 export default function StudySpaceView() {
+  const role = useRole()
   const offering = useOffering()
   const revalidator = useRevalidator()
   const [error, setError] = useState<string | null>(null)
@@ -18,7 +20,7 @@ export default function StudySpaceView() {
     catch (e) { setError(e instanceof Error ? e.message : 'Publication failed.') }
     finally { setBusy(false) }
   }
-  if (!offering.can_manage) return <p role="alert">Only the creator of this study space can manage it.</p>
+  if (role !== 'lecturer' || !offering.can_manage) return <p role="alert">Only an authorised lecturer who manages this Offering can create Topics or upload material.</p>
   return <section className="mx-auto w-full max-w-3xl space-y-6 pb-10">
     <h1 className="text-2xl font-semibold">{offering.unit.code} · Study space</h1>
     <p className="text-muted">{offering.unit.title} · {offering.semester} {offering.year}</p>

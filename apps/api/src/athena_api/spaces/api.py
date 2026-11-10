@@ -1,14 +1,31 @@
 from fastapi import APIRouter, Request, Response
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
 
 from .service import CreateOffering, StudySpaces
+
+
+class IdentityOut(BaseModel):
+    anonymous: bool = True
+    role: Literal['student', 'lecturer']
+
+
+class LecturerInviteBody(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    code: str = Field(min_length=32, max_length=128)
 
 
 def spaces_router(spaces: StudySpaces):
     router = APIRouter(tags=['study spaces'])
 
-    @router.get('/identity')
-    def identity():
-        return {'anonymous': True}
+    @router.get('/identity', response_model=IdentityOut)
+    def identity(request: Request):
+        return IdentityOut(role='lecturer' if spaces.is_lecturer(request.state.student_id) else 'student')
+
+    @router.post('/identity/lecturer-access', response_model=IdentityOut)
+    def lecturer_access(body: LecturerInviteBody, request: Request):
+        spaces.redeem_lecturer_invite(request.state.student_id, body.code)
+        return identity(request)
 
     @router.get('/offerings')
     def offerings(request: Request):

@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useRevalidator } from 'react-router'
+import { useRole } from '../../app/role'
 import { createStudySpace } from '../../api/spaces'
 import { Button } from '../../components/ui'
 
@@ -13,6 +14,7 @@ const field =
  * The server grants management to this browser identity when it creates the draft.
  */
 export function CreateSpaceButton() {
+  const role = useRole()
   const dialog = useRef<HTMLDialogElement>(null)
   const [submitted, setSubmitted] = useState<string | null>(null)
   const navigate = useNavigate()
@@ -37,6 +39,8 @@ export function CreateSpaceButton() {
     finally { setBusy(false) }
   }
 
+
+  if (role !== 'lecturer') return null
 
   return (
     <>
