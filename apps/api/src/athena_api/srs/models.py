@@ -25,10 +25,12 @@ class _Variant(Model):
     stem: NonBlank
     #: Shown after answering, right or wrong.
     explanation: NonBlank
-    #: bank = written or generated in advance; live = rephrased by the LLM during a review.
-    origin: Literal["bank", "live"] = "bank"
-    #: Live variants start pending until a lecturer checks them.
-    status: Literal["approved", "pending"] = "approved"
+    #: bank = hand-written; generated = drafted by the bank generator from unit material;
+    #: live = rephrased by the LLM during a review.
+    origin: Literal["bank", "generated", "live"] = "bank"
+    #: Generated and live variants start pending until a lecturer approves them.
+    #: Students only see approved ones (plus live ones written for them, unless rejected).
+    status: Literal["approved", "pending", "rejected"] = "approved"
 
 
 class McqVariant(_Variant):

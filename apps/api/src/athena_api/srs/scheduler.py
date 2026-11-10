@@ -71,7 +71,10 @@ def pick_variant(item: Item, card: CardState, rng: random.Random | None = None) 
     rng = rng or random.Random()
     wrong = set(card.wrong_variant_ids)
     mine = set(card.live_variant_ids)
-    candidates = [v for v in item.variants if v.id not in wrong and (v.status == "approved" or v.id in mine)]
+    candidates = [
+        v for v in item.variants
+        if v.id not in wrong and (v.status == "approved" or (v.id in mine and v.status != "rejected"))
+    ]
     if not candidates:
         return Pick(None, "needs a live rephrase: no approved wording left that the student hasn't got wrong")
 

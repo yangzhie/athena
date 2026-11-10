@@ -29,6 +29,20 @@ Data goes to `data/athena.db` (gitignored; override with `ATHENA_DB`). Interacti
 docs at http://127.0.0.1:8000/docs. `ATHENA_DEV_STUDENT_ID` stands in for SSO: every
 request is that student. Without it, SRS routes return 401.
 
+## Generate questions from a lecture
+
+```sh
+uv run athena-srs generate \
+  --clips ../../workers/indexer/data/<recording>/clips.json \
+  --topics ../../workers/indexer/topics/cse5alg.json --per-clip 2
+```
+
+Drafts items from each clip's transcript with the LLM. Each must quote evidence that
+appears in the transcript, use a real topic, and have 3 clearly different wordings
+(multiple choice or short answer; numeric questions come from code, never the LLM).
+Accepted drafts are saved **pending** and linked to their clip; students don't see
+them until a lecturer approves them.
+
 ## SRS API
 
 | Route | Does |
@@ -57,4 +71,4 @@ request is that student. Without it, SRS routes return 401.
 - [x] 4. Starter banks for CSE5ALG and CSE5DMI (`srs/starter_banks.py`, `athena-srs` command)
 - [ ] 5. Review screen in the web app
 - [x] 6. Live rephrasing when variants run out (`srs/rephrase.py`)
-- [ ] 7. Bank generator from unit material
+- [x] 7. Bank generator from indexed lectures (`srs/generate.py`, `athena-srs generate`)
