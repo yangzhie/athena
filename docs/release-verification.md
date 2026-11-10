@@ -25,6 +25,21 @@ retry. Frontend regression coverage includes these cases without paid model call
 The browser journey also passed with a deliberately lost successful start
 response: editing the goal and recovering opened exactly one original session.
 
+Grounded session-start repair (11 November): source quotations now enter model
+context through a numeric reference catalog, rather than provider schema literals.
+Regression cases cover multiline/control-character/Unicode/code/long text, exact
+document and transcript citations, invalid references and source conflicts. API
+tests start complete grounded sessions and replay them without additional model
+calls. Existing extraction, upload and context limits still apply.
+
+A separate authorised diagnostic allowance reproduced the original HTTP 400
+`invalid_json_schema` rejection and confirmed that OpenAI accepts the repaired
+schema against the same material. Subsequent live verification flagged source
+instruction following; the verification prompt now explicitly distinguishes
+ordinary course directions from rule overrides. The allowance was exhausted before
+that prompt refinement could be checked live. Full live grounded session startup
+is still unverified; offline fixture success does not establish live model quality.
+
 A bounded paid acceptance used 12 calls total with `gpt-4.1-mini` and SDK retries
 disabled. Mean model-call latency was about 2.54 seconds; token-based cost estimate
 was USD 0.005435 using the [published pricing](https://developers.openai.com/api/docs/models/gpt-4.1-mini).

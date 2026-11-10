@@ -88,6 +88,38 @@ def test_agent_failure_on_start_leaves_no_half_session():
     assert client.get(BASE).json() == []
 
 
+@pytest.mark.parametrize('kind', ['document', 'video'])
+def test_grounded_start_with_multiline_material_preserves_citations_and_replays(kind):
+    from types import SimpleNamespace
+    text = 'Bubble Sort compares adjacent items.\r\nSwap when out of order.\t例子: "3, 1" → "1, 3".\n'
+    source = dict(kind=kind, source_id='uploaded', title='Uploaded material')
+    if kind == 'document':
+        source.update(passage_id='page-4', text=text, page=4)
+    else:
+        source.update(segment_id='approved-clip', transcript=text, start_seconds=12.5, end_seconds=29.0)
+    support = {'supported': True, 'evidence': [{'source_index': 0, 'quote_index': 0}]}
+    responses = [item for generated in FIXTURE['responses'][:4] for item in (generated, support)]
+    client, _, _ = make_client(responses)
+    tutor = client.app.state.sessions.tutor
+    tutor.material = SimpleNamespace(for_goal=lambda offering, goal: [source])
+    headers = {'Idempotency-Key': 'multiline-start'}
+    first = client.post(BASE, json={'goal': 'Bubble Sort'}, headers=headers)
+    assert first.status_code == 201, first.json()
+    opening = first.json()['messages'][0]
+    citation = opening['sources'][0]
+    assert citation['quote'] == text and citation['source_id'] == 'uploaded'
+    assert opening['knowledge_origin'] == 'materials'
+    if kind == 'document':
+        assert citation['passage_id'] == 'page-4' and citation['page'] == 4
+    else:
+        assert citation['segment_id'] == 'approved-clip' and citation['start_seconds'] == 12.5
+    assert len(tutor.llm._llm.calls) == 8
+    replay = client.post(BASE, json={'goal': 'Bubble Sort'}, headers=headers)
+    assert replay.json() == first.json()
+    assert len(tutor.llm._llm.calls) == 8
+    assert len(client.get(BASE).json()) == 1
+
+
 def test_agent_sessions_are_per_student():
     client, _, who = make_client(FIXTURE["responses"])
     sid = client.post(BASE, json={"goal": FIXTURE["goal"]}).json()["session"]["id"]

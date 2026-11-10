@@ -573,7 +573,7 @@ remains an explicit empty selection rather than silently enabling general knowle
 
 Selected materials now enter the bounded planning, teaching, and assessment
 context. Source-based generation requests only supported domain content and runs
-a second structured support check requiring exact quotes resolving to selected
+a second structured support check requiring quote references resolving to selected
 passages/transcripts. Unsupported content or fabricated evidence fails before
 state publication; empty selections cannot silently produce general-knowledge
 content. Semantic support still depends on model judgement, while quote/reference
@@ -584,7 +584,16 @@ planning a new session. Selection and private criteria remain backend data.
 Grounded activities, assessments, and roadmaps return typed `sources`. Each
 citation copies identifiers, title, URI, page/section or exact supplied video
 start/end times from verified evidence, plus its exact quote. Models select
-source indices and quotes; they cannot generate citation metadata. Question
+source and quote indices from a request-local catalog; the server validates both
+indices and copies the exact original quotation. Source text enters request data,
+never schema enums or constants, so multiline text, Unicode, control characters,
+code and long passages cannot violate provider schema-literal restrictions.
+The catalog includes each full passage and up to 60 sentence excerpts; no source
+content is normalised or discarded from the full-passage option. Existing upload,
+extraction and model-context limits still apply. Verification distinguishes ordinary
+course directions and learning objectives from instructions attempting to override
+the tutor's rules. A reported override still rejects the generated content.
+Models cannot generate citation metadata. Question
 citations are retained with private records for replay and deterministic grading.
 Internal generation provenance is excluded from schemas and serialization.
 
