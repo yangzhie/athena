@@ -140,8 +140,8 @@ def rebuild_messages(builder: ContextBuilder, topic: TopicContext, messages: lis
 async def generate_learning_content(llm: LLM, builder: ContextBuilder, topic: TopicContext, messages: list[Message], model: type[Model]) -> Model:
     """One grounded repair, then an explicit general-knowledge explanation.
 
-    Only content generation opts into this policy. Assessment evaluation and its
-    stored criteria retain strict grounding and cannot enter this fallback.
+    Only new content generation opts into this policy. Assessment evaluation
+    uses the accepted criteria and exact learner evidence, never this fallback.
     """
     current = messages
     for attempt in range(2):

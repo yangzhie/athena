@@ -171,21 +171,25 @@ def test_hints_can_explain_beyond_material_without_changing_the_question(assesse
     assert store.read(context) == before and len(mock.calls) == 5
 
 
-def test_grading_never_uses_general_knowledge_fallback(assessed_topic):
+def test_grading_uses_the_stored_rubric_without_requiring_course_coverage(assessed_topic):
     from athena_agent.learning import TextAnswer
-    from athena_agent.grounding import EvidenceError
     context, store = assessed_topic
-    assessor, _ = service(store, [{'prompt': 'Explain adjacent swaps.', 'expected_reasoning': 'Swap neighbours.'}])
+    support = select_materials(context, store)
+    assessor, _ = service(store, [{'prompt': 'Explain adjacent swaps.', 'expected_reasoning': 'Swap neighbours.'}, support])
     question = asyncio.run(assessor.generate_open_ended(context, 'bubble-sort'))
-    select_materials(context, store)
+    snapshot = store.read(context)
+    snapshot.active_topic.knowledge.items[0].text = 'Unrelated material selected after the question was asked.'
+    store._save(context, snapshot)
     before = store.read(context)
     assessor, mock = service(store, [
         {'outcome': 'correct', 'feedback': 'Good.', 'confidence': 0.9, 'evidence_quotes': ['swap neighbours']},
-        {'supported': False, 'evidence': []},
     ])
-    with pytest.raises(EvidenceError):
-        asyncio.run(assessor.evaluate(context, TextAnswer(question_id=question.question.question_id, text='I swap neighbours.')))
-    assert store.read(context) == before and len(mock.calls) == 2
+    result = asyncio.run(assessor.evaluate(context, TextAnswer(question_id=question.question.question_id, text='I swap neighbours.')))
+    assert result.outcome == 'correct' and len(mock.calls) == 1
+    assert result.sources == before.active_topic.question_records[-1].sources
+    assert result.sources == question.sources and result.sources
+    assert store.read(context).active_topic.question_records == before.active_topic.question_records
+    assert 'selected_materials' not in mock.calls[0].messages[1].content
 
 
 def test_source_safety_evaluation():

@@ -48,15 +48,6 @@
       "prerequisite_gaps": []
     },
     {
-      "supported": true,
-      "evidence": [
-        {
-          "source_index": 0,
-          "quote_index": 0
-        }
-      ]
-    },
-    {
       "text": "Compare neighbours. Swap adjacent values only when out of order."
     },
     {
@@ -90,15 +81,6 @@
       ]
     },
     {
-      "supported": true,
-      "evidence": [
-        {
-          "source_index": 0,
-          "quote_index": 0
-        }
-      ]
-    },
-    {
       "prompt": "Why does the largest item reach the end of a pass on [4, 2, 1]?",
       "expected_reasoning": "Successive swaps carry the larger value right."
     },
@@ -117,15 +99,6 @@
       "confidence": 0.95,
       "evidence_quotes": [
         "larger value moves right"
-      ]
-    },
-    {
-      "supported": true,
-      "evidence": [
-        {
-          "source_index": 0,
-          "quote_index": 0
-        }
       ]
     },
     {

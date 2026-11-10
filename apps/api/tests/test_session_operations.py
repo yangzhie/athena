@@ -173,9 +173,9 @@ def test_independent_adapters_publish_one_transition_and_exchange(tmp_path, kind
                     response = client.post(f'{BASE}/{sid}/answers', json=body_for(activity, FIXTURE['turns'][0]))
                     assert response.status_code == 200
                     activity = response.json()[-1]['activity']
-                    responses = FIXTURE['responses'][8:10]
+                    responses = FIXTURE['responses'][7:9]
                 else:
-                    responses = FIXTURE['responses'][4:8]
+                    responses = FIXTURE['responses'][4:7]
 
         async def run():
             entered = 0

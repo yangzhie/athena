@@ -62,6 +62,20 @@ The completed checks passed: 739 agent/API tests (six opt-in skips), 57 frontend
 tests, frontend lint and the production build. Final targeted checks also verified
 that clarification questions do not receive a misleading general-answer badge.
 
+Answer-submission repair: multiple-choice grading already used its stored key,
+but subsequent diagnosis or follow-up generation could still fail a source-only
+check and roll the submission back. Grading and diagnosis now use the accepted
+private question criteria and exact learner evidence, preserving the question's
+original citations instead of requiring coverage in current retrieval. New
+questions and roadmap content use bounded repair followed by labelled general
+knowledge when coverage is insufficient. Conflicts and invalid evidence still
+fail explicitly. Regression coverage exercises both answers to the apartment-rent
+question, follow-up completion and retry replay. No live sessions were modified
+and no paid model calls were made for this repair.
+Verification passed: 741 agent/API tests (six opt-in skips), 56 final focused
+checks and the isolated browser learning journey, including answer submission,
+continuation, completion, retry recovery, Playground execution and sharing.
+
 A bounded paid acceptance used 12 calls total with `gpt-4.1-mini` and SDK retries
 disabled. Mean model-call latency was about 2.54 seconds; token-based cost estimate
 was USD 0.005435 using the [published pricing](https://developers.openai.com/api/docs/models/gpt-4.1-mini).

@@ -570,16 +570,19 @@ selection contract, scope validation, topic storage, and snapshot copying.
 It requires no retriever. Malformed or out-of-scope supplied data is an invalid
 request; unavailable retrieval is a dependency failure. An empty external result
 remains an explicit empty selection. Explanations may answer it as labelled general
-knowledge; assessment evaluation retains strict source checks.
+knowledge; assessment evaluation uses the accepted question's private criteria
+and exact learner-answer evidence, rather than newly retrieved passages.
 
 Selected materials now enter the bounded planning, teaching, and assessment
 context. Source-based generation requests only supported domain content and runs
 a second structured support check requiring quote references resolving to selected
 passages/transcripts. Fabricated evidence fails before state publication.
-Planning and question generation permit one grounded repair for insufficient
-support. Chat explanations, teaching and hints can answer gaps with explicitly
-labelled general knowledge after at most one grounded repair. Assessment evaluation
-never uses this fallback. Semantic support still depends on model judgement,
+Planning, new questions, chat explanations, teaching and hints can answer gaps
+with explicitly labelled general knowledge after at most one grounded repair.
+Grading and diagnosis evaluate the accepted question and recorded learner answer;
+they do not require an applied example to appear in course slides, do not replace
+the stored criteria, and preserve the question's original source references.
+Assessment evaluation never uses a general-knowledge fallback. Semantic support still depends on model judgement,
 while quote/reference integrity is deterministic.
 `orchestrator.start(..., materials=retrieval_result)` can select materials before
 planning a new session. Selection and private criteria remain backend data.

@@ -6,7 +6,7 @@ from pydantic import Field, create_model, model_validator
 
 from ._schema import Contract, NonBlankString
 from .context import ContextBuilder
-from .grounding import generate_grounded
+from .grounding import generate_learning_content
 from .conversation import ConversationError, ConversationTurn, InMemoryConversationStore, TopicContext
 from .contracts import RequestContext
 from .memory import LearningMemoryStore
@@ -52,7 +52,7 @@ class PlanningService:
             model,
             **({'additional_context': inputs} if inputs is not None else {}),
         )
-        return await generate_grounded(self._llm, self.context_builder, topic, messages, model, repair=True)
+        return await generate_learning_content(self._llm, self.context_builder, topic, messages, model)
 
     async def interpret_goal(
         self, text: str, clarification_turns: Sequence[ConversationTurn] = (),

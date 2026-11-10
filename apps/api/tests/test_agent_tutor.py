@@ -88,6 +88,60 @@ def test_agent_failure_on_start_leaves_no_half_session():
     assert client.get(BASE).json() == []
 
 
+@pytest.mark.parametrize('correct', [True, False])
+def test_rent_answer_progresses_when_retrieved_material_cannot_support_next_step(correct):
+    from types import SimpleNamespace
+    opening = [
+        {'scope': 'narrow', 'rationale': 'Distinguish two prediction tasks.'},
+        {'partial_coverage': False, 'concepts': [{'concept_id': 'prediction', 'title': 'Prediction',
+            'description': 'Numerical values and class labels', 'prerequisite_ids': []}]},
+        {'concepts': [{'concept_id': 'prediction', 'objectives': ['Distinguish regression and classification'], 'difficulty': 'beginner'}]},
+        {'prompt': 'A model uses an apartment’s size and location to predict its monthly rent. What is the model trained to predict?',
+         'choices': [{'choice_id': 'rent', 'text': 'A numerical rent amount'}, {'choice_id': 'label', 'text': 'A class label'}],
+         'correct_choice_id': 'rent', 'rationale': 'Rent is a numerical target.'},
+    ]
+    missing = {'supported': False, 'evidence': [], 'problem': 'insufficient_evidence'}
+    followup = {'prompt': 'Why is predicting rent regression?', 'expected_reasoning': 'The target is a numerical monthly rent.'}
+    explanation = {'text': 'Regression predicts a numerical amount, such as monthly rent. Classification predicts a label.'}
+    next_draft = followup if correct else explanation
+    after = ([] if correct else [{'misconceptions': [], 'prerequisite_gaps': []}])
+    after += [next_draft, missing, next_draft, missing, next_draft]
+    after += [{'outcome': 'correct', 'feedback': 'The numerical target makes this regression.', 'confidence': 1.0,
+               'evidence_quotes': ['numerical monthly rent']}]
+    client, agent_store, _ = make_client([*opening, *after])
+    created = client.post(BASE, json={'goal': 'Regression versus classification'}).json()
+    sid, activity = created['session']['id'], created['messages'][0]['activity']
+    tutor = client.app.state.sessions.tutor
+    tutor.material = SimpleNamespace(for_goal=lambda *_: [dict(kind='document', source_id='slides', passage_id='overview',
+        title='Lecture overview', text='This lecture introduces supervised learning.')])
+    context = RequestContext(request_id='check', learner_id='alice', session_id=sid)
+    rubric = agent_store.read(context).active_topic.question_records[0].bundle.criteria
+    body = {'question_id': activity['question']['question_id'], 'choice_id': 'rent' if correct else 'label',
+            'shown': 'A numerical rent amount' if correct else 'A class label'}
+    response = client.post(f'{BASE}/{sid}/answers', json=body)
+    assert response.status_code == 200, response.json()
+    next_activity = response.json()[-1]['activity']
+    assert next_activity['kind'] == ('question' if correct else 'explanation')
+    assert next_activity['knowledge_origin'] == 'general' and next_activity['sources'] == []
+    snapshot = agent_store.read(context)
+    assert len(snapshot.active_topic.assessment_records) == 1
+    assert snapshot.active_topic.assessment_records[0].assessment.outcome == ('correct' if correct else 'incorrect')
+    assert snapshot.active_topic.question_records[0].bundle.criteria == rubric
+    count = len(tutor.llm._llm.calls)
+    assert client.post(f'{BASE}/{sid}/answers', json=body).json() == response.json()
+    assert len(tutor.llm._llm.calls) == count
+    if correct:
+        # The accepted general-knowledge follow-up is graded using its original
+        # private rubric, even though current retrieval still finds course text.
+        answered = client.post(f'{BASE}/{sid}/answers', json={
+            'question_id': next_activity['question']['question_id'], 'text': 'It predicts numerical monthly rent.',
+            'shown': 'It predicts numerical monthly rent.',
+        })
+        assert answered.status_code == 200, answered.json()
+        assert answered.json()[-1]['activity']['kind'] == 'completion'
+        assert len(agent_store.read(context).active_topic.assessment_records) == 2
+
+
 @pytest.mark.parametrize('mixed', [False, True])
 def test_question_first_answers_preserve_sources_through_retry_restart_and_share(tmp_path, mixed):
     from types import SimpleNamespace
