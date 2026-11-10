@@ -2,6 +2,11 @@ import { ApiError, call } from './client'
 
 interface PendingOperation { id: string; fingerprint: string }
 const memory = new Map<string, PendingOperation>()
+const recoveries = new Map<string, Promise<unknown>>()
+
+export function hasPendingOperation(path: string): boolean {
+  return read(`athena-operation:${path}`) !== undefined
+}
 
 function read(key: string): PendingOperation | undefined {
   try {
@@ -30,7 +35,7 @@ export async function operationCall<T>(path: string, input: object, signal?: Abo
   const key = `athena-operation:${path}`
   const previous = read(key)
   if (previous && previous.fingerprint !== fingerprint) {
-    throw new ApiError(409, 'Refresh to recover the previous submission before starting another operation.')
+    throw new ApiError(409, 'A previous submission is still pending. Retry it or refresh to recover before starting a different operation.')
   }
   const pending = previous ?? { id: crypto.randomUUID(), fingerprint }
   write(key, pending)
@@ -49,16 +54,31 @@ export async function operationCall<T>(path: string, input: object, signal?: Abo
 }
 
 /** Resume a saved server operation after refresh without retaining its private input. */
-export async function recoverPendingOperation(path: string, sessionsBase: string) {
+export async function recoverPendingOperation<T = unknown>(path: string, sessionsBase: string): Promise<T | undefined> {
   const key = `athena-operation:${path}`
   const pending = read(key)
   if (!pending) return
+  const recoveryKey = `${path}:${pending.id}`
+  const active = recoveries.get(recoveryKey)
+  if (active) return active as Promise<T | undefined>
+  const recovery = retryOperation<T>(path, sessionsBase, pending)
+  recoveries.set(recoveryKey, recovery)
+  try {
+    return await recovery
+  } finally {
+    recoveries.delete(recoveryKey)
+  }
+}
+
+async function retryOperation<T>(path: string, sessionsBase: string, pending: PendingOperation): Promise<T | undefined> {
+  const key = `athena-operation:${path}`
   const kind = sessionsBase.endsWith('/srs') ? (path.endsWith('/rating') ? 'rating' : 'answer') : path.endsWith('/messages') ? 'message' : 'start'
   try {
-    await call(`${sessionsBase}/operations/${encodeURIComponent(`${kind}:${pending.id}`)}/retry`, { method: 'POST' })
+    const result = await call<T>(`${sessionsBase}/operations/${encodeURIComponent(`${kind}:${pending.id}`)}/retry`, { method: 'POST' })
     if (read(key)?.id === pending.id) write(key)
+    return result
   } catch (error) {
-    if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
+    if (error instanceof ApiError && [400, 401, 403, 404, 413, 422].includes(error.status)) {
       if (read(key)?.id === pending.id) write(key)
       if (error.status === 404) return // The original request never arrived, or its session was deleted.
     }

@@ -22,8 +22,26 @@ test('two identities share material and retain private sessions, Playground and 
   await page.getByRole('radio', { name: 'Student', exact: true }).click()
   await page.goto(`/units/${offering}`)
   await page.getByLabel('What do you want to learn?').fill('Bubble Sort')
+  // Lose the response after the server commits the opening session. Recovery
+  // must open that session, even if the student has since edited their goal.
+  let loseStartResponse = true
+  await page.route(`**/api/units/${offering}/sessions`, async (route) => {
+    if (route.request().method() === 'POST' && loseStartResponse) {
+      loseStartResponse = false
+      const response = await route.fetch()
+      expect(response.ok()).toBeTruthy()
+      await route.abort('failed')
+    } else await route.continue()
+  })
   await page.getByRole('button', { name: 'Start session', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Recover previous session', exact: true })).toBeVisible()
+  await page.getByLabel('What do you want to learn?').fill('A different goal')
+  await expect(page.getByRole('button', { name: 'Start session', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Recover previous session', exact: true }).click()
   await expect(page.getByText('Which relationship underlies bubble-sort?', { exact: true })).toBeVisible()
+  const recoveredSessions = await (await page.request.get(`/api/units/${offering}/sessions`)).json()
+  expect(recoveredSessions).toHaveLength(1)
+  expect(recoveredSessions[0].goal).toBe('Bubble Sort')
   const sessionURL = page.url()
   const other = await browser.newContext()
   const outsider = await other.newPage()

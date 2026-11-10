@@ -16,6 +16,15 @@ opening, Practice recovery, Playground, execution, sharing/revocation and deleti
 Focused API tests additionally cover restart recovery, proposals/rejection,
 versioned citations, clip approval and five-Environment aggregate suppression.
 
+Session-start recovery now offers **Recover previous session** when an earlier
+request has an uncertain result, instead of requiring refresh before a changed
+goal. Recovery opens the original session; a confirmed missing operation unlocks
+a fresh submission. Tutor/network failures retain the retry identity and show the
+underlying error. Background refresh and the recovery button share one in-flight
+retry. Frontend regression coverage includes these cases without paid model calls.
+The browser journey also passed with a deliberately lost successful start
+response: editing the goal and recovering opened exactly one original session.
+
 A bounded paid acceptance used 12 calls total with `gpt-4.1-mini` and SDK retries
 disabled. Mean model-call latency was about 2.54 seconds; token-based cost estimate
 was USD 0.005435 using the [published pricing](https://developers.openai.com/api/docs/models/gpt-4.1-mini).

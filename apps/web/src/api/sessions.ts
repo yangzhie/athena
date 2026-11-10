@@ -1,6 +1,6 @@
 import type { AgentActivity, ChatMessage, LearningSession, SourceReference } from '../types'
 import { call } from './client'
-import { operationCall, recoverPendingOperation } from './operations'
+import { hasPendingOperation, operationCall, recoverPendingOperation } from './operations'
 
 import type { components } from '../../../../packages/shared/api'
 type SessionDto = components['schemas']['LearningSessionOut']
@@ -61,6 +61,13 @@ const toMessage = (m: MessageDto): ChatMessage => ({
 })
 
 const base = (offeringId: string) => `/units/${encodeURIComponent(offeringId)}/sessions`
+
+export const hasPendingSession = (offeringId: string) => hasPendingOperation(base(offeringId))
+
+export async function recoverSession(offeringId: string) {
+  const r = await recoverPendingOperation<{ session: SessionDto; messages: MessageDto[] }>(base(offeringId), base(offeringId))
+  return r ? { session: toSession(r.session), messages: r.messages.map(toMessage) } : undefined
+}
 
 export async function listSessions(offeringId: string): Promise<LearningSession[]> {
   await recoverPendingOperation(base(offeringId), base(offeringId))
