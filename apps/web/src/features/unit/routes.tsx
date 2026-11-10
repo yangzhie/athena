@@ -2,6 +2,7 @@ import type { Feature } from '../../app/feature'
 import ClipsView from './clips/ClipsView'
 import { UNIT_ROUTE_ID, clipsLoader, unitLoader } from './loader'
 import PracticeView from './practice/PracticeView'
+import QuestionsReviewView from './questions/QuestionsReviewView'
 import ReviewView from './review/ReviewView'
 import NewSessionView from './sessions/NewSessionView'
 import SessionView from './sessions/SessionView'
@@ -22,6 +23,7 @@ export const unitFeature: Feature = {
         { path: 'clips', element: <ClipsView />, loader: clipsLoader },
         { path: 'review', element: <ReviewView />, loader: clipsLoader },
         { path: 'practice', element: <PracticeView /> },
+        { path: 'questions', element: <QuestionsReviewView /> },
       ],
     },
   ],

@@ -12,6 +12,7 @@ Only multiple choice and short answer: numeric answers come from code
 status="pending", linked to their clip, and hidden from students until a lecturer approves them.
 """
 
+import difflib
 import hashlib
 import json
 import os
@@ -26,6 +27,9 @@ from pydantic import BaseModel, ValidationError
 from .models import Bank, Item, McqVariant, ShortVariant
 from .rephrase import _similarity
 
+#: A draft whose idea is this similar (word overlap) to an existing one is a duplicate.
+DUPLICATE_CONCEPT = 0.6
+
 SYSTEM_PROMPT = """You write spaced-repetition questions for a university unit, from a lecture transcript.
 
 Write up to {per_source} items. Each item is ONE idea the lecture actually teaches, worth remembering.
@@ -34,7 +38,8 @@ For each item give 3 wordings ("variants") that test the same idea in clearly di
 wrong will later see another, so they must not be near-copies.
 
 Rules:
-- Only use what the transcript teaches. Quote 1-2 sentences from it as evidence, copied exactly.
+- Only use what the transcript teaches. Quote 1-2 sentences from it as evidence, copied word for
+  word, including the speaker's fillers and any transcription errors. Don't tidy the quote.
 - topic_id must be one of the unit topics given.
 - Variants are "mcq" (3-4 options, exactly one correct, plausible wrong options based on real
   misconceptions) or "short" (a model answer and 1-3 rubric points). No numeric calculations.
@@ -142,11 +147,37 @@ def _norm(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
 
+#: How closely the evidence must match some passage of the transcript (word sequence).
+#: Tolerates a corrected word or a dropped filler; rejects paraphrase and invention.
+EVIDENCE_MATCH = 0.85
+
+
+def evidence_match(evidence: str, transcript: str) -> float:
+    """Best word-sequence similarity between `evidence` and any same-length passage of `transcript`."""
+    ev, words = _norm(evidence).split(), _norm(transcript).split()
+    if not ev or not words:
+        return 0.0
+    n = len(ev)
+    best = 0.0
+    for i in range(max(1, len(words) - n + 1)):
+        window = words[i : i + n]
+        if not set(ev) & set(window):
+            continue
+        best = max(best, difflib.SequenceMatcher(None, ev, window, autojunk=False).ratio())
+        if best == 1.0:
+            break
+    return best
+
+
 def check_draft(draft: dict, source: Source, topic_ids: set[str]) -> list[str]:
     problems = []
-    evidence = _norm(draft.get("evidence", ""))
-    if len(evidence.split()) < 5 or evidence not in _norm(source.text):
-        problems.append("evidence must be quoted exactly from the transcript (5+ words)")
+    evidence = draft.get("evidence", "")
+    if len(_norm(evidence).split()) < 5:
+        problems.append("evidence must quote at least 5 words of the transcript")
+    else:
+        match = evidence_match(evidence, source.text)
+        if match < EVIDENCE_MATCH:
+            problems.append(f"evidence doesn't match the transcript ({match:.0%} similar to the closest passage)")
     if draft.get("topic_id") not in topic_ids:
         problems.append(f"unknown topic_id {draft.get('topic_id')!r}")
     variants = draft.get("variants", [])
@@ -199,9 +230,13 @@ def generate(
     model: DraftModel,
     *,
     per_source: int = 2,
+    existing: list[Item] | None = None,
     on_progress: Callable[[int, int, Source], None] | None = None,
 ) -> Report:
+    """Draft items from each source. Drafts duplicating an idea already in `existing`
+    (or accepted earlier in this run) are rejected."""
     topic_ids = {t["id"] for t in topics}
+    known = [i.concept for i in existing or []]
     system = SYSTEM_PROMPT.format(per_source=per_source)
     report = Report([], [])
     for n, source in enumerate(sources, start=1):
@@ -211,9 +246,14 @@ def generate(
         )
         for draft in model.draft(system, user)[:per_source]:
             problems = check_draft(draft, source, topic_ids)
+            twin = next((c for c in known if _similarity(c, draft.get("concept", "")) >= DUPLICATE_CONCEPT), None)
+            if twin:
+                problems.append(f"duplicates an existing idea: {twin!r}")
             if not problems:
                 try:
-                    report.accepted.append(to_item(draft, source, offering_id))
+                    item = to_item(draft, source, offering_id)
+                    report.accepted.append(item)
+                    known.append(item.concept)
                     continue
                 except (ValidationError, KeyError, ValueError) as e:
                     problems = [f"invalid wording: {e.__class__.__name__}"]

@@ -73,15 +73,17 @@ def _generate(args) -> None:
         raise SystemExit("athena-srs: no offering id in clips.json; pass --offering")
     topics = json.loads(args.topics.read_text())["topics"]
     sources = sources[: args.max_clips]
+    store = SqliteStore(args.db)
+    current = store.get_bank(offering)
     try:
         report = generate(
             sources, topics, offering, OpenAIDraftModel(args.model), per_source=args.per_clip,
+            existing=list(current.items) if current else [],
             on_progress=lambda n, total, s: print(f"clip {n}/{total}: {s.title}", flush=True),
         )
     except GenerateError as e:
         raise SystemExit(f"athena-srs: {e}") from None
 
-    store = SqliteStore(args.db)
     store.put_bank(merge_into(store.get_bank(offering), offering, report.accepted))
     store.close()
     print(f"\n{len(report.accepted)} items drafted (pending lecturer approval), {len(report.rejected)} rejected by checks")

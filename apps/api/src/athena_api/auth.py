@@ -28,3 +28,28 @@ def student_dependency(resolve: StudentResolver):
         return sid
 
     return Annotated[str, Depends(student)]
+
+
+LecturerResolver = Callable[[Request, str], str | None]
+"""(request, offering_id) → lecturer id if the caller teaches that offering, else None."""
+
+
+def dev_lecturer_resolver(request: Request, offering_id: str) -> str | None:
+    """PoC only: every request is the lecturer in ATHENA_DEV_LECTURER_ID, for every offering.
+
+    Real roles come from SSO plus the offering's lecturer list. The web app's
+    "Viewing as" switch only changes the UI; it grants nothing here.
+    """
+    return os.environ.get("ATHENA_DEV_LECTURER_ID") or None
+
+
+def lecturer_dependency(resolve: LecturerResolver):
+    """A FastAPI dependency giving the lecturer's id for the path's offering, or 403."""
+
+    def lecturer(request: Request, offering_id: str) -> str:
+        lid = resolve(request, offering_id)
+        if not lid:
+            raise HTTPException(403, "only this unit's lecturers can do that")
+        return lid
+
+    return Annotated[str, Depends(lecturer)]

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
-from .auth import StudentResolver, dev_student_resolver
+from .auth import LecturerResolver, StudentResolver, dev_lecturer_resolver, dev_student_resolver
 from .env import load_dotenv
 from .sessions.agent_tutor import agent_tutor_from_env
 from .sessions.api import sessions_router
@@ -13,6 +13,8 @@ from .sessions.service import SessionService
 from .sessions.tutor import PlaceholderTutor
 from .sessions.store import SqliteSessionStore
 from .srs.api import srs_router
+from .srs.bank_admin import BankAdmin
+from .srs.bank_api import bank_router
 from .srs.rephrase import OpenAIRephraser, RephraseError
 from .srs.service import SrsService
 from .srs.store import SqliteStore
@@ -23,6 +25,7 @@ def create_app(
     srs: SrsService | None = None,
     sessions: SessionService | None = None,
     resolve_student: StudentResolver = dev_student_resolver,
+    resolve_lecturer: LecturerResolver = dev_lecturer_resolver,
 ) -> FastAPI:
     app = FastAPI(title="Athena API", version="0.1.0")
 
@@ -36,6 +39,7 @@ def create_app(
         srs = srs or SrsService(SqliteStore(db), rephraser=_rephraser())
         sessions = sessions or SessionService(SqliteSessionStore(db), tutor=agent_tutor_from_env() or PlaceholderTutor())
     app.include_router(srs_router(srs, resolve_student))
+    app.include_router(bank_router(BankAdmin(srs.store), resolve_lecturer))
     app.include_router(sessions_router(sessions, resolve_student))
     return app
 

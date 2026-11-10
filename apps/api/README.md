@@ -17,7 +17,7 @@ uv run pytest
 
 ```sh
 uv run athena-srs load-starter    # once: CSE5ALG and CSE5DMI starter banks
-ATHENA_DEV_STUDENT_ID=dev-student uv run uvicorn athena_api.app:create_app --factory --reload
+ATHENA_DEV_STUDENT_ID=dev-student ATHENA_DEV_LECTURER_ID=dev-lecturer uv run uvicorn athena_api.app:create_app --factory --reload
 ```
 
 Live rephrasing turns on when `OPENAI_API_KEY` and `OPENAI_MODEL` are set (the
@@ -51,6 +51,18 @@ them until a lecturer approves them.
 | `GET /units/{offering}/srs/next` | next question, **without its answer**, or `done` with the next due time |
 | `POST /units/{offering}/srs/attempts` | `{item_id, variant_id, answer}` → graded on the server, feedback; wrong answers are recorded as "again" |
 | `POST /units/{offering}/srs/attempts/{id}/rating` | `{rating}` for right or short answers: hard/good/easy (short answers may also say again) |
+
+## Lecturer: question bank review
+
+Lecturer-only (403 otherwise). In dev, `ATHENA_DEV_LECTURER_ID` makes every request
+that lecturer for every unit; real roles come from SSO. No student data is returned.
+
+| Route | Does |
+| --- | --- |
+| `GET /units/{offering}/srs/bank` | every item and wording, with answers, origin and status |
+| `POST …/srs/bank/items/{item}/variants/{variant}/status` | `{status: approved \| rejected \| pending}` |
+| `PATCH …/srs/bank/items/{item}/variants/{variant}` | edit the wording's text and answer fields (validated; status unchanged) |
+| `POST …/srs/bank/approve-pending` | `{item_ids?}` → approve every pending wording |
 
 ## Sessions API
 

@@ -15,7 +15,7 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 /**
  * The open unit's navigation.
  * Students: their learning sessions, then lecture clips and practice.
- * Lecturers: clip review (students' sessions are private).
+ * Lecturers: clip and question review (students' sessions are private).
  */
 export function UnitViewNav({ onNavigate }: SidebarActionProps) {
   const role = useRole()
@@ -39,6 +39,9 @@ export function UnitViewNav({ onNavigate }: SidebarActionProps) {
       <nav aria-label="This unit" className="space-y-0.5">
         <NavLink to={`/units/${id}/review`} onClick={onNavigate} className={linkClass}>
           <span aria-hidden>🎬</span> Review clips
+        </NavLink>
+        <NavLink to={`/units/${id}/questions`} onClick={onNavigate} className={linkClass}>
+          <span aria-hidden>📝</span> Review questions
         </NavLink>
       </nav>
     )

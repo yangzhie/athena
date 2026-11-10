@@ -58,8 +58,9 @@ def test_good_draft_passes_checks_and_becomes_a_pending_linked_item():
 
 
 @pytest.mark.parametrize("change, problem", [
-    ({"evidence": "insertion sort uses a heap to find the minimum"}, "evidence"),
-    ({"evidence": "shift"}, "evidence"),
+    ({"evidence": "insertion sort uses a heap to find the minimum"}, "doesn't match"),
+    ({"evidence": "we pick a pivot and partition everything around it"}, "doesn't match"),
+    ({"evidence": "shift"}, "at least 5 words"),
     ({"topic_id": "graphs"}, "unknown topic_id"),
     ({"variants": [variant("What happens to larger elements?")]}, "3 wordings"),
     ({"variants": [variant("What happens to larger elements during insertion?")] * 3}, "too similar"),
@@ -109,3 +110,19 @@ def test_generated_pending_items_are_hidden_from_students():
     store.put_bank(Bank(offering_id="o", items=[to_item(draft(), SRC, "o")]))
     svc = SrsService(store, clock=lambda: datetime(2026, 11, 10, tzinfo=UTC), scheduler=make_scheduler(fuzz=False))
     assert svc.next("alice", "o")["done"] is True
+
+
+def test_near_quotes_are_accepted():
+    # One word tidied ("a" for "one") and a filler dropped: still clearly from the lecture.
+    near = draft(evidence="take the next element and shift every larger element a place to the right")
+    assert check_draft(near, SRC, {"insertion-sort"}) == []
+
+
+def test_duplicate_ideas_are_rejected():
+    twin = draft(concept="Insertion sort shifts larger elements to the right to make room for the key.")
+    report = generate([SRC], TOPICS, "o", FakeModel([draft(), twin]), per_source=2)
+    assert len(report.accepted) == 1
+    assert "duplicates" in report.rejected[0][1][0]
+    existing = [to_item(draft(), SRC, "o")]
+    again = generate([SRC], TOPICS, "o", FakeModel([twin]), per_source=1, existing=existing)
+    assert again.accepted == []
