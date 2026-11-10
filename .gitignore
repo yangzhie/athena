@@ -47,3 +47,6 @@ venv/
 *.mp3
 *.wav
 *.flac
+
+# Runtime databases, course material and indexing artifacts
+/data/

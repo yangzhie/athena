@@ -5,6 +5,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from .materials.store import Materials
+from .materials.api import materials_router
 from .spaces.service import StudySpaces
 from .spaces.api import spaces_router
 from .spaces.identity import AnonymousIdentity
@@ -76,6 +78,9 @@ def create_app(
         sessions.environment_resolver = spaces.environment
         app.state.spaces = spaces
         app.include_router(spaces_router(spaces))
+        materials = Materials(spaces, os.environ.get('ATHENA_MATERIAL_ROOT', str(spaces.path.parent / 'materials')))
+        app.state.materials = materials
+        app.include_router(materials_router(materials))
     else:
         # Explicit host/test adapters own their authentication and offering policy.
         resolve_lecturer = resolve_lecturer or dev_lecturer_resolver

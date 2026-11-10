@@ -1,7 +1,7 @@
 """Real routes and databases: independent browser identities share material, not learning."""
 from athena_api.app import create_app
 from athena_api.lectures.service import LectureService
-from athena_api.lectures.store import MemoryLectureStore
+from athena_api.lectures.store import SqliteLectureStore
 from athena_api.sessions.service import SessionService
 from athena_api.sessions.store import SqliteSessionStore
 from athena_api.sessions.tutor import PlaceholderTutor
@@ -17,7 +17,7 @@ def clients(tmp_path):
     spaces = StudySpaces(tmp_path / 'host.db')
     sessions = SessionService(SqliteSessionStore(tmp_path / 'host.db'), tutor=PlaceholderTutor())
     app = create_app(spaces=spaces, sessions=sessions, srs=SrsService(MemoryStore()),
-                     lectures=LectureService(MemoryLectureStore()))
+                     lectures=LectureService(SqliteLectureStore(tmp_path / 'host.db')))
     return spaces, sessions, TestClient(app), TestClient(app)
 
 

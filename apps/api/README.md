@@ -237,3 +237,47 @@ Override with `ATHENA_AGENT_CONTEXT_BYTES`.
 - [ ] 5. Review screen in the web app
 - [x] 6. Live rephrasing when variants run out (`srs/rephrase.py`)
 - [x] 7. Bank generator from indexed lectures (`srs/generate.py`, `athena-srs generate`)
+
+## Material upload and processing
+
+Creators upload material from the study-space management screen. PDF, UTF-8 text,
+DOCX and PPTX documents preserve their real page, slide or paragraph locations.
+DOCX pages are not invented. A PDF without extractable text reports that OCR is
+required. Recordings are indexed through the existing lecture pipeline; its clips
+start pending and must be approved by the creator before students see them.
+
+Run both the API and worker from `apps/api/`, sharing `ATHENA_DB` and
+`ATHENA_MATERIAL_ROOT` (defaults: `data/athena.db` and `data/materials`):
+
+```sh
+# Once from the repository root; installs the separate transcription dependencies:
+uv sync --project workers/indexer
+# From apps/api, beside the running API:
+uv run python -m athena_api.materials.worker
+# Or process one pending job and exit:
+uv run python -m athena_api.materials.worker --once
+```
+
+Install FFmpeg/ffprobe and Poppler/pdftotext on the host. The default recording
+command invokes `uv run --project <repository>/workers/indexer index-lecture`;
+`ATHENA_INDEXER_COMMAND` can select an already installed indexer. Whisper runs
+locally and downloads its model on first use (`ATHENA_WHISPER_MODEL`, default
+`small`); segmentation uses the configured OpenAI model. No transcription or
+model call happens inside an upload request. Recordings are limited to four
+hours; processing defaults to a one-hour timeout (`ATHENA_PROCESSING_TIMEOUT`).
+FFmpeg input protocols are restricted to local files/pipes.
+
+Uploads use raw bytes: `POST /units/{offering}/materials?filename=...` returns 202.
+Add `replace=<material-id>` to create an immutable new version; earlier passages
+remain attributable. Defaults are 50 MiB per document and 500 MiB per recording,
+overridable by `ATHENA_DOCUMENT_MAX_BYTES` / `ATHENA_RECORDING_MAX_BYTES`.
+`GET .../materials` shows processing states; creators can `POST .../{id}/retry`
+after a failure and `POST .../{id}/publish` once a document is ready. Students
+can access only ready, published documents and approved lecture clips. Source
+files and extracted passages use authorised endpoints, never public static paths.
+
+The durable SQLite queue uses worker leases and fencing tokens. Restarted workers
+reclaim expired jobs; stale workers cannot publish a later worker’s result.
+Recording transcription keeps its existing per-chunk cache for retries. Failed
+jobs remain visible with a safe explanation; retry is explicit. Keep database,
+material storage and indexing caches on persistent storage and out of Git.

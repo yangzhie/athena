@@ -53,6 +53,7 @@ class StudySpaces:
     def __init__(self, path: str | Path):
         if str(path) != ':memory:':
             Path(path).parent.mkdir(parents=True, exist_ok=True)
+        self.path = Path(path)
         self.db = sqlite3.connect(str(path), check_same_thread=False, timeout=10)
         self.lock = threading.RLock()
         self.db.execute('PRAGMA foreign_keys=ON')
