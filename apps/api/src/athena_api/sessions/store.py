@@ -15,6 +15,9 @@ class SessionStore(Protocol):
     def delete(self, student_id: str, session_id: str) -> bool: ...
     def messages(self, student_id: str, session_id: str) -> list[Message]: ...
     def add_message(self, student_id: str, message: Message) -> None: ...
+    def shared(self, offering_id: str) -> list[LearningSession]:
+        """Sessions currently shared in an offering (for its lecturers)."""
+        ...
 
 
 class MemorySessionStore:
@@ -46,6 +49,9 @@ class MemorySessionStore:
     def add_message(self, student_id, message):
         if self.get(student_id, message.session_id):
             self.msgs.setdefault(message.session_id, []).append(message)
+
+    def shared(self, offering_id):
+        return [s for s in self.sessions.values() if s.offering_id == offering_id and s.shared and s.share_token]
 
 
 _SCHEMA = """
@@ -114,6 +120,12 @@ class SqliteSessionStore:
         with self._lock:
             rows = self._db.execute("SELECT data FROM session_messages WHERE session_id = ? ORDER BY seq", (session_id,)).fetchall()
         return [Message.model_validate_json(r[0]) for r in rows]
+
+    def shared(self, offering_id):
+        with self._lock:
+            rows = self._db.execute("SELECT data FROM learning_sessions WHERE offering_id = ?", (offering_id,)).fetchall()
+        sessions = [LearningSession.model_validate_json(r[0]) for r in rows]
+        return [s for s in sessions if s.shared and s.share_token]
 
     def add_message(self, student_id, message):
         if not self.get(student_id, message.session_id):

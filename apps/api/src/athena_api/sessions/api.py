@@ -5,9 +5,10 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError
 
-from ..auth import StudentResolver, student_dependency
-from .models import LearningSessionOut, Message
+from ..auth import LecturerResolver, StudentResolver, lecturer_dependency, student_dependency
+from .models import LearningSessionOut, Message, SharedSessionSummary, SharedSessionView
 from .service import NotFound, SessionService
+from .shared import NotShared, SharedSessions
 from .tutor import TutorError
 
 Text = Annotated[str, StringConstraints(min_length=1, pattern=r"\S")]
@@ -119,5 +120,24 @@ def sessions_router(service: SessionService, resolve_student: StudentResolver) -
     @router.post("/{session_id}/continue", response_model=list[Message])
     async def continue_(offering_id: str, session_id: str, body: ContinueBody, sid: Student):
         return await arun(service.continue_, sid, offering_id, session_id, body.activity_id)
+
+    return router
+
+
+def shared_sessions_router(shared: SharedSessions, resolve_lecturer: LecturerResolver) -> APIRouter:
+    """Lecturers: sessions students have shared, anonymously (AGENTS.md, Privacy rule 6)."""
+    router = APIRouter(prefix="/units/{offering_id}/shared-sessions", tags=["shared-sessions"])
+    Lecturer = lecturer_dependency(resolve_lecturer)
+
+    @router.get("", response_model=list[SharedSessionSummary])
+    def list_shared(offering_id: str, _: Lecturer):
+        return shared.list(offering_id)
+
+    @router.get("/{share_id}", response_model=SharedSessionView)
+    def view(offering_id: str, share_id: str, _: Lecturer):
+        try:
+            return shared.view(offering_id, share_id)
+        except NotShared as e:
+            raise HTTPException(404, str(e)) from None
 
     return router

@@ -28,11 +28,11 @@ export default function NewSessionView() {
         <UnitHeader offering={offering} />
         <Card title="Students’ learning sessions are private">
           <p className="text-sm text-muted">
-            Each student’s sessions and chats are visible only to them. You’ll see class-level insights later, and only
-            sessions a student chooses to share.
+            Each student’s sessions and chats are visible only to them, unless they choose to share one with you
+            (anonymously).
           </p>
-          <Link to={`/units/${offering.id}/review`} className="mt-3 inline-block text-sm text-accent hover:underline">
-            Review lecture clips
+          <Link to={`/units/${offering.id}/shared`} className="mt-3 inline-block text-sm text-accent hover:underline">
+            See shared sessions
           </Link>
         </Card>
       </div>

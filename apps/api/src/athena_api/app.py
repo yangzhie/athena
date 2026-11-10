@@ -11,7 +11,8 @@ from .lectures.api import lectures_router
 from .lectures.service import LectureService
 from .lectures.store import SqliteLectureStore
 from .sessions.agent_tutor import agent_tutor_from_env
-from .sessions.api import sessions_router
+from .sessions.api import sessions_router, shared_sessions_router
+from .sessions.shared import SharedSessions
 from .sessions.material import LectureMaterial
 from .sessions.service import SessionService
 from .sessions.tutor import PlaceholderTutor
@@ -48,6 +49,7 @@ def create_app(
     app.include_router(srs_router(srs, resolve_student))
     app.include_router(bank_router(BankAdmin(srs.store), resolve_lecturer))
     app.include_router(sessions_router(sessions, resolve_student))
+    app.include_router(shared_sessions_router(SharedSessions(sessions.store), resolve_lecturer))
     app.include_router(lectures_router(lectures, resolve_student, resolve_lecturer))
     return app
 

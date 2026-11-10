@@ -59,3 +59,35 @@ class LearningSessionOut(BaseModel):
     @classmethod
     def of(cls, s: LearningSession) -> "LearningSessionOut":
         return cls(**s.model_dump(exclude={"student_id", "share_token"}))
+
+
+# --- Lecturer-facing (shared sessions): never the student id or the session id ---------
+
+
+class SharedSessionSummary(BaseModel):
+    #: The anonymous share id (the session's current share token).
+    share_id: str
+    student_label: str = "Anonymous student"
+    title: str
+    goal: str
+    shared_at: datetime
+    updated_at: datetime
+    message_count: int
+
+
+class SharedMessage(BaseModel):
+    """A message as a lecturer sees it in a shared session."""
+
+    id: str
+    role: Literal["tutor", "learner", "lecturer"]
+    content: str
+    sources: list[dict]
+    knowledge_origin: str | None
+    activity: dict | None
+    answer_for: str | None
+    created_at: datetime
+
+
+class SharedSessionView(BaseModel):
+    session: SharedSessionSummary
+    messages: list[SharedMessage]

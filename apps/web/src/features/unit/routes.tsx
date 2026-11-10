@@ -5,6 +5,8 @@ import PracticeView from './practice/PracticeView'
 import QuestionsReviewView from './questions/QuestionsReviewView'
 import ReviewView from './review/ReviewView'
 import NewSessionView from './sessions/NewSessionView'
+import SharedSessionView from './shared/SharedSessionView'
+import SharedSessionsView from './shared/SharedSessionsView'
 import SessionView from './sessions/SessionView'
 import UnitLayout from './UnitLayout'
 import { UnitViewNav } from './UnitViewNav'
@@ -24,6 +26,8 @@ export const unitFeature: Feature = {
         { path: 'review', element: <ReviewView />, loader: clipsLoader },
         { path: 'practice', element: <PracticeView /> },
         { path: 'questions', element: <QuestionsReviewView /> },
+        { path: 'shared', element: <SharedSessionsView /> },
+        { path: 'shared/:shareId', element: <SharedSessionView /> },
       ],
     },
   ],

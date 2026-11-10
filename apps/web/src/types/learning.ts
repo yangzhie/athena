@@ -37,7 +37,8 @@ export interface Mastery {
 
 export interface ChatMessage {
   id: string
-  role: 'tutor' | 'learner'
+  /** lecturer = a reply from the unit's lecturer in a session the student shared. */
+  role: 'tutor' | 'learner' | 'lecturer'
   content: string
   /** Material the reply is based on. Tutor messages only. */
   sources?: SourceReference[]

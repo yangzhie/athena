@@ -21,6 +21,15 @@ export function MessageBubble({
   onAnswer?: (input: { choiceId?: string; text?: string; shown: string }) => void
   onContinue?: () => void
 }) {
+  if (message.role === 'lecturer') {
+    return (
+      <div className="rounded-xl border border-accent/40 bg-accent-soft/50 px-4 py-3 text-[0.9375rem] leading-relaxed">
+        <p className="mb-1 text-xs font-medium text-accent">Your lecturer</p>
+        <p className="whitespace-pre-wrap">{message.content}</p>
+      </div>
+    )
+  }
+
   if (message.role === 'learner') {
     return (
       <div className="flex justify-end">

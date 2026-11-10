@@ -62,11 +62,15 @@ function toSource(s: Record<string, unknown>): SourceReference | null {
   return null
 }
 
+/** The agent's sources → citations the chat can show (unknown kinds dropped). */
+export const toSourceList = (sources: Record<string, unknown>[]) =>
+  sources.map(toSource).filter((s): s is SourceReference => s !== null)
+
 const toMessage = (m: MessageDto): ChatMessage => ({
   id: m.id,
   role: m.role,
   content: m.content,
-  sources: m.sources.map(toSource).filter((s): s is SourceReference => s !== null),
+  sources: toSourceList(m.sources),
   knowledgeOrigin: m.knowledge_origin ?? undefined,
   activity: m.activity ?? undefined,
   answerFor: m.answer_for ?? undefined,
