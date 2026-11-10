@@ -79,8 +79,8 @@ Athena should not simply provide information. It should understand what the lear
 
 A single page:
 
-- **Left sidebar:** the units the student is enrolled in (hardcoded in the proof of concept: CSE5DMI Data Mining and CSE5ALG Data Structures and Algorithms), a switch between the open unit's chat and its lecture clips, and a lecturer button to create a study space.
-- **Main area:** the open unit's tutor chat (replies above, prompt box at the bottom, sources under each reply), or its lecture clips grouped by week.
+- **Left sidebar:** the units the student is enrolled in (hardcoded in the proof of concept: CSE5DMI Data Mining and CSE5ALG Data Structures and Algorithms); for the open unit, the student's learning sessions, Lecture clips and Practice (spaced repetition); and a lecturer button to create a study space.
+- **Main area:** a unit's **learning sessions**: the student starts one per thing they want to learn (e.g. "k-fold cross-validation"), and each is its own tutor chat with that goal (replies above, prompt box at the bottom, sources under each reply). Also the unit's lecture clips grouped by week, and Practice.
 - **Right side panel:** one item opened from the chat or clips: a lecture clip, a cited source passage, or an interactive sandbox.
 - **Lecturer view** (a demo "Viewing as" switch in the sidebar until SSO provides roles): create study spaces and review the clips lecture indexing proposes. Students only see clips a lecturer has approved.
 

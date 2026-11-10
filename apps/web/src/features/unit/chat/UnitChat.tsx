@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import type { Offering } from '../../../types'
+import type { LearningSession, Offering } from '../../../types'
+import { touchSession } from '../sessions/sessionStore'
 import { Composer } from './Composer'
 import { MessageBubble } from './MessageBubble'
 import { sendMessage, stopStreaming, useThread } from './chatStore'
@@ -8,9 +9,9 @@ function nearBottom() {
   return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160
 }
 
-/** Chat with the unit's tutor: messages above, prompt box pinned to the bottom. */
-export function UnitChat({ offering }: { offering: Offering }) {
-  const { messages, streaming } = useThread(offering.id)
+/** One learning session's chat: messages above, prompt box pinned to the bottom. */
+export function UnitChat({ offering, session }: { offering: Offering; session: LearningSession }) {
+  const { messages, streaming } = useThread(session.id)
   const end = useRef<HTMLDivElement>(null)
   const lastCount = useRef(messages.length)
   const last = messages.at(-1)
@@ -23,7 +24,10 @@ export function UnitChat({ offering }: { offering: Offering }) {
     if (added || nearBottom()) end.current?.scrollIntoView({ block: 'end' })
   }, [messages.length, last?.content])
 
-  const send = (text: string) => void sendMessage(offering, text)
+  const send = (text: string) => {
+    touchSession(offering.id, session.id)
+    void sendMessage(offering, session.id, text)
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col">
@@ -35,9 +39,9 @@ export function UnitChat({ offering }: { offering: Offering }) {
       <div className="flex flex-1 flex-col py-6">
         {messages.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
-            <h2 className="text-2xl font-semibold tracking-tight">What do you want to work on?</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">{session.title}</h2>
             <p className="mt-2 max-w-md text-muted">
-              Ask anything about {offering.unit.title}. Answers will be based on your unit's material.
+              Ask anything about it. Answers will be based on {offering.unit.code}'s material.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               {offering.suggestions.map((s) => (
@@ -68,7 +72,7 @@ export function UnitChat({ offering }: { offering: Offering }) {
           placeholder={`Message ${offering.unit.code} tutor`}
           streaming={streaming}
           onSend={send}
-          onStop={() => stopStreaming(offering.id)}
+          onStop={() => stopStreaming(session.id)}
         />
         <p className="mt-2 text-center text-xs text-muted">
           Athena can make mistakes. Check important answers against your unit's material.

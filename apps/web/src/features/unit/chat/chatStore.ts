@@ -1,24 +1,54 @@
 import { useSyncExternalStore } from 'react'
 import { streamTutorReply } from '../../../api/tutor'
+import { readStored, writeStored } from '../../../lib/storage'
 import type { ChatMessage, Offering } from '../../../types'
 
 /**
- * One chat thread per offering, kept in memory so switching units in the
- * sidebar doesn't lose the conversation. Not persisted across reloads yet.
+ * One chat thread per learning session. Saved in this browser after each
+ * finished reply (not on every streamed word); moves to apps/api later.
  */
 export interface Thread {
   messages: ChatMessage[]
   streaming: boolean
 }
 
+const KEY = 'athena.threads'
 const EMPTY: Thread = { messages: [], streaming: false }
-const threads = new Map<string, Thread>()
+const threads = new Map<string, Thread>(load())
 const controllers = new Map<string, AbortController>()
 const listeners = new Set<() => void>()
+
+function load(): [string, Thread][] {
+  try {
+    const saved = JSON.parse(readStored(KEY) ?? '{}') as Record<string, ChatMessage[]>
+    return Object.entries(saved).map(([id, messages]) => [id, { messages, streaming: false }])
+  } catch {
+    return []
+  }
+}
+
+function save() {
+  const out: Record<string, ChatMessage[]> = {}
+  for (const [id, t] of threads) out[id] = t.messages
+  writeStored(KEY, JSON.stringify(out))
+}
 
 function set(id: string, update: (t: Thread) => Thread) {
   threads.set(id, update(threads.get(id) ?? EMPTY))
   listeners.forEach((l) => l())
+}
+
+/** Start a thread with a first message (the tutor's opening). */
+export function seedThread(sessionId: string, message: ChatMessage) {
+  set(sessionId, () => ({ messages: [message], streaming: false }))
+  save()
+}
+
+export function deleteThread(sessionId: string) {
+  controllers.get(sessionId)?.abort()
+  threads.delete(sessionId)
+  listeners.forEach((l) => l())
+  save()
 }
 
 function subscribe(listener: () => void) {
@@ -26,15 +56,15 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener)
 }
 
-export function useThread(offeringId: string): Thread {
-  return useSyncExternalStore(subscribe, () => threads.get(offeringId) ?? EMPTY)
+export function useThread(sessionId: string): Thread {
+  return useSyncExternalStore(subscribe, () => threads.get(sessionId) ?? EMPTY)
 }
 
 let seq = 0
 const newId = () => `msg-${Date.now()}-${seq++}`
 
-export async function sendMessage(offering: Offering, text: string) {
-  const id = offering.id
+export async function sendMessage(offering: Offering, sessionId: string, text: string) {
+  const id = sessionId
   if (threads.get(id)?.streaming) return
 
   const learner: ChatMessage = { id: newId(), role: 'learner', content: text, createdAt: new Date().toISOString() }
@@ -66,10 +96,13 @@ export async function sendMessage(offering: Offering, text: string) {
     }))
   } finally {
     controllers.delete(id)
-    set(id, (t) => ({ ...t, streaming: false }))
+    if (threads.has(id)) {
+      set(id, (t) => ({ ...t, streaming: false }))
+      save()
+    }
   }
 }
 
-export function stopStreaming(offeringId: string) {
-  controllers.get(offeringId)?.abort()
+export function stopStreaming(sessionId: string) {
+  controllers.get(sessionId)?.abort()
 }
