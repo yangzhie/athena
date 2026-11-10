@@ -16,6 +16,7 @@ uv run pytest
 ## Run
 
 ```sh
+uv run athena-srs load-starter    # once: CSE5ALG and CSE5DMI starter banks
 ATHENA_DEV_STUDENT_ID=dev-student uv run uvicorn athena_api.app:create_app --factory --reload
 ```
 
@@ -48,7 +49,7 @@ request is that student. Without it, SRS routes return 401.
 - [x] 1. Service scaffold and SRS data formats (`srs/models.py`)
 - [x] 2. Scheduler and variant rotation (`srs/scheduler.py`)
 - [x] 3. Storage (SQLite) and API routes (`srs/store.py`, `srs/service.py`, `srs/api.py`)
-- [ ] 4. Starter banks for CSE5ALG and CSE5DMI
+- [x] 4. Starter banks for CSE5ALG and CSE5DMI (`srs/starter_banks.py`, `athena-srs` command)
 - [ ] 5. Review screen in the web app
 - [ ] 6. Live rephrasing when variants run out
 - [ ] 7. Bank generator from unit material
