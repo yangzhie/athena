@@ -26,6 +26,8 @@ class LearningSession(Model):
     #: The anonymous id lecturers know this share by. New on every share, so separate
     #: shares can't be linked to each other or to the student. Never sent to students.
     share_token: str | None = None
+    #: When the lecturer last replied in this session (for the student's "new reply" marker).
+    last_lecturer_reply_at: datetime | None = None
 
 
 class Message(Model):
@@ -56,6 +58,7 @@ class LearningSessionOut(BaseModel):
     updated_at: datetime
     shared: bool
     shared_at: datetime | None
+    last_lecturer_reply_at: datetime | None
 
     @classmethod
     def of(cls, s: LearningSession) -> "LearningSessionOut":

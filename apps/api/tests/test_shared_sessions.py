@@ -89,6 +89,7 @@ def test_lecturer_reply_reaches_the_students_chat(client):
     assert r.status_code == 201 and r.json()["role"] == "lecturer"
     assert "alice-12345" not in r.text
 
+    assert client.get(MINE).json()[0]["last_lecturer_reply_at"] is not None
     mine = client.get(f"{MINE}/{sid}").json()["messages"]
     assert mine[-1]["role"] == "lecturer" and mine[-1]["content"].startswith("Think of each fold")
     assert client.get(f"{SHARED}/{share_id}").json()["messages"][-1]["role"] == "lecturer"

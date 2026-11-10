@@ -18,4 +18,6 @@ export interface LearningSession {
    */
   shared: boolean
   sharedAt?: string
+  /** When the lecturer last replied (shared sessions only). */
+  lastLecturerReplyAt?: string
 }

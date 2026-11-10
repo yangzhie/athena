@@ -11,6 +11,7 @@ interface SessionDto {
   updated_at: string
   shared: boolean
   shared_at: string | null
+  last_lecturer_reply_at: string | null
 }
 
 interface MessageDto {
@@ -33,6 +34,7 @@ const toSession = (s: SessionDto): LearningSession => ({
   updatedAt: s.updated_at,
   shared: s.shared,
   sharedAt: s.shared_at ?? undefined,
+  lastLecturerReplyAt: s.last_lecturer_reply_at ?? undefined,
 })
 
 /** The agent's SourceReference (snake_case) → the app's camelCase type. Unknown kinds are dropped. */

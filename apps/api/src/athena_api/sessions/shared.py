@@ -55,7 +55,9 @@ class SharedSessions:
         s = self._find(offering_id, share_id)
         m = Message(id=uuid.uuid4().hex, session_id=s.id, role="lecturer", content=text.strip(), created_at=self.clock())
         self.store.add_message(s.student_id, m)
-        self.store.put(s.model_copy(update={"updated_at": self.clock()}))  # surfaces the session in the student's list
+        now = self.clock()
+        # Surfaces the session in the student's list, with a "new reply" marker.
+        self.store.put(s.model_copy(update={"updated_at": now, "last_lecturer_reply_at": now}))
         return self._shared_message(share_id, m)
 
     def _shared_message(self, share_id: str, m: Message) -> SharedMessage:

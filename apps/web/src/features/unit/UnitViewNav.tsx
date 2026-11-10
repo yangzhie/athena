@@ -4,6 +4,7 @@ import type { SidebarActionProps } from '../../app/feature'
 import { useRole } from '../../app/role'
 import { cn } from '../../lib/cn'
 import { refreshSrsSummary, useSrsSummary } from './practice/summaryStore'
+import { hasNewReply, useSeen } from './sessions/seenStore'
 import { refreshSessions, useSessionList } from './sessions/sessionStore'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -23,12 +24,19 @@ export function UnitViewNav({ onNavigate }: SidebarActionProps) {
   const id = unit?.params.offeringId ?? ''
   const summary = useSrsSummary(id)
   const { sessions } = useSessionList(id)
+  const seen = useSeen()
 
   useEffect(() => {
-    if (id && role === 'student') {
-      void refreshSrsSummary(id)
+    if (!id || role !== 'student') return
+    void refreshSrsSummary(id)
+    void refreshSessions(id)
+    // Pick up lecturer replies (and due reviews) when the student comes back to the tab.
+    const onFocus = () => {
       void refreshSessions(id)
+      void refreshSrsSummary(id)
     }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [id, role])
 
   if (!id) return null
@@ -63,6 +71,19 @@ export function UnitViewNav({ onNavigate }: SidebarActionProps) {
               <li key={s.id}>
                 <NavLink to={`/units/${id}/s/${s.id}`} onClick={onNavigate} className={linkClass} title={s.goal}>
                   <span className="truncate">{s.title}</span>
+                  {s.shared && (
+                    <span className="ml-auto shrink-0 text-xs" title="Shared with your lecturer" aria-label="shared with your lecturer">
+                      👁
+                    </span>
+                  )}
+                  {hasNewReply(s, seen) && (
+                    <span
+                      className={cn('size-2 shrink-0 rounded-full bg-accent', !s.shared && 'ml-auto')}
+                      title="New reply from your lecturer"
+                      role="img"
+                      aria-label="new reply from your lecturer"
+                    />
+                  )}
                 </NavLink>
               </li>
             ))}

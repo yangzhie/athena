@@ -5,6 +5,7 @@ import { Card } from '../../../components/ui'
 import { loadThread, useThread } from '../chat/chatStore'
 import { UnitChat } from '../chat/UnitChat'
 import { useOffering } from '../useOffering'
+import { markSeen } from './seenStore'
 import { SessionHeader } from './SessionHeader'
 
 /** One learning session: its header and chat, loaded from apps/api. */
@@ -14,6 +15,12 @@ export default function SessionView() {
   const thread = useThread(sessionId)
 
   // Fresh on open and whenever the tab regains focus, so a lecturer's reply shows up.
+  // Opening the session (and having it on screen) counts as having seen any lecturer reply.
+  const lastReply = thread.session?.lastLecturerReplyAt
+  useEffect(() => {
+    if (thread.status === 'ready') markSeen(sessionId)
+  }, [sessionId, thread.status, lastReply, thread.messages.length])
+
   useEffect(() => {
     void loadThread(offering.id, sessionId, { refresh: true })
     const onFocus = () => void loadThread(offering.id, sessionId, { refresh: true })
