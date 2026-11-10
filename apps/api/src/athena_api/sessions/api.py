@@ -1,0 +1,74 @@
+"""HTTP routes for learning sessions. Scoped to the signed-in student throughout."""
+
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Response
+from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError
+
+from ..auth import StudentResolver, student_dependency
+from .models import LearningSessionOut, Message
+from .service import NotFound, SessionService
+
+Text = Annotated[str, StringConstraints(min_length=1, pattern=r"\S")]
+
+
+class CreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    goal: Annotated[str, StringConstraints(min_length=1, max_length=200, pattern=r"\S")]
+
+
+class RenameBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: Annotated[str, StringConstraints(min_length=1, max_length=80, pattern=r"\S")]
+
+
+class MessageBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: Annotated[str, StringConstraints(min_length=1, max_length=4000, pattern=r"\S")]
+
+
+class SessionWithMessages(BaseModel):
+    session: LearningSessionOut
+    messages: list[Message]
+
+
+def sessions_router(service: SessionService, resolve_student: StudentResolver) -> APIRouter:
+    router = APIRouter(prefix="/units/{offering_id}/sessions", tags=["sessions"])
+    Student = student_dependency(resolve_student)
+
+    def run(fn, *args):
+        try:
+            return fn(*args)
+        except NotFound as e:
+            raise HTTPException(404, str(e)) from None
+        except ValidationError:
+            raise HTTPException(422, "invalid value") from None
+
+    @router.get("", response_model=list[LearningSessionOut])
+    def list_sessions(offering_id: str, sid: Student):
+        return [LearningSessionOut.of(s) for s in service.list(sid, offering_id)]
+
+    @router.post("", response_model=SessionWithMessages, status_code=201)
+    def create(offering_id: str, body: CreateBody, sid: Student):
+        session, messages = run(service.create, sid, offering_id, body.goal)
+        return SessionWithMessages(session=LearningSessionOut.of(session), messages=messages)
+
+    @router.get("/{session_id}", response_model=SessionWithMessages)
+    def get(offering_id: str, session_id: str, sid: Student):
+        session, messages = run(service.get, sid, offering_id, session_id)
+        return SessionWithMessages(session=LearningSessionOut.of(session), messages=messages)
+
+    @router.patch("/{session_id}", response_model=LearningSessionOut)
+    def rename(offering_id: str, session_id: str, body: RenameBody, sid: Student):
+        return LearningSessionOut.of(run(service.rename, sid, offering_id, session_id, body.title))
+
+    @router.delete("/{session_id}", status_code=204)
+    def delete(offering_id: str, session_id: str, sid: Student):
+        run(service.delete, sid, offering_id, session_id)
+        return Response(status_code=204)
+
+    @router.post("/{session_id}/messages", response_model=list[Message])
+    def send(offering_id: str, session_id: str, body: MessageBody, sid: Student):
+        return run(service.send, sid, offering_id, session_id, body.text)
+
+    return router

@@ -4,7 +4,7 @@ import type { SidebarActionProps } from '../../app/feature'
 import { useRole } from '../../app/role'
 import { cn } from '../../lib/cn'
 import { refreshSrsSummary, useSrsSummary } from './practice/summaryStore'
-import { useSessions } from './sessions/sessionStore'
+import { refreshSessions, useSessionList } from './sessions/sessionStore'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -22,10 +22,13 @@ export function UnitViewNav({ onNavigate }: SidebarActionProps) {
   const unit = useMatch('/units/:offeringId/*')
   const id = unit?.params.offeringId ?? ''
   const summary = useSrsSummary(id)
-  const sessions = useSessions(id)
+  const { sessions } = useSessionList(id)
 
   useEffect(() => {
-    if (id && role === 'student') void refreshSrsSummary(id)
+    if (id && role === 'student') {
+      void refreshSrsSummary(id)
+      void refreshSessions(id)
+    }
   }, [id, role])
 
   if (!id) return null

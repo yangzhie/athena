@@ -1,17 +1,15 @@
 """HTTP routes for SRS. Student identity always comes from the server-side resolver."""
 
-from collections.abc import Callable
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
+
+from ..auth import StudentResolver, student_dependency
 
 from .scheduler import ReviewError
 from .service import Conflict, NotFound, SrsService
-
-StudentResolver = Callable[[Request], str | None]
-
 
 class AnswerBody(BaseModel):
     """No student id here: identity comes from authentication, never the request body."""
@@ -38,13 +36,7 @@ class Summary(BaseModel):
 def srs_router(service: SrsService, resolve_student: StudentResolver) -> APIRouter:
     router = APIRouter(prefix="/units/{offering_id}/srs", tags=["srs"])
 
-    def student(request: Request) -> str:
-        sid = resolve_student(request)
-        if not sid:
-            raise HTTPException(401, "sign in required")
-        return sid
-
-    Student = Annotated[str, Depends(student)]
+    Student = student_dependency(resolve_student)
 
     def run(fn, *args):
         try:

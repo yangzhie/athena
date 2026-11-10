@@ -1,108 +1,88 @@
-import { useSyncExternalStore } from 'react'
-import { streamTutorReply } from '../../../api/tutor'
-import { readStored, writeStored } from '../../../lib/storage'
-import type { ChatMessage, Offering } from '../../../types'
+import { asApiError, type ApiError } from '../../../api/client'
+import { getSession, sendSessionMessage } from '../../../api/sessions'
+import { createKeyedStore } from '../../../lib/keyedStore'
+import type { ChatMessage, LearningSession } from '../../../types'
 
-/**
- * One chat thread per learning session. Saved in this browser after each
- * finished reply (not on every streamed word); moves to apps/api later.
- */
+/** One learning session's chat, loaded from and saved by apps/api. */
 export interface Thread {
+  status: 'loading' | 'ready' | 'missing' | 'error'
+  session?: LearningSession
   messages: ChatMessage[]
-  streaming: boolean
+  /** Waiting for the tutor's reply. */
+  sending: boolean
+  error?: ApiError
 }
 
-const KEY = 'athena.threads'
-const EMPTY: Thread = { messages: [], streaming: false }
-const threads = new Map<string, Thread>(load())
+const EMPTY: Thread = { status: 'loading', messages: [], sending: false }
+const store = createKeyedStore<Thread>(EMPTY)
 const controllers = new Map<string, AbortController>()
-const listeners = new Set<() => void>()
 
-function load(): [string, Thread][] {
+export const useThread = store.use
+
+export async function loadThread(offeringId: string, sessionId: string) {
+  const current = store.get(sessionId)
+  if (current.status === 'ready' || current.sending) return
   try {
-    const saved = JSON.parse(readStored(KEY) ?? '{}') as Record<string, ChatMessage[]>
-    return Object.entries(saved).map(([id, messages]) => [id, { messages, streaming: false }])
-  } catch {
-    return []
+    const { session, messages } = await getSession(offeringId, sessionId)
+    store.set(sessionId, { status: 'ready', session, messages, sending: false })
+  } catch (e) {
+    const error = asApiError(e)
+    store.set(sessionId, { ...EMPTY, status: error.status === 404 ? 'missing' : 'error', error })
   }
 }
 
-function save() {
-  const out: Record<string, ChatMessage[]> = {}
-  for (const [id, t] of threads) out[id] = t.messages
-  writeStored(KEY, JSON.stringify(out))
+export function seedThread(session: LearningSession, messages: ChatMessage[]) {
+  store.set(session.id, { status: 'ready', session, messages, sending: false })
 }
 
-function set(id: string, update: (t: Thread) => Thread) {
-  threads.set(id, update(threads.get(id) ?? EMPTY))
-  listeners.forEach((l) => l())
+export function updateThreadSession(session: LearningSession) {
+  const t = store.get(session.id)
+  if (t.session) store.set(session.id, { ...t, session })
 }
 
-/** Start a thread with a first message (the tutor's opening). */
-export function seedThread(sessionId: string, message: ChatMessage) {
-  set(sessionId, () => ({ messages: [message], streaming: false }))
-  save()
-}
-
-export function deleteThread(sessionId: string) {
+export function forgetThread(sessionId: string) {
   controllers.get(sessionId)?.abort()
-  threads.delete(sessionId)
-  listeners.forEach((l) => l())
-  save()
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener)
-  return () => listeners.delete(listener)
-}
-
-export function useThread(sessionId: string): Thread {
-  return useSyncExternalStore(subscribe, () => threads.get(sessionId) ?? EMPTY)
+  store.set(sessionId, { ...EMPTY, status: 'missing' })
 }
 
 let seq = 0
-const newId = () => `msg-${Date.now()}-${seq++}`
+const tempId = () => `pending-${Date.now()}-${seq++}`
 
-export async function sendMessage(offering: Offering, sessionId: string, text: string) {
-  const id = sessionId
-  if (threads.get(id)?.streaming) return
-
-  const learner: ChatMessage = { id: newId(), role: 'learner', content: text, createdAt: new Date().toISOString() }
-  const tutor: ChatMessage = { id: newId(), role: 'tutor', content: '', createdAt: new Date().toISOString() }
-  set(id, (t) => ({ messages: [...t.messages, learner, tutor], streaming: true }))
+/** Show the learner's message and a "thinking" tutor bubble, then swap in what the API stored. */
+export async function sendMessage(offeringId: string, sessionId: string, text: string) {
+  const t = store.get(sessionId)
+  if (t.sending || t.status !== 'ready') return
+  const now = new Date().toISOString()
+  const learner: ChatMessage = { id: tempId(), role: 'learner', content: text, createdAt: now }
+  const pending: ChatMessage = { id: tempId(), role: 'tutor', content: '', createdAt: now }
+  store.set(sessionId, { ...t, messages: [...t.messages, learner, pending], sending: true, error: undefined })
 
   const controller = new AbortController()
-  controllers.set(id, controller)
-  const history = threads.get(id)!.messages.slice(0, -1)
-
+  controllers.set(sessionId, controller)
   try {
-    for await (const event of streamTutorReply(offering, history, controller.signal)) {
-      set(id, (t) => ({
-        ...t,
-        messages: t.messages.map((m) => {
-          if (m.id !== tutor.id) return m
-          return event.type === 'text'
-            ? { ...m, content: m.content + event.text }
-            : { ...m, sources: event.sources, knowledgeOrigin: event.knowledgeOrigin }
-        }),
-      }))
-    }
-  } catch {
-    set(id, (t) => ({
-      ...t,
-      messages: t.messages.map((m) =>
-        m.id === tutor.id ? { ...m, content: m.content + '\n\nSomething went wrong. Try again.' } : m,
-      ),
-    }))
+    const saved = await sendSessionMessage(offeringId, sessionId, text, controller.signal)
+    const cur = store.get(sessionId)
+    store.set(sessionId, {
+      ...cur,
+      messages: [...cur.messages.filter((m) => m.id !== learner.id && m.id !== pending.id), ...saved],
+      sending: false,
+    })
+  } catch (e) {
+    const cur = store.get(sessionId)
+    const stopped = e instanceof DOMException && e.name === 'AbortError'
+    store.set(sessionId, {
+      ...cur,
+      // Keep what the learner typed visible; drop the empty tutor bubble.
+      messages: cur.messages.filter((m) => m.id !== pending.id),
+      sending: false,
+      error: stopped ? undefined : asApiError(e),
+    })
   } finally {
-    controllers.delete(id)
-    if (threads.has(id)) {
-      set(id, (t) => ({ ...t, streaming: false }))
-      save()
-    }
+    controllers.delete(sessionId)
   }
 }
 
-export function stopStreaming(sessionId: string) {
+/** Stop waiting for the reply. The server may still save it; it appears on the next load. */
+export function stopWaiting(sessionId: string) {
   controllers.get(sessionId)?.abort()
 }

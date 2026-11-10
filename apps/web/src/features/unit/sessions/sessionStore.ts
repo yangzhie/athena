@@ -1,66 +1,56 @@
-import { useMemo } from 'react'
-import { createPersistedStore } from '../../../lib/persistedStore'
+import * as api from '../../../api/sessions'
+import { asApiError, type ApiError } from '../../../api/client'
+import { createKeyedStore } from '../../../lib/keyedStore'
 import type { LearningSession } from '../../../types'
-import { deleteThread, seedThread } from '../chat/chatStore'
+import { forgetThread, seedThread } from '../chat/chatStore'
 
-/**
- * The student's sessions per unit. Kept in this browser for now; moves to
- * apps/api (scoped to the signed-in student) in the next step.
- */
-const store = createPersistedStore<Record<string, LearningSession[]>>('athena.sessions', {})
-
-/** Most recently used first. */
-export function useSessions(offeringId: string): LearningSession[] {
-  const all = store.use()
-  return useMemo(
-    () => [...(all[offeringId] ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [all, offeringId],
-  )
+/** The student's sessions per unit, from apps/api. */
+export interface SessionList {
+  status: 'loading' | 'ready' | 'error'
+  sessions: LearningSession[]
+  error?: ApiError
 }
 
-export function useSession(offeringId: string, sessionId: string): LearningSession | undefined {
-  return useSessions(offeringId).find((s) => s.id === sessionId)
-}
+const store = createKeyedStore<SessionList>({ status: 'loading', sessions: [] })
 
-function update(offeringId: string, fn: (list: LearningSession[]) => LearningSession[]) {
-  store.set((all) => ({ ...all, [offeringId]: fn(all[offeringId] ?? []) }))
-}
+export const useSessionList = store.use
 
-export function createSession(offeringId: string, goal: string): LearningSession {
-  const now = new Date().toISOString()
-  const clean = goal.trim().replace(/\s+/g, ' ')
-  const session: LearningSession = {
-    id: crypto.randomUUID(),
-    offeringId,
-    goal: clean,
-    title: clean.length > 60 ? `${clean.slice(0, 57)}…` : clean,
-    createdAt: now,
-    updatedAt: now,
-    shared: false,
+export async function refreshSessions(offeringId: string) {
+  try {
+    store.set(offeringId, { status: 'ready', sessions: await api.listSessions(offeringId) })
+  } catch (e) {
+    store.set(offeringId, { ...store.get(offeringId), status: 'error', error: asApiError(e) })
   }
-  update(offeringId, (list) => [...list, session])
-  // The tutor opens the session: Athena asks first rather than waiting for a question.
-  seedThread(session.id, {
-    id: `${session.id}-intro`,
-    role: 'tutor',
-    content: `Let’s work on “${clean}”. To start, tell me what you already know about it, or where you get stuck. I’ll pitch things from there.`,
-    createdAt: now,
-  })
+}
+
+function upsert(session: LearningSession) {
+  const list = store.get(session.offeringId).sessions.filter((s) => s.id !== session.id)
+  const sessions = [session, ...list].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  store.set(session.offeringId, { status: 'ready', sessions })
+}
+
+/** Creates the session (the API adds the tutor's opening message) and returns it. */
+export async function createSession(offeringId: string, goal: string): Promise<LearningSession> {
+  const { session, messages } = await api.createSession(offeringId, goal)
+  seedThread(session, messages)
+  upsert(session)
   return session
 }
 
-export function renameSession(offeringId: string, sessionId: string, title: string) {
-  const clean = title.trim()
-  if (!clean) return
-  update(offeringId, (list) => list.map((s) => (s.id === sessionId ? { ...s, title: clean.slice(0, 80) } : s)))
+export async function renameSession(offeringId: string, sessionId: string, title: string) {
+  const session = await api.renameSession(offeringId, sessionId, title)
+  upsert(session)
+  return session
 }
 
-export function touchSession(offeringId: string, sessionId: string) {
-  const now = new Date().toISOString()
-  update(offeringId, (list) => list.map((s) => (s.id === sessionId ? { ...s, updatedAt: now } : s)))
+export async function deleteSession(offeringId: string, sessionId: string) {
+  await api.deleteSession(offeringId, sessionId)
+  const list = store.get(offeringId)
+  store.set(offeringId, { ...list, sessions: list.sessions.filter((s) => s.id !== sessionId) })
+  forgetThread(sessionId)
 }
 
-export function deleteSession(offeringId: string, sessionId: string) {
-  update(offeringId, (list) => list.filter((s) => s.id !== sessionId))
-  deleteThread(sessionId)
+/** After a message, move the session to the top of the list. */
+export function bumpSession(session: LearningSession) {
+  upsert({ ...session, updatedAt: new Date().toISOString() })
 }

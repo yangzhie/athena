@@ -52,6 +52,22 @@ them until a lecturer approves them.
 | `POST /units/{offering}/srs/attempts` | `{item_id, variant_id, answer}` → graded on the server, feedback; wrong answers are recorded as "again" |
 | `POST /units/{offering}/srs/attempts/{id}/rating` | `{rating}` for right or short answers: hard/good/easy (short answers may also say again) |
 
+## Sessions API
+
+A student's learning sessions in a unit: each is one chat with a goal they chose.
+All routes are scoped to the signed-in student; another student's session id gives 404.
+
+| Route | Does |
+| --- | --- |
+| `GET /units/{offering}/sessions` | the student's sessions, most recent first |
+| `POST /units/{offering}/sessions` | `{goal}` → new session plus the tutor's opening message |
+| `GET /units/{offering}/sessions/{id}` | the session and its messages |
+| `PATCH /units/{offering}/sessions/{id}` | `{title}` rename |
+| `DELETE /units/{offering}/sessions/{id}` | delete the session and its messages |
+| `POST /units/{offering}/sessions/{id}/messages` | `{text}` → the learner message and the tutor's reply |
+
+Tutor replies are placeholders until the agent (`agent/`) is wired in behind `sessions/tutor.py`.
+
 ## SRS design
 
 - A unit's **bank** holds **items**. An item is one idea to remember, with several

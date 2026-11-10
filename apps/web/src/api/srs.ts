@@ -4,6 +4,10 @@
  * Answers are graded on the server; questions never include their answers.
  */
 
+import { call } from './client'
+
+export { ApiError } from './client'
+
 export type Rating = 'again' | 'hard' | 'good' | 'easy'
 
 export interface SrsQuestion {
@@ -49,33 +53,6 @@ export interface SrsSummary {
   new_available: number
   reviewed_today: number
   next_due_at: string | null
-}
-
-export class ApiError extends Error {
-  status: number
-  constructor(status: number, message: string) {
-    super(message)
-    this.status = status
-  }
-}
-
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  let res: Response
-  try {
-    res = await fetch(`/api${path}`, {
-      ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
-    })
-  } catch {
-    throw new ApiError(0, 'The Athena API isn’t reachable.')
-  }
-  if (!res.ok) {
-    const body = await res.json().catch(() => null)
-    // The Vite proxy answers 5xx with no JSON body when the API isn't running.
-    if (res.status >= 500 && !body) throw new ApiError(0, 'The Athena API isn’t reachable.')
-    throw new ApiError(res.status, body?.detail ?? `Request failed (${res.status})`)
-  }
-  return res.json() as Promise<T>
 }
 
 const base = (offeringId: string) => `/units/${encodeURIComponent(offeringId)}/srs`

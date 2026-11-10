@@ -1,29 +1,25 @@
-"""FastAPI application factory. Modules (SRS first) add their routers here."""
+"""FastAPI application factory. Each module (SRS, sessions) adds its router here."""
 
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 
+from .auth import StudentResolver, dev_student_resolver
 from .env import load_dotenv
-from .srs.api import StudentResolver, srs_router
+from .sessions.api import sessions_router
+from .sessions.service import SessionService
+from .sessions.store import SqliteSessionStore
+from .srs.api import srs_router
 from .srs.rephrase import OpenAIRephraser, RephraseError
 from .srs.service import SrsService
-from .srs.store import SqliteStore, SrsStore
-
-
-def dev_student_resolver(request: Request) -> str | None:
-    """PoC only: every request is the student named in ATHENA_DEV_STUDENT_ID.
-
-    Real identity comes from university SSO via trusted middleware. Never read
-    a student id from request headers, query or body.
-    """
-    return os.environ.get("ATHENA_DEV_STUDENT_ID") or None
+from .srs.store import SqliteStore
 
 
 def create_app(
     *,
     srs: SrsService | None = None,
+    sessions: SessionService | None = None,
     resolve_student: StudentResolver = dev_student_resolver,
 ) -> FastAPI:
     app = FastAPI(title="Athena API", version="0.1.0")
@@ -32,11 +28,13 @@ def create_app(
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    if srs is None:
+    if srs is None or sessions is None:
         load_dotenv()
-        store: SrsStore = SqliteStore(Path(os.environ.get("ATHENA_DB", "data/athena.db")))
-        srs = SrsService(store, rephraser=_rephraser())
+        db = Path(os.environ.get("ATHENA_DB", "data/athena.db"))
+        srs = srs or SrsService(SqliteStore(db), rephraser=_rephraser())
+        sessions = sessions or SessionService(SqliteSessionStore(db))
     app.include_router(srs_router(srs, resolve_student))
+    app.include_router(sessions_router(sessions, resolve_student))
     return app
 
 

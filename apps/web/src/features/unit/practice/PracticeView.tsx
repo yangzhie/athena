@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { ApiUnavailable } from '../../../components/ApiUnavailable'
+import { asApiError, type ApiError } from '../../../api/client'
 import {
-  ApiError,
   getNextQuestion,
   rateAttempt,
   submitAnswer,
@@ -8,7 +9,7 @@ import {
   type SrsAttemptResult,
   type SrsNext,
 } from '../../../api/srs'
-import { Badge, Button, Card } from '../../../components/ui'
+import { Badge, Card } from '../../../components/ui'
 import { formatRelative } from '../../../lib/format'
 import { UnitHeader } from '../UnitHeader'
 import { useOffering } from '../useOffering'
@@ -29,7 +30,7 @@ async function fetchState(offeringId: string): Promise<State> {
     const next = await getNextQuestion(offeringId)
     return next.done ? { phase: 'done', nextDueAt: next.next_due_at } : { phase: 'question', next, result: null }
   } catch (e) {
-    return { phase: 'error', error: e instanceof ApiError ? e : new ApiError(0, String(e)) }
+    return { phase: 'error', error: asApiError(e) }
   }
 }
 
@@ -63,7 +64,7 @@ export default function PracticeView() {
       setTally((t) => ({ answered: t.answered + 1, right: t.right + (result.correct === true ? 1 : 0) }))
       if (!result.needs_rating) void refreshSrsSummary(offering.id)
     } catch (e) {
-      setState({ phase: 'error', error: e instanceof ApiError ? e : new ApiError(0, String(e)) })
+      setState({ phase: 'error', error: asApiError(e) })
     } finally {
       setBusy(false)
     }
@@ -76,7 +77,7 @@ export default function PracticeView() {
       await rateAttempt(offering.id, state.result.attempt_id, rating)
       await load()
     } catch (e) {
-      setState({ phase: 'error', error: e instanceof ApiError ? e : new ApiError(0, String(e)) })
+      setState({ phase: 'error', error: asApiError(e) })
     } finally {
       setBusy(false)
     }
@@ -98,19 +99,7 @@ export default function PracticeView() {
 
       {state.phase === 'loading' && <Card>Loading…</Card>}
 
-      {state.phase === 'error' && (
-        <Card title={state.error.status === 0 ? 'Practice isn’t available' : 'Something went wrong'}>
-          <p className="text-sm text-muted">{state.error.message}</p>
-          {state.error.status === 0 && (
-            <pre className="mt-3 overflow-x-auto rounded-lg bg-line/40 p-3 text-xs">
-              {'cd apps/api\nuv run athena-srs load-starter\nATHENA_DEV_STUDENT_ID=dev-student uv run uvicorn athena_api.app:create_app --factory --reload'}
-            </pre>
-          )}
-          <Button variant="secondary" size="sm" className="mt-3" onClick={() => void load()}>
-            Try again
-          </Button>
-        </Card>
-      )}
+      {state.phase === 'error' && <ApiUnavailable error={state.error} what="Practice" onRetry={() => void load()} />}
 
       {state.phase === 'done' && (
         <Card>

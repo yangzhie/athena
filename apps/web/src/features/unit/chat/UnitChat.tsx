@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 import type { LearningSession, Offering } from '../../../types'
-import { touchSession } from '../sessions/sessionStore'
+import { bumpSession } from '../sessions/sessionStore'
 import { Composer } from './Composer'
 import { MessageBubble } from './MessageBubble'
-import { sendMessage, stopStreaming, useThread } from './chatStore'
+import { sendMessage, stopWaiting, useThread } from './chatStore'
 
 function nearBottom() {
   return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160
@@ -11,7 +11,7 @@ function nearBottom() {
 
 /** One learning session's chat: messages above, prompt box pinned to the bottom. */
 export function UnitChat({ offering, session }: { offering: Offering; session: LearningSession }) {
-  const { messages, streaming } = useThread(session.id)
+  const { messages, sending: streaming, error } = useThread(session.id)
   const end = useRef<HTMLDivElement>(null)
   const lastCount = useRef(messages.length)
   const last = messages.at(-1)
@@ -25,8 +25,8 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
   }, [messages.length, last?.content])
 
   const send = (text: string) => {
-    touchSession(offering.id, session.id)
-    void sendMessage(offering, session.id, text)
+    bumpSession(session)
+    void sendMessage(offering.id, session.id, text)
   }
 
   return (
@@ -63,6 +63,11 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
             ))}
           </div>
         )}
+        {error && (
+          <p className="mt-4 text-sm text-bad" role="alert">
+            Your message couldn’t be sent: {error.message}
+          </p>
+        )}
         <div ref={end} />
       </div>
 
@@ -72,7 +77,7 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
           placeholder={`Message ${offering.unit.code} tutor`}
           streaming={streaming}
           onSend={send}
-          onStop={() => stopStreaming(session.id)}
+          onStop={() => stopWaiting(session.id)}
         />
         <p className="mt-2 text-center text-xs text-muted">
           Athena can make mistakes. Check important answers against your unit's material.

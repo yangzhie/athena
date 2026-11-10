@@ -2,24 +2,42 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '../../../components/ui'
 import type { LearningSession, Offering } from '../../../types'
+import { updateThreadSession } from '../chat/chatStore'
 import { deleteSession, renameSession } from './sessionStore'
 
 /** Session title with rename and delete, and a privacy note. */
 export function SessionHeader({ offering, session }: { offering: Offering; session: LearningSession }) {
   const navigate = useNavigate()
   const [mode, setMode] = useState<'view' | 'rename' | 'confirm-delete'>('view')
+  const [error, setError] = useState<string | null>(null)
 
-  function rename(e: FormEvent<HTMLFormElement>) {
+  async function rename(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    renameSession(offering.id, session.id, String(new FormData(e.currentTarget).get('title')))
-    setMode('view')
+    const title = String(new FormData(e.currentTarget).get('title')).trim()
+    if (!title) return
+    try {
+      updateThreadSession(await renameSession(offering.id, session.id, title))
+      setMode('view')
+      setError(null)
+    } catch {
+      setError('Couldn’t rename the session.')
+    }
+  }
+
+  async function remove() {
+    try {
+      await deleteSession(offering.id, session.id)
+      navigate(`/units/${offering.id}`)
+    } catch {
+      setError('Couldn’t delete the session.')
+    }
   }
 
   return (
     <header className="space-y-1">
       <p className="text-sm text-muted">{offering.unit.code} · learning session</p>
       {mode === 'rename' ? (
-        <form onSubmit={rename} className="flex flex-wrap items-center gap-2">
+        <form onSubmit={(e) => void rename(e)} className="flex flex-wrap items-center gap-2">
           <input
             name="title"
             defaultValue={session.title}
@@ -40,10 +58,7 @@ export function SessionHeader({ offering, session }: { offering: Offering; sessi
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => {
-                  deleteSession(offering.id, session.id)
-                  navigate(`/units/${offering.id}`)
-                }}
+                onClick={() => void remove()}
               >
                 Delete
               </Button>
@@ -56,6 +71,11 @@ export function SessionHeader({ offering, session }: { offering: Offering; sessi
             </span>
           )}
         </div>
+      )}
+      {error && (
+        <p className="text-sm text-bad" role="alert">
+          {error}
+        </p>
       )}
       <p className="text-xs text-muted">🔒 Private: only you can see this session.</p>
     </header>

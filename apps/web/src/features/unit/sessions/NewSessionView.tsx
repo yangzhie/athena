@@ -1,19 +1,26 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useRole } from '../../../app/role'
+import { ApiUnavailable } from '../../../components/ApiUnavailable'
 import { Button, Card } from '../../../components/ui'
 import { formatDate } from '../../../lib/format'
 import { UnitHeader } from '../UnitHeader'
 import { useOffering } from '../useOffering'
-import { createSession, useSessions } from './sessionStore'
+import { createSession, refreshSessions, useSessionList } from './sessionStore'
 
 /** The unit's landing page: start a new learning session, or reopen one. */
 export default function NewSessionView() {
   const offering = useOffering()
   const role = useRole()
-  const sessions = useSessions(offering.id)
+  const { status, sessions, error } = useSessionList(offering.id)
   const navigate = useNavigate()
   const [goal, setGoal] = useState('')
+  const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (role === 'student') void refreshSessions(offering.id)
+  }, [offering.id, role])
 
   if (role === 'lecturer') {
     return (
@@ -32,15 +39,22 @@ export default function NewSessionView() {
     )
   }
 
-  function start(text: string) {
-    if (!text.trim()) return
-    const session = createSession(offering.id, text)
-    navigate(`/units/${offering.id}/s/${session.id}`)
+  async function start(text: string) {
+    if (!text.trim() || starting) return
+    setStarting(true)
+    setStartError(null)
+    try {
+      const session = await createSession(offering.id, text)
+      navigate(`/units/${offering.id}/s/${session.id}`)
+    } catch (e) {
+      setStartError(e instanceof Error ? e.message : 'Couldn’t start the session.')
+      setStarting(false)
+    }
   }
 
   function submit(e: FormEvent) {
     e.preventDefault()
-    start(goal)
+    void start(goal)
   }
 
   return (
@@ -61,16 +75,22 @@ export default function NewSessionView() {
             maxLength={200}
             className="h-11 flex-1 rounded-xl border border-line bg-surface px-4 text-sm outline-none focus:border-accent"
           />
-          <Button type="submit" disabled={!goal.trim()} className="h-11">
-            Start session
+          <Button type="submit" disabled={!goal.trim() || starting} className="h-11">
+            {starting ? 'Starting…' : 'Start session'}
           </Button>
         </form>
+        {startError && (
+          <p className="mt-2 text-sm text-bad" role="alert">
+            {startError}
+          </p>
+        )}
         <div className="mt-4 flex flex-wrap gap-2">
           {offering.suggestions.map((s) => (
             <button
               key={s}
               type="button"
-              onClick={() => start(s)}
+              onClick={() => void start(s)}
+              disabled={starting}
               className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm transition-colors hover:bg-line/50"
             >
               {s}
@@ -78,6 +98,10 @@ export default function NewSessionView() {
           ))}
         </div>
       </div>
+
+      {status === 'error' && error && (
+        <ApiUnavailable error={error} what="Sessions" onRetry={() => void refreshSessions(offering.id)} />
+      )}
 
       {sessions.length > 0 && (
         <section>
