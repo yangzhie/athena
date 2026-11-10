@@ -2,14 +2,31 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '../../../components/ui'
 import type { LearningSession, Offering } from '../../../types'
-import { updateThreadSession } from '../chat/chatStore'
-import { deleteSession, renameSession } from './sessionStore'
+import { formatDate } from '../../../lib/format'
+import { updateThreadSession, useThread } from '../chat/chatStore'
+import { ShareDialog } from './ShareDialog'
+import { deleteSession, renameSession, setSharing } from './sessionStore'
 
 /** Session title with rename and delete, and a privacy note. */
 export function SessionHeader({ offering, session }: { offering: Offering; session: LearningSession }) {
   const navigate = useNavigate()
   const [mode, setMode] = useState<'view' | 'rename' | 'confirm-delete'>('view')
   const [error, setError] = useState<string | null>(null)
+  const [sharing, setSharingOpen] = useState(false)
+  const { messages } = useThread(session.id)
+
+  async function share() {
+    updateThreadSession(await setSharing(offering.id, session.id, true))
+    setSharingOpen(false)
+  }
+
+  async function stopSharing() {
+    try {
+      updateThreadSession(await setSharing(offering.id, session.id, false))
+    } catch {
+      setError('Couldn’t stop sharing. Try again.')
+    }
+  }
 
   async function rename(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -77,7 +94,29 @@ export function SessionHeader({ offering, session }: { offering: Offering; sessi
           {error}
         </p>
       )}
-      <p className="text-xs text-muted">🔒 Private: only you can see this session.</p>
+      {session.shared ? (
+        <p className="flex flex-wrap items-center gap-x-2 text-xs">
+          <span className="font-medium text-accent">
+            👁 Shared anonymously with your lecturer{session.sharedAt && ` since ${formatDate(session.sharedAt)}`}
+          </span>
+          <button type="button" onClick={() => void stopSharing()} className="text-muted underline hover:text-ink">
+            Stop sharing
+          </button>
+        </p>
+      ) : (
+        <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted">
+          🔒 Private: only you can see this session.
+          <button type="button" onClick={() => setSharingOpen(true)} className="underline hover:text-ink">
+            Share with lecturer…
+          </button>
+        </p>
+      )}
+      <ShareDialog
+        open={sharing}
+        messageCount={messages.length}
+        onConfirm={share}
+        onClose={() => setSharingOpen(false)}
+      />
     </header>
   )
 }

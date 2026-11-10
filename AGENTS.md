@@ -24,10 +24,18 @@ Roles: **lecturers** create study spaces, upload material, approve lecture clips
 Students must trust that they can ask honest questions. In every feature, endpoint and query:
 
 1. An environment belongs to exactly one (student, offering) pair, and only that student can read it.
-2. Chats, individual quiz answers and memory notes never reach any lecturer-facing view or API.
+2. Chats, individual quiz answers and memory notes never reach any lecturer-facing view or API, except a learning session the student has explicitly shared (rule 6).
 3. Lecturers see class-level aggregates by default; individual insight only with the student's opt-in for that offering, which they can withdraw.
 4. A lecturer of one unit never sees anything from the student's other units, even in aggregate.
 5. Learner identity comes from trusted authentication on the server, never from client-supplied data.
+6. **Sharing a session with a lecturer** is the only way a chat leaves the student's environment:
+   - Only the student can share, one session at a time. It is off by default; lecturers cannot request it.
+   - Sharing covers the whole session (earlier and later messages), shown to the student in a preview before they confirm.
+   - Only lecturers of that session's unit can see it. Other students never can.
+   - It is **anonymous**: lecturer-facing views and APIs never include the student's identity. Each share gets a new pseudonym, so separate shares (or re-sharing) can't be linked. The preview warns that anything the student wrote that identifies them stays visible.
+   - The lecturer can read it and reply in the thread; the student sees the replies.
+   - The student can stop sharing at any time; the lecturer's access ends immediately.
+   - Shared sessions never feed lecturer analytics or insights as individual data.
 
 ## Core Learning Experience
 

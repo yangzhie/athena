@@ -80,6 +80,20 @@ class SessionService:
         self.store.put(updated)
         return updated
 
+    def share(self, student_id: str, offering_id: str, session_id: str) -> LearningSession:
+        """Share with the unit's lecturers, anonymously. A new token every time (unlinkable)."""
+        s = self._get(student_id, session_id, offering_id)
+        updated = s.model_copy(update={"shared": True, "shared_at": self.clock(), "share_token": uuid.uuid4().hex})
+        self.store.put(updated)
+        return updated
+
+    def unshare(self, student_id: str, offering_id: str, session_id: str) -> LearningSession:
+        """Stop sharing. Lecturer access ends at once: their routes look the session up by its token."""
+        s = self._get(student_id, session_id, offering_id)
+        updated = s.model_copy(update={"shared": False, "shared_at": None, "share_token": None})
+        self.store.put(updated)
+        return updated
+
     def delete(self, student_id: str, offering_id: str, session_id: str) -> None:
         self._get(student_id, session_id, offering_id)
         self.store.delete(student_id, session_id)

@@ -54,3 +54,9 @@ export async function deleteSession(offeringId: string, sessionId: string) {
 export function bumpSession(session: LearningSession) {
   upsert({ ...session, updatedAt: new Date().toISOString() })
 }
+
+export async function setSharing(offeringId: string, sessionId: string, shared: boolean) {
+  const session = shared ? await api.shareSession(offeringId, sessionId) : await api.unshareSession(offeringId, sessionId)
+  upsert(session)
+  return session
+}

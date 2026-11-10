@@ -20,9 +20,12 @@ class LearningSession(Model):
     title: Annotated[str, StringConstraints(min_length=1, max_length=80, pattern=r"\S")]
     created_at: datetime
     updated_at: datetime
-    #: Reserved for lecturer collaboration: an explicit, revocable, per-session share by
-    #: the student. Not settable yet, and nothing reads it until that design is agreed.
+    #: Shared with the unit's lecturers by the student (AGENTS.md, Privacy rule 6).
     shared: bool = False
+    shared_at: datetime | None = None
+    #: The anonymous id lecturers know this share by. New on every share, so separate
+    #: shares can't be linked to each other or to the student. Never sent to students.
+    share_token: str | None = None
 
 
 class Message(Model):
@@ -51,7 +54,8 @@ class LearningSessionOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     shared: bool
+    shared_at: datetime | None
 
     @classmethod
     def of(cls, s: LearningSession) -> "LearningSessionOut":
-        return cls(**s.model_dump(exclude={"student_id"}))
+        return cls(**s.model_dump(exclude={"student_id", "share_token"}))

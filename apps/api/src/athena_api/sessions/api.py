@@ -88,6 +88,16 @@ def sessions_router(service: SessionService, resolve_student: StudentResolver) -
     def rename(offering_id: str, session_id: str, body: RenameBody, sid: Student):
         return LearningSessionOut.of(run(service.rename, sid, offering_id, session_id, body.title))
 
+    @router.post("/{session_id}/share", response_model=LearningSessionOut)
+    def share(offering_id: str, session_id: str, sid: Student):
+        """Share this session, anonymously, with the unit's lecturers."""
+        return LearningSessionOut.of(run(service.share, sid, offering_id, session_id))
+
+    @router.delete("/{session_id}/share", response_model=LearningSessionOut)
+    def unshare(offering_id: str, session_id: str, sid: Student):
+        """Stop sharing; lecturers lose access immediately."""
+        return LearningSessionOut.of(run(service.unshare, sid, offering_id, session_id))
+
     @router.delete("/{session_id}", status_code=204)
     def delete(offering_id: str, session_id: str, sid: Student):
         run(service.delete, sid, offering_id, session_id)

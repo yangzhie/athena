@@ -13,8 +13,9 @@ export interface LearningSession {
   createdAt: string
   updatedAt: string
   /**
-   * Reserved for lecturer–student collaboration: an explicit, revocable,
-   * per-session share by the student. Always false until that's designed.
+   * Shared anonymously with the unit's lecturers by the student (AGENTS.md, Privacy rule 6).
+   * They can read and reply until the student stops sharing.
    */
   shared: boolean
+  sharedAt?: string
 }

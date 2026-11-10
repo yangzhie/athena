@@ -100,3 +100,32 @@ def test_validation_and_auth(client):
     assert client.post(f"{BASE}/{sid}/messages", json={"text": "  "}).status_code == 422
     client.who["id"] = None
     assert client.get(BASE).status_code == 401
+
+
+def test_share_and_unshare(client):
+    sid = create(client)["session"]["id"]
+    shared = client.post(f"{BASE}/{sid}/share").json()
+    assert shared["shared"] is True and shared["shared_at"]
+    assert "share_token" not in shared  # the anonymous id is for lecturers' routes only
+    stopped = client.delete(f"{BASE}/{sid}/share").json()
+    assert (stopped["shared"], stopped["shared_at"]) == (False, None)
+
+
+def test_only_the_owner_can_share(client):
+    sid = create(client)["session"]["id"]
+    client.who["id"] = "bob"
+    assert client.post(f"{BASE}/{sid}/share").status_code == 404
+    assert client.delete(f"{BASE}/{sid}/share").status_code == 404
+
+
+def test_share_tokens_are_fresh_and_cleared():
+    from athena_api.sessions.service import SessionService as S
+    from athena_api.sessions.store import MemorySessionStore as M
+    import asyncio
+
+    svc = S(M(), clock=Clock())
+    session, _ = asyncio.run(svc.create("alice", UNIT, "clustering"))
+    first = svc.share("alice", UNIT, session.id).share_token
+    assert svc.unshare("alice", UNIT, session.id).share_token is None
+    second = svc.share("alice", UNIT, session.id).share_token
+    assert first and second and first != second

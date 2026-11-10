@@ -10,6 +10,7 @@ interface SessionDto {
   created_at: string
   updated_at: string
   shared: boolean
+  shared_at: string | null
 }
 
 interface MessageDto {
@@ -31,6 +32,7 @@ const toSession = (s: SessionDto): LearningSession => ({
   createdAt: s.created_at,
   updatedAt: s.updated_at,
   shared: s.shared,
+  sharedAt: s.shared_at ?? undefined,
 })
 
 /** The agent's SourceReference (snake_case) → the app's camelCase type. Unknown kinds are dropped. */
@@ -141,4 +143,14 @@ export async function continueSession(offeringId: string, sessionId: string, act
     signal,
   })
   return r.map(toMessage)
+}
+
+/** Share the session anonymously with the unit's lecturers. */
+export async function shareSession(offeringId: string, sessionId: string) {
+  return toSession(await call<SessionDto>(`${base(offeringId)}/${encodeURIComponent(sessionId)}/share`, { method: 'POST' }))
+}
+
+/** Stop sharing; lecturers lose access immediately. */
+export async function unshareSession(offeringId: string, sessionId: string) {
+  return toSession(await call<SessionDto>(`${base(offeringId)}/${encodeURIComponent(sessionId)}/share`, { method: 'DELETE' }))
 }
