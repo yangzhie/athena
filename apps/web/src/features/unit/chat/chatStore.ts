@@ -1,5 +1,5 @@
 import { asApiError, type ApiError } from '../../../api/client'
-import { getSession, sendSessionMessage } from '../../../api/sessions'
+import { answerQuestion, continueSession, getSession, sendSessionMessage, type AnswerInput } from '../../../api/sessions'
 import { createKeyedStore } from '../../../lib/keyedStore'
 import type { ChatMessage, LearningSession } from '../../../types'
 
@@ -48,38 +48,57 @@ export function forgetThread(sessionId: string) {
 let seq = 0
 const tempId = () => `pending-${Date.now()}-${seq++}`
 
-/** Show the learner's message and a "thinking" tutor bubble, then swap in what the API stored. */
-export async function sendMessage(offeringId: string, sessionId: string, text: string) {
+/**
+ * Run one tutor turn: show the learner's part (if any) and a "thinking" bubble at once,
+ * then swap in what the API stored.
+ */
+async function turn(
+  sessionId: string,
+  learnerText: string | null,
+  request: (signal: AbortSignal) => Promise<ChatMessage[]>,
+  answerFor?: string,
+) {
   const t = store.get(sessionId)
   if (t.sending || t.status !== 'ready') return
   const now = new Date().toISOString()
-  const learner: ChatMessage = { id: tempId(), role: 'learner', content: text, createdAt: now }
+  const learner: ChatMessage | null =
+    learnerText === null ? null : { id: tempId(), role: 'learner', content: learnerText, answerFor, createdAt: now }
   const pending: ChatMessage = { id: tempId(), role: 'tutor', content: '', createdAt: now }
-  store.set(sessionId, { ...t, messages: [...t.messages, learner, pending], sending: true, error: undefined })
+  const temp = new Set([pending.id, ...(learner ? [learner.id] : [])])
+  store.set(sessionId, { ...t, messages: [...t.messages, ...(learner ? [learner] : []), pending], sending: true, error: undefined })
 
   const controller = new AbortController()
   controllers.set(sessionId, controller)
   try {
-    const saved = await sendSessionMessage(offeringId, sessionId, text, controller.signal)
+    const saved = await request(controller.signal)
     const cur = store.get(sessionId)
-    store.set(sessionId, {
-      ...cur,
-      messages: [...cur.messages.filter((m) => m.id !== learner.id && m.id !== pending.id), ...saved],
-      sending: false,
-    })
+    store.set(sessionId, { ...cur, messages: [...cur.messages.filter((m) => !temp.has(m.id)), ...saved], sending: false })
   } catch (e) {
     const cur = store.get(sessionId)
     const stopped = e instanceof DOMException && e.name === 'AbortError'
     store.set(sessionId, {
       ...cur,
-      // Keep what the learner typed visible; drop the empty tutor bubble.
-      messages: cur.messages.filter((m) => m.id !== pending.id),
+      // Drop the thinking bubble; an unsent answer is dropped too so the question stays open.
+      messages: cur.messages.filter((m) => m.id !== pending.id && !(learner?.answerFor && m.id === learner.id)),
       sending: false,
       error: stopped ? undefined : asApiError(e),
     })
   } finally {
     controllers.delete(sessionId)
   }
+}
+
+export function sendMessage(offeringId: string, sessionId: string, text: string) {
+  return turn(sessionId, text, (signal) => sendSessionMessage(offeringId, sessionId, text, signal))
+}
+
+/** Answers the tutor's question. The server echoes the learner's answer as their message. */
+export function answer(offeringId: string, sessionId: string, input: AnswerInput) {
+  return turn(sessionId, input.shown, (signal) => answerQuestion(offeringId, sessionId, input, signal), input.questionId)
+}
+
+export function continueLearning(offeringId: string, sessionId: string, activityId: string) {
+  return turn(sessionId, null, (signal) => continueSession(offeringId, sessionId, activityId, signal))
 }
 
 /** Stop waiting for the reply. The server may still save it; it appears on the next load. */

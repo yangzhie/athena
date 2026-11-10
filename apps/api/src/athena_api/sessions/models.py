@@ -33,6 +33,11 @@ class Message(Model):
     #: Tutor messages: the material the reply is based on (agent SourceReference dicts).
     sources: list[dict] = Field(default_factory=list)
     knowledge_origin: Literal["materials", "supplement", "general"] | None = None
+    #: Tutor messages from the agent: the learner-facing activity (question, explanation,
+    #: feedback, ...) as JSON. Never contains answers or grading criteria.
+    activity: dict | None = None
+    #: Learner messages that answer a question: that question's id.
+    answer_for: str | None = None
     created_at: datetime
 
 

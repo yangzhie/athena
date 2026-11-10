@@ -95,4 +95,6 @@ A single page:
 
 Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`, `style:`, `docs:`). Never commit `.env` files, API keys, or course material and lecture recordings.
 
-**Open:** the agent's sessions are organised by learning goal, not by unit. How a unit maps to agent sessions (for example one session per unit, with the unit's material supplied as `materials`) is not yet decided.
+**Decided:** a unit holds many learning sessions, each created by the student with a goal (e.g. "k-fold cross-validation"). Each one is one agent session with that goal, run in-process by `apps/api` (`sessions/agent_tutor.py`), with the learner id taken from server-side auth.
+
+**Open:** which unit material is supplied to each agent session (e.g. the unit's approved lecture clips matching the goal), and whether students can share a session with their lecturer (see Privacy).

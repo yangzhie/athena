@@ -66,7 +66,24 @@ All routes are scoped to the signed-in student; another student's session id giv
 | `DELETE /units/{offering}/sessions/{id}` | delete the session and its messages |
 | `POST /units/{offering}/sessions/{id}/messages` | `{text}` → the learner message and the tutor's reply |
 
-Tutor replies are placeholders until the agent (`agent/`) is wired in behind `sessions/tutor.py`.
+| `POST /units/{offering}/sessions/{id}/answers` | `{question_id, choice_id \| text, shown}` → the learner's answer and the tutor's next messages |
+| `POST /units/{offering}/sessions/{id}/continue` | `{activity_id}` → move on after a teaching step |
+
+The tutor is the adaptive learning agent in `agent/`, used in-process
+(`sessions/agent_tutor.py`). One session here is one agent session with the
+student's goal: it opens with a diagnostic question, teaches, checks understanding
+and adapts. Tutor messages carry the agent's learner-facing activity (`activity`),
+which the web app renders as question cards and teaching steps.
+
+`ATHENA_TUTOR` picks the tutor:
+
+| Value | Tutor |
+| --- | --- |
+| *(unset)* | the agent with OpenAI if `OPENAI_API_KEY` and `OPENAI_MODEL` are set, else the placeholder |
+| `placeholder` | canned text replies, no questions (e.g. while there are no API credits) |
+| `demo` | the agent replaying its scripted Bubble Sort journey: try the full UI without OpenAI |
+
+Agent memory lives in its own database, `ATHENA_AGENT_DB` (default `data/agent.db`).
 
 ## SRS design
 

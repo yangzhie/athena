@@ -28,16 +28,33 @@ class SessionService:
             raise NotFound("no such session")  # same answer for "missing" and "someone else's"
         return s
 
-    def _tutor_message(self, session: LearningSession, reply: TutorReply) -> Message:
-        return Message(
-            id=uuid.uuid4().hex, session_id=session.id, role="tutor", content=reply.content,
-            sources=reply.sources, knowledge_origin=reply.knowledge_origin, created_at=self.clock(),
-        )
+    def _save_replies(self, session: LearningSession, replies: list[TutorReply]) -> list[Message]:
+        """Store the tutor's messages. A repeat of the activity already on screen isn't shown twice."""
+        last_activity = next((m.activity for m in reversed(self.store.messages(session.student_id, session.id)) if m.activity), None)
+        out = []
+        for r in replies:
+            if r.activity and last_activity and r.activity.get("activity_id") == last_activity.get("activity_id"):
+                continue
+            m = Message(
+                id=uuid.uuid4().hex, session_id=session.id, role="tutor", content=r.content,
+                sources=r.sources, knowledge_origin=r.knowledge_origin, activity=r.activity, created_at=self.clock(),
+            )
+            self.store.add_message(session.student_id, m)
+            out.append(m)
+            last_activity = r.activity or last_activity
+        self.store.put(session.model_copy(update={"updated_at": self.clock()}))
+        return out
+
+    def _learner(self, session: LearningSession, content: str, answer_for: str | None = None) -> Message:
+        m = Message(id=uuid.uuid4().hex, session_id=session.id, role="learner", content=content,
+                    answer_for=answer_for, created_at=self.clock())
+        self.store.add_message(session.student_id, m)
+        return m
 
     def list(self, student_id: str, offering_id: str) -> list[LearningSession]:
         return self.store.list(student_id, offering_id)
 
-    def create(self, student_id: str, offering_id: str, goal: str) -> tuple[LearningSession, list[Message]]:
+    async def create(self, student_id: str, offering_id: str, goal: str) -> tuple[LearningSession, list[Message]]:
         now = self.clock()
         clean = " ".join(goal.split())
         session = LearningSession(
@@ -45,9 +62,12 @@ class SessionService:
             goal=clean, title=_title(clean), created_at=now, updated_at=now,
         )
         self.store.put(session)
-        opening = self._tutor_message(session, self.tutor.opening(session))
-        self.store.add_message(student_id, opening)
-        return session, [opening]
+        try:
+            replies = await self.tutor.start(session)
+        except Exception:
+            self.store.delete(student_id, session.id)  # no half-started sessions
+            raise
+        return session, self._save_replies(session, replies)
 
     def get(self, student_id: str, offering_id: str, session_id: str) -> tuple[LearningSession, list[Message]]:
         s = self._get(student_id, session_id, offering_id)
@@ -64,12 +84,20 @@ class SessionService:
         self._get(student_id, session_id, offering_id)
         self.store.delete(student_id, session_id)
 
-    def send(self, student_id: str, offering_id: str, session_id: str, text: str) -> list[Message]:
-        """Store the learner's message, get the tutor's reply, return both."""
+    async def send(self, student_id: str, offering_id: str, session_id: str, text: str) -> list[Message]:
+        """A chat message: store it, get the tutor's reply, return both."""
         s = self._get(student_id, session_id, offering_id)
-        learner = Message(id=uuid.uuid4().hex, session_id=s.id, role="learner", content=text.strip(), created_at=self.clock())
-        self.store.add_message(student_id, learner)
-        reply = self._tutor_message(s, self.tutor.reply(s, self.store.messages(student_id, s.id)))
-        self.store.add_message(student_id, reply)
-        self.store.put(s.model_copy(update={"updated_at": self.clock()}))
-        return [learner, reply]
+        learner = self._learner(s, text.strip())
+        return [learner, *self._save_replies(s, await self.tutor.message(s, text.strip()))]
+
+    async def answer(self, student_id: str, offering_id: str, session_id: str, question_id: str, *,
+                     choice_id: str | None, text: str | None, shown: str, hint_used: bool = False) -> list[Message]:
+        """An answer to the tutor's question. `shown` is how it appears in the chat (e.g. the chosen option)."""
+        s = self._get(student_id, session_id, offering_id)
+        replies = await self.tutor.answer(s, question_id, choice_id=choice_id, text=text, hint_used=hint_used)
+        learner = self._learner(s, shown, answer_for=question_id)
+        return [learner, *self._save_replies(s, replies)]
+
+    async def continue_(self, student_id: str, offering_id: str, session_id: str, activity_id: str) -> list[Message]:
+        s = self._get(student_id, session_id, offering_id)
+        return self._save_replies(s, await self.tutor.continue_(s, activity_id))

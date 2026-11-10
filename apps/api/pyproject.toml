@@ -13,6 +13,7 @@ dependencies = [
     "uvicorn>=0.30,<1",
     "pydantic>=2.12,<3",
     "fsrs>=6,<7",
+    "athena-agent",
     "openai>=2,<3",
 ]
 
@@ -21,6 +22,10 @@ athena-srs = "athena_api.srs.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8.3,<10", "httpx>=0.27,<1"]
+
+[tool.uv.sources]
+# The adaptive learning agent (agent/), used in-process as the tutor.
+athena-agent = { path = "../../agent", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/athena_api"]

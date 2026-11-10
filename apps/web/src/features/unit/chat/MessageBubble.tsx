@@ -1,15 +1,25 @@
 import { cn } from '../../../lib/cn'
 import type { ChatMessage } from '../../../types'
+import { ActivityCard } from './ActivityCard'
 import { SourceList } from './SourceList'
 
 export function MessageBubble({
   message,
   pending,
   offeringId,
+  open = false,
+  busy = false,
+  onAnswer,
+  onContinue,
 }: {
   message: ChatMessage
   pending?: boolean
   offeringId: string
+  /** This message's activity is the one waiting on the learner. */
+  open?: boolean
+  busy?: boolean
+  onAnswer?: (input: { choiceId?: string; text?: string; shown: string }) => void
+  onContinue?: () => void
 }) {
   if (message.role === 'learner') {
     return (
@@ -24,7 +34,15 @@ export function MessageBubble({
   // Tutor replies are full-width text, like Claude or ChatGPT, not a bubble.
   return (
     <div className="text-[0.9375rem] leading-relaxed">
-      {message.content ? (
+      {message.activity ? (
+        <ActivityCard
+          activity={message.activity}
+          open={open}
+          busy={busy}
+          onAnswer={(a) => onAnswer?.(a)}
+          onContinue={() => onContinue?.()}
+        />
+      ) : message.content ? (
         <p className={cn('whitespace-pre-wrap', pending && 'after:ml-0.5 after:animate-pulse after:content-["▍"]')}>
           {message.content}
         </p>

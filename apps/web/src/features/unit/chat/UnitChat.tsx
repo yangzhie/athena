@@ -3,7 +3,8 @@ import type { LearningSession, Offering } from '../../../types'
 import { bumpSession } from '../sessions/sessionStore'
 import { Composer } from './Composer'
 import { MessageBubble } from './MessageBubble'
-import { sendMessage, stopWaiting, useThread } from './chatStore'
+import { answer, continueLearning, sendMessage, stopWaiting, useThread } from './chatStore'
+import type { ChatMessage } from '../../../types'
 
 function nearBottom() {
   return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160
@@ -23,6 +24,8 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
     lastCount.current = messages.length
     if (added || nearBottom()) end.current?.scrollIntoView({ block: 'end' })
   }, [messages.length, last?.content])
+
+  const openId = openActivityId(messages)
 
   const send = (text: string) => {
     bumpSession(session)
@@ -59,7 +62,20 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
         ) : (
           <div className="space-y-6">
             {messages.map((m) => (
-              <MessageBubble key={m.id} message={m} pending={streaming && m === last} offeringId={offering.id} />
+              <MessageBubble
+                key={m.id}
+                message={m}
+                pending={streaming && m === last}
+                offeringId={offering.id}
+                open={!!m.activity && m.activity.activity_id === openId}
+                busy={streaming}
+                onAnswer={(a) => {
+                  if (m.activity?.kind !== 'question') return
+                  bumpSession(session)
+                  void answer(offering.id, session.id, { questionId: m.activity.question.question_id, ...a })
+                }}
+                onContinue={() => m.activity && void continueLearning(offering.id, session.id, m.activity.activity_id)}
+              />
             ))}
           </div>
         )}
@@ -85,4 +101,20 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
       </div>
     </div>
   )
+}
+
+/**
+ * The activity waiting on the learner: the latest activity, if it's a question not yet
+ * answered or a teaching step not yet continued from. Earlier ones are read-only.
+ */
+function openActivityId(messages: ChatMessage[]): string | null {
+  const i = messages.findLastIndex((m) => m.activity)
+  if (i < 0) return null
+  const a = messages[i].activity!
+  const after = messages.slice(i + 1)
+  if (a.kind === 'question') {
+    return after.some((m) => m.answerFor === a.question.question_id) ? null : a.activity_id
+  }
+  if (a.kind === 'explanation') return a.activity_id
+  return null
 }

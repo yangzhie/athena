@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError
 from ..auth import StudentResolver, student_dependency
 from .models import LearningSessionOut, Message
 from .service import NotFound, SessionService
+from .tutor import TutorError
 
 Text = Annotated[str, StringConstraints(min_length=1, pattern=r"\S")]
 
@@ -27,6 +28,23 @@ class MessageBody(BaseModel):
     text: Annotated[str, StringConstraints(min_length=1, max_length=4000, pattern=r"\S")]
 
 
+class AnswerBody(BaseModel):
+    """Exactly one of choice_id (multiple choice) or text (open-ended)."""
+
+    model_config = ConfigDict(extra="forbid")
+    question_id: Text
+    choice_id: str | None = None
+    text: Annotated[str, StringConstraints(max_length=4000)] | None = None
+    #: How the answer appears in the chat, e.g. the chosen option's text.
+    shown: Annotated[str, StringConstraints(min_length=1, max_length=4000, pattern=r"\S")]
+    hint_used: bool = False
+
+
+class ContinueBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    activity_id: Text
+
+
 class SessionWithMessages(BaseModel):
     session: LearningSessionOut
     messages: list[Message]
@@ -44,13 +62,21 @@ def sessions_router(service: SessionService, resolve_student: StudentResolver) -
         except ValidationError:
             raise HTTPException(422, "invalid value") from None
 
+    async def arun(fn, *args, **kwargs):
+        try:
+            return await fn(*args, **kwargs)
+        except NotFound as e:
+            raise HTTPException(404, str(e)) from None
+        except TutorError as e:
+            raise HTTPException(e.status, str(e)) from None
+
     @router.get("", response_model=list[LearningSessionOut])
     def list_sessions(offering_id: str, sid: Student):
         return [LearningSessionOut.of(s) for s in service.list(sid, offering_id)]
 
     @router.post("", response_model=SessionWithMessages, status_code=201)
-    def create(offering_id: str, body: CreateBody, sid: Student):
-        session, messages = run(service.create, sid, offering_id, body.goal)
+    async def create(offering_id: str, body: CreateBody, sid: Student):
+        session, messages = await arun(service.create, sid, offering_id, body.goal)
         return SessionWithMessages(session=LearningSessionOut.of(session), messages=messages)
 
     @router.get("/{session_id}", response_model=SessionWithMessages)
@@ -68,7 +94,20 @@ def sessions_router(service: SessionService, resolve_student: StudentResolver) -
         return Response(status_code=204)
 
     @router.post("/{session_id}/messages", response_model=list[Message])
-    def send(offering_id: str, session_id: str, body: MessageBody, sid: Student):
-        return run(service.send, sid, offering_id, session_id, body.text)
+    async def send(offering_id: str, session_id: str, body: MessageBody, sid: Student):
+        return await arun(service.send, sid, offering_id, session_id, body.text)
+
+    @router.post("/{session_id}/answers", response_model=list[Message])
+    async def answer(offering_id: str, session_id: str, body: AnswerBody, sid: Student):
+        if (body.choice_id is None) == (body.text is None):
+            raise HTTPException(422, "give exactly one of choice_id or text")
+        return await arun(
+            service.answer, sid, offering_id, session_id, body.question_id,
+            choice_id=body.choice_id, text=body.text, shown=body.shown, hint_used=body.hint_used,
+        )
+
+    @router.post("/{session_id}/continue", response_model=list[Message])
+    async def continue_(offering_id: str, session_id: str, body: ContinueBody, sid: Student):
+        return await arun(service.continue_, sid, offering_id, session_id, body.activity_id)
 
     return router

@@ -1,4 +1,4 @@
-import type { ChatMessage, KnowledgeOrigin, LearningSession, SourceReference } from '../types'
+import type { AgentActivity, ChatMessage, KnowledgeOrigin, LearningSession, SourceReference } from '../types'
 import { call } from './client'
 
 /** Session as the API returns it (snake_case). */
@@ -18,6 +18,8 @@ interface MessageDto {
   content: string
   sources: Record<string, unknown>[]
   knowledge_origin: KnowledgeOrigin | null
+  activity: AgentActivity | null
+  answer_for: string | null
   created_at: string
 }
 
@@ -64,6 +66,8 @@ const toMessage = (m: MessageDto): ChatMessage => ({
   content: m.content,
   sources: m.sources.map(toSource).filter((s): s is SourceReference => s !== null),
   knowledgeOrigin: m.knowledge_origin ?? undefined,
+  activity: m.activity ?? undefined,
+  answerFor: m.answer_for ?? undefined,
   createdAt: m.created_at,
 })
 
@@ -104,6 +108,36 @@ export async function sendSessionMessage(offeringId: string, sessionId: string, 
   const r = await call<MessageDto[]>(`${base(offeringId)}/${encodeURIComponent(sessionId)}/messages`, {
     method: 'POST',
     body: JSON.stringify({ text }),
+    signal,
+  })
+  return r.map(toMessage)
+}
+
+export interface AnswerInput {
+  questionId: string
+  /** Multiple choice: the chosen option's id. */
+  choiceId?: string
+  /** Open-ended: the learner's answer. */
+  text?: string
+  /** How the answer appears in the chat (the option's text, or the typed answer). */
+  shown: string
+}
+
+/** Answers the tutor's question; returns [learner answer, tutor's next messages…]. */
+export async function answerQuestion(offeringId: string, sessionId: string, a: AnswerInput, signal?: AbortSignal) {
+  const r = await call<MessageDto[]>(`${base(offeringId)}/${encodeURIComponent(sessionId)}/answers`, {
+    method: 'POST',
+    body: JSON.stringify({ question_id: a.questionId, choice_id: a.choiceId ?? null, text: a.text ?? null, shown: a.shown }),
+    signal,
+  })
+  return r.map(toMessage)
+}
+
+/** Moves on after a teaching step; returns the tutor's next messages. */
+export async function continueSession(offeringId: string, sessionId: string, activityId: string, signal?: AbortSignal) {
+  const r = await call<MessageDto[]>(`${base(offeringId)}/${encodeURIComponent(sessionId)}/continue`, {
+    method: 'POST',
+    body: JSON.stringify({ activity_id: activityId }),
     signal,
   })
   return r.map(toMessage)
