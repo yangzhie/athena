@@ -82,6 +82,7 @@ A single page:
 - **Left sidebar:** the units the student is enrolled in (hardcoded in the proof of concept: CSE5DMI Data Mining and CSE5ALG Data Structures and Algorithms), a switch between the open unit's chat and its lecture clips, and a lecturer button to create a study space.
 - **Main area:** the open unit's tutor chat (replies above, prompt box at the bottom, sources under each reply), or its lecture clips grouped by week.
 - **Right side panel:** one item opened from the chat or clips: a lecture clip, a cited source passage, or an interactive sandbox.
+- **Playground view** (`units/:offeringId/playground`): a canvas the tutor sets up when trying something beats reading about it (e.g. a code graph, a lab bench), with the unit's chat thread beside it instead of the side panel. The tutor offers it from a chat reply.
 - **Lecturer view** (a demo "Viewing as" switch in the sidebar until SSO provides roles): create study spaces and review the clips lecture indexing proposes. Students only see clips a lecturer has approved.
 
 ## Repository
@@ -90,6 +91,8 @@ A single page:
   - Each feature lives in `src/features/<name>/` and registers itself in `src/app/features.ts`.
   - Pages only call `src/api/`, which returns mocks today. Swap those function bodies for real API calls and keep their signatures.
   - New side panel content is a new kind in `src/features/unit/panel/types.ts` plus a renderer in `renderers.ts`.
+- `packages/playground/`: the Playground Canvas (canvas, preset object types with their config schemas, scene validation, the component catalog for the model, and the tutor runner). Shipped as TypeScript source. See its README.
+- `apps/playground/`: standalone demo of the Playground with a mock tutor.
 - `agent/`: Python adaptive learning agent (FastAPI, Pydantic, uv, pytest). See `agent/README.md`.
 - `apps/api/`, `workers/`, `packages/shared/`, `infra/`, `docs/`: planned, placeholders only.
 

@@ -3,6 +3,7 @@ import ChatView from './ChatView'
 import { ClipsToggle } from './ClipsToggle'
 import ClipsView from './clips/ClipsView'
 import { UNIT_ROUTE_ID, clipsLoader, unitLoader } from './loader'
+import PlaygroundView from './playground/PlaygroundView'
 import ReviewView from './review/ReviewView'
 import UnitLayout from './UnitLayout'
 
@@ -18,6 +19,7 @@ export const unitFeature: Feature = {
         { index: true, element: <ChatView /> },
         { path: 'clips', element: <ClipsView />, loader: clipsLoader },
         { path: 'review', element: <ReviewView />, loader: clipsLoader },
+        { path: 'playground', element: <PlaygroundView /> },
       ],
     },
   ],

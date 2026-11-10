@@ -51,9 +51,9 @@ export async function sendMessage(offering: Offering, text: string) {
         ...t,
         messages: t.messages.map((m) => {
           if (m.id !== tutor.id) return m
-          return event.type === 'text'
-            ? { ...m, content: m.content + event.text }
-            : { ...m, sources: event.sources, knowledgeOrigin: event.knowledgeOrigin }
+          if (event.type === 'text') return { ...m, content: m.content + event.text }
+          if (event.type === 'playground') return { ...m, playground: event.offer }
+          return { ...m, sources: event.sources, knowledgeOrigin: event.knowledgeOrigin }
         }),
       }))
     }
@@ -68,6 +68,11 @@ export async function sendMessage(offering: Offering, text: string) {
     controllers.delete(id)
     set(id, (t) => ({ ...t, streaming: false }))
   }
+}
+
+/** Add a message written outside the chat box, e.g. by the tutor reacting to the Playground. */
+export function postToThread(offeringId: string, message: Omit<ChatMessage, 'id' | 'createdAt'>) {
+  set(offeringId, (t) => ({ ...t, messages: [...t.messages, { ...message, id: newId(), createdAt: new Date().toISOString() }] }))
 }
 
 export function stopStreaming(offeringId: string) {

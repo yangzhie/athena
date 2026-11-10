@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@athena/playground/styles.css";
 
 /*
  * Design tokens. Tailwind v4 turns each --color-* into utilities
