@@ -3,7 +3,15 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from athena_api.srs.models import Bank, CardState, Item, McqVariant, NumericVariant, ReviewLogEntry, Variant
+from athena_api.srs.models import (
+    Bank,
+    CardState,
+    Item,
+    McqVariant,
+    NumericVariant,
+    ReviewLogEntry,
+    Variant,
+)
 
 
 def mcq(id="v1", **kw):

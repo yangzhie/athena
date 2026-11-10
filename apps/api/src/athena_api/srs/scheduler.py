@@ -12,7 +12,16 @@ from datetime import UTC, datetime
 
 import fsrs
 
-from .models import CardState, Item, McqVariant, NumericVariant, Rating, ReviewLogEntry, ShortVariant, Variant
+from .models import (
+    CardState,
+    Item,
+    McqVariant,
+    NumericVariant,
+    Rating,
+    ReviewLogEntry,
+    ShortVariant,
+    Variant,
+)
 
 #: How many recently shown wordings to avoid when there's a choice.
 RECENT = 3
