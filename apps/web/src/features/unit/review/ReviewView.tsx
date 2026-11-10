@@ -1,22 +1,51 @@
-import { Link, useLoaderData } from 'react-router'
+import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { asApiError, type ApiError } from '../../../api/client'
+import {
+  approvePendingClips,
+  editClip,
+  getLecturesForReview,
+  resetClip,
+  setClipStatus,
+} from '../../../api/lectureReview'
 import { useRole } from '../../../app/role'
-import { Badge, Button } from '../../../components/ui'
+import { ApiUnavailable } from '../../../components/ApiUnavailable'
+import { Badge, Button, Card } from '../../../components/ui'
 import { formatTimestamp } from '../../../lib/format'
-import type { clipsLoader } from '../loader'
 import { openInPanel } from '../panel/panelStore'
 import { UnitHeader } from '../UnitHeader'
 import { useOffering } from '../useOffering'
-import { reviewClip } from './applyReview'
 import { ReviewClipRow } from './ReviewClipRow'
 import { ReviewTimeline } from './ReviewTimeline'
-import { approveAll, useDecisions } from './reviewStore'
+import type { ReviewedLecture } from './types'
 
-/** Lecturer screen: check the clips lecture indexing proposed before students see them. */
+/** Lecturer screen: check the clips lecture indexing proposed before students (and the tutor) use them. */
 export default function ReviewView() {
   const offering = useOffering()
   const role = useRole()
-  const { lectures } = useLoaderData<typeof clipsLoader>()
-  const decisions = useDecisions()
+  const [lectures, setLectures] = useState<ReviewedLecture[] | null>(null)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      setLectures(await getLecturesForReview(offering.id))
+      setError(null)
+    } catch (e) {
+      setError(asApiError(e))
+    }
+  }, [offering.id])
+
+  useEffect(() => {
+    if (role !== 'lecturer') return
+    let cancelled = false
+    getLecturesForReview(offering.id)
+      .then((l) => !cancelled && setLectures(l))
+      .catch((e) => !cancelled && setError(asApiError(e)))
+    return () => {
+      cancelled = true
+    }
+  }, [offering.id, role])
 
   if (role !== 'lecturer') {
     return (
@@ -30,24 +59,50 @@ export default function ReviewView() {
     )
   }
 
+  async function act(fn: () => Promise<unknown>) {
+    setBusy(true)
+    try {
+      await fn()
+      await load()
+    } catch (e) {
+      setError(asApiError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6 pb-10">
       <div>
         <UnitHeader offering={offering} title="Review clips" />
         <p className="mt-1 text-sm text-muted">
-          Lecture indexing proposes clips. Students only see the ones you approve. Your decisions are saved in this
-          browser for now.
+          Lecture indexing proposes clips. Students, and the tutor in their sessions, only use the ones you approve.
         </p>
       </div>
 
-      {lectures.length === 0 && (
-        <p className="rounded-xl border-2 border-dashed border-line p-10 text-center text-muted">No lectures yet.</p>
+      {error && error.status !== 403 && <ApiUnavailable error={error} what="Clip review" onRetry={() => void load()} />}
+      {error?.status === 403 && (
+        <Card title="The API doesn’t recognise you as a lecturer">
+          <p className="text-sm text-muted">
+            Start the API with <code>ATHENA_DEV_LECTURER_ID=dev-lecturer</code> to act as a lecturer in development.
+          </p>
+        </Card>
       )}
 
-      {lectures.map((lecture) => {
-        const clips = lecture.clips.map((c) => reviewClip(c, decisions[c.id])).sort((a, b) => a.startS - b.startS)
-        const pending = clips.filter((c) => c.status === 'pending')
+      {lectures?.length === 0 && (
+        <Card>
+          <p className="text-sm text-muted">
+            No indexed lectures for this unit yet. Index a recording with <code>workers/indexer</code>, then import it
+            with <code>uv run athena-lectures import &lt;clips.json&gt;</code> in <code>apps/api</code>.
+          </p>
+        </Card>
+      )}
+
+      {lectures?.map((lecture) => {
+        const clips = [...lecture.clips].sort((a, b) => a.startS - b.startS)
+        const pending = clips.filter((c) => c.status === 'pending').length
         const approved = clips.filter((c) => c.status === 'approved').length
+        const active = clips.filter((c) => c.status !== 'rejected')
 
         return (
           <section key={lecture.id} className="overflow-hidden rounded-xl border border-line bg-surface">
@@ -61,9 +116,9 @@ export default function ReviewView() {
                   <span className="text-xs text-muted">
                     {approved}/{clips.length} approved · {formatTimestamp(lecture.durationS)}
                   </span>
-                  {pending.length > 0 ? (
-                    <Button size="sm" onClick={() => approveAll(pending.map((c) => c.id))}>
-                      Approve {pending.length} pending
+                  {pending > 0 ? (
+                    <Button size="sm" disabled={busy} onClick={() => void act(() => approvePendingClips(offering.id, lecture.id))}>
+                      Approve {pending} pending
                     </Button>
                   ) : (
                     clips.length > 0 && <Badge tone="good">✓ Reviewed</Badge>
@@ -79,16 +134,31 @@ export default function ReviewView() {
               </p>
             ) : (
               <ol className="divide-y divide-line">
-                {clips.map((c, i) => (
-                  <ReviewClipRow
-                    key={c.id}
-                    clip={c}
-                    durationS={lecture.durationS}
-                    prevEndS={i > 0 ? clips[i - 1].endS : 0}
-                    nextStartS={i < clips.length - 1 ? clips[i + 1].startS : lecture.durationS}
-                    onPreview={() => openInPanel(offering.id, { kind: 'clip', clip: c, lecture })}
-                  />
-                ))}
+                {clips.map((c) => {
+                  const i = active.findIndex((a) => a.id === c.id)
+                  return (
+                    <ReviewClipRow
+                      key={c.id}
+                      clip={c}
+                      durationS={lecture.durationS}
+                      prevEndS={i > 0 ? active[i - 1].endS : 0}
+                      nextStartS={i >= 0 && i < active.length - 1 ? active[i + 1].startS : lecture.durationS}
+                      busy={busy}
+                      onPreview={() => openInPanel(offering.id, { kind: 'clip', clip: c, lecture })}
+                      onStatus={(status) => void act(() => setClipStatus(offering.id, lecture.id, c.id, status))}
+                      onReset={() => void act(() => resetClip(offering.id, lecture.id, c.id))}
+                      onEdit={async (edit) => {
+                        try {
+                          await editClip(offering.id, lecture.id, c.id, edit)
+                          await load()
+                          return null
+                        } catch (e) {
+                          return asApiError(e).message
+                        }
+                      }}
+                    />
+                  )
+                })}
               </ol>
             )}
           </section>

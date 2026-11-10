@@ -96,6 +96,7 @@ def build_clips(
     duration_s: float,
     offering_id: str | None = None,
     week: int | None = None,
+    media: str | None = None,
     min_clip_s: float = MIN_CLIP_S,
     bridge_noise_s: float = BRIDGE_NOISE_S,
 ) -> IndexResult:
@@ -117,5 +118,5 @@ def build_clips(
     ]
     return IndexResult(
         recording_id=recording_id, title=title, duration_s=duration_s, status="ready",
-        offering_id=offering_id, week=week, clips=clips,
+        offering_id=offering_id, week=week, media=media, clips=clips,
     )

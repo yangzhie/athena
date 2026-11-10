@@ -6,7 +6,7 @@ import type { DocumentReference, LectureClip, LectureRecording, SandboxSession }
  */
 export type PanelContent =
   | { kind: 'sandbox'; session: SandboxSession }
-  | { kind: 'clip'; clip: LectureClip; lecture: Pick<LectureRecording, 'id' | 'title' | 'week' | 'durationS'> }
+  | { kind: 'clip'; clip: LectureClip; lecture: Pick<LectureRecording, 'id' | 'title' | 'week' | 'durationS' | 'mediaUrl'> }
   | { kind: 'source'; source: DocumentReference }
 
 export type PanelKind = PanelContent['kind']

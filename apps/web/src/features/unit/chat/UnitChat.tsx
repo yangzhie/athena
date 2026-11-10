@@ -1,16 +1,18 @@
 import { useEffect, useRef } from 'react'
-import type { Offering } from '../../../types'
+import type { LearningSession, Offering } from '../../../types'
+import { bumpSession } from '../sessions/sessionStore'
 import { Composer } from './Composer'
 import { MessageBubble } from './MessageBubble'
-import { sendMessage, stopStreaming, useThread } from './chatStore'
+import { answer, continueLearning, sendMessage, stopWaiting, suggestPlayground, useThread } from './chatStore'
+import { openActivityId } from './activity'
 
 function nearBottom() {
   return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160
 }
 
-/** Chat with the unit's tutor: messages above, prompt box pinned to the bottom. */
-export function UnitChat({ offering }: { offering: Offering }) {
-  const { messages, streaming } = useThread(offering.id)
+/** One learning session's chat: messages above, prompt box pinned to the bottom. */
+export function UnitChat({ offering, session }: { offering: Offering; session: LearningSession }) {
+  const { messages, sending: streaming, error } = useThread(session.id)
   const end = useRef<HTMLDivElement>(null)
   const lastCount = useRef(messages.length)
   const last = messages.at(-1)
@@ -23,7 +25,14 @@ export function UnitChat({ offering }: { offering: Offering }) {
     if (added || nearBottom()) end.current?.scrollIntoView({ block: 'end' })
   }, [messages.length, last?.content])
 
-  const send = (text: string) => void sendMessage(offering, text)
+  const openId = openActivityId(messages)
+
+  const send = (text: string) => {
+    bumpSession(session)
+    void sendMessage(offering.id, session.id, text).then((saved) => {
+      if (saved) return suggestPlayground(offering, session.id, text)
+    })
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col">
@@ -35,9 +44,9 @@ export function UnitChat({ offering }: { offering: Offering }) {
       <div className="flex flex-1 flex-col py-6">
         {messages.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
-            <h2 className="text-2xl font-semibold tracking-tight">What do you want to work on?</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">{session.title}</h2>
             <p className="mt-2 max-w-md text-muted">
-              Ask anything about {offering.unit.title}. Answers will be based on your unit's material.
+              Ask anything about it. Answers will be based on {offering.unit.code}'s material.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               {offering.suggestions.map((s) => (
@@ -55,9 +64,28 @@ export function UnitChat({ offering }: { offering: Offering }) {
         ) : (
           <div className="space-y-6">
             {messages.map((m) => (
-              <MessageBubble key={m.id} message={m} pending={streaming && m === last} offeringId={offering.id} />
+              <MessageBubble
+                key={m.id}
+                message={m}
+                pending={streaming && m.id.startsWith('pending-') && m.role === 'tutor'}
+                offeringId={offering.id}
+                sessionId={session.id}
+                open={!!m.activity && m.activity.activity_id === openId}
+                busy={streaming}
+                onAnswer={(a) => {
+                  if (m.activity?.kind !== 'question') return
+                  bumpSession(session)
+                  void answer(offering.id, session.id, { questionId: m.activity.question.question_id, ...a })
+                }}
+                onContinue={() => m.activity && void continueLearning(offering.id, session.id, m.activity.activity_id)}
+              />
             ))}
           </div>
+        )}
+        {error && (
+          <p className="mt-4 text-sm text-bad" role="alert">
+            Your message couldn’t be sent: {error.message}
+          </p>
         )}
         <div ref={end} />
       </div>
@@ -68,7 +96,7 @@ export function UnitChat({ offering }: { offering: Offering }) {
           placeholder={`Message ${offering.unit.code} tutor`}
           streaming={streaming}
           onSend={send}
-          onStop={() => stopStreaming(offering.id)}
+          onStop={() => stopWaiting(session.id)}
         />
         <p className="mt-2 text-center text-xs text-muted">
           Athena can make mistakes. Check important answers against your unit's material.

@@ -1,6 +1,6 @@
 import { cn } from '../../../lib/cn'
 import { formatTimestamp } from '../../../lib/format'
-import type { ReviewedClip } from './applyReview'
+import type { ReviewedClip } from './types'
 
 const fill = { approved: 'bg-good', rejected: 'bg-line', pending: 'bg-warn' } as const
 
