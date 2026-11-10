@@ -95,6 +95,9 @@ export default function NewSessionView() {
             {starting ? 'Starting…' : 'Start session'}
           </Button>
         </form>
+        {starting && <p className="mt-2 text-sm text-muted" role="status">
+          Preparing a focused plan and first question. Checking course sources can take a little longer.
+        </p>}
         {pending && !starting && (
           <div className="mt-3 space-y-2" role="status">
             <p className="text-sm text-muted">

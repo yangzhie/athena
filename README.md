@@ -63,5 +63,7 @@ Lecturer metrics require five contributing Environments and never include raw
 answers or chat. Explicit sharing includes the whole saved discussion, including
 Playground discussion, and is anonymous and revocable. Historical aggregate
 rollups are not retained after deletion. OCR is reported unavailable for scanned
-PDFs. Voice, multi-host scaling, identity recovery and hardened public deployment
-remain production work; see [operations](docs/operations.md).
+PDFs. Open-ended answers support microphone dictation with transcript review before
+submission; recordings are not saved by Athena. Multi-host scaling, identity recovery
+and hardened public deployment remain production work; see [operations](docs/operations.md).
+For the checked demonstration flow and known limits, see [demo readiness](docs/demo-readiness.md).

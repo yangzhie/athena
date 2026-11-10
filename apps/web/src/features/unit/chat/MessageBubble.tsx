@@ -4,6 +4,7 @@ import type { ChatMessage, PlaygroundOffer } from '../../../types'
 import { playgroundPath } from '../sessions/paths'
 import { ActivityCard } from './ActivityCard'
 import { SourceList } from './SourceList'
+import { transcribeAnswer } from '../../../api/sessions'
 
 export function MessageBubble({
   message,
@@ -71,11 +72,14 @@ export function MessageBubble({
       {localLabel}
       {message.activity ? (
         <ActivityCard
+          key={message.activity.activity_id}
           activity={message.activity}
           open={open && viewer === 'student'}
           busy={busy}
           onAnswer={(a) => onAnswer?.(a)}
           onContinue={() => onContinue?.()}
+          transcribe={sessionId && viewer === 'student'
+            ? (audio, signal) => transcribeAnswer(offeringId, sessionId, audio, signal) : undefined}
         />
       ) : message.content ? (
         <p className={cn('whitespace-pre-wrap', pending && 'after:ml-0.5 after:animate-pulse after:content-["▍"]')}>

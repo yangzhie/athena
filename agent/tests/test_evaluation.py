@@ -109,6 +109,35 @@ def test_failed_evaluation_records_nothing(assessed_topic, result):
     assert store.read(context) == before
 
 
+def test_paraphrased_grade_evidence_is_repaired_using_original_answer(assessed_topic):
+    context, store = assessed_topic
+    question = make_question(context, store)
+    assessor, mock = service(store, [
+        {**GRADE, 'evidence_quotes': ['a paraphrase not written by the learner']},
+        {'outcome': 'correct', 'feedback': 'Your reasoning explains the movement.', 'confidence': 0.9, 'evidence_indices': [0]},
+    ])
+    result = asyncio.run(assessor.evaluate(context, TextAnswer(question_id=question.question_id, text=TEXT)))
+    assert result.outcome == 'correct' and len(mock.calls) == 2
+    assert store.read(context).active_topic.assessment_records[-1].evidence_quotes == [TEXT]
+    before = len(mock.calls)
+    assert asyncio.run(assessor.evaluate(context, TextAnswer(question_id=question.question_id, text=TEXT))) == result
+    assert len(mock.calls) == before
+
+
+@pytest.mark.parametrize('indices', [[999], []])
+def test_invalid_grade_repair_is_not_evidence(assessed_topic, indices):
+    context, store = assessed_topic
+    question = make_question(context, store)
+    assessor, mock = service(store, [
+        {**GRADE, 'evidence_quotes': ['fabricated']},
+        {'outcome': 'correct', 'feedback': 'Good.', 'confidence': 0.9, 'evidence_indices': indices},
+    ])
+    before = store.read(context)
+    with pytest.raises(LLMError):
+        asyncio.run(assessor.evaluate(context, TextAnswer(question_id=question.question_id, text=TEXT)))
+    assert store.read(context) == before and len(mock.calls) == 2
+
+
 def test_cancelled_evaluation_records_nothing(assessed_topic):
     context, store = assessed_topic
     question = make_question(context, store)

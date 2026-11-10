@@ -22,7 +22,9 @@ ABOUT_WEIGHT = 3.0
 _STOP = set(
     "a an and are as at be but by do does for from how i in is it its me of on or so that the this to was what when "
     "which why will with you your about learn understand explain help want know "
-    "between difference differ versus vs compare tell give".split()
+    "between difference differ versus vs compare tell give "
+    "lecture lectures material materials note notes slide slides course uploaded covered cover covers related example examples briefly "
+    "not if even only also still can could would should these those they them such any some other both than then into use using".split()
 )
 
 
@@ -38,9 +40,19 @@ def _stem(w: str) -> str:
     return w
 
 
+_STOP_STEMS = {_stem(word) for word in _STOP}
+
+
 def _terms(text: str) -> list[str]:
     words = re.findall(r"[a-z0-9²]+", text.lower())
-    return [_stem(w) for w in words if len(w) > 1 and w not in _STOP]
+    stems = (_stem(w) for w in words if len(w) > 1 and w not in _STOP)
+    return [stem for stem in stems if stem not in _STOP_STEMS]
+
+
+def needs_goal_context(question: str) -> bool:
+    """Use the goal for underspecified follow-ups, not unrelated explicit questions."""
+    generic = set(_terms('another more again detail reason meaning happen case word please simple simply show work can concrete'))
+    return not (set(_terms(question)) - generic)
 
 
 def rank(goal: str, docs: list[str], *, k1: float = 1.2, b: float = 0.75) -> list[float]:

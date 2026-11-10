@@ -584,6 +584,16 @@ they do not require an applied example to appear in course slides, do not replac
 the stored criteria, and preserve the question's original source references.
 Assessment evaluation never uses a general-knowledge fallback. Semantic support still depends on model judgement,
 while quote/reference integrity is deterministic.
+
+Question generation shares the reasoning-focused policy in `pedagogy.py`: avoid
+copying a target noun out of a scenario, use plausible misconception distractors,
+and require explanation or transfer after a correct choice. Recent prompts and
+the learning goal accompany each new question. A narrow comparison uses one
+integrated Concept rather than repeated definition/encoding lessons. Explicitly
+related asides stay in the discussion without silently starting another roadmap.
+When a grader paraphrases required evidence, one bounded repair selects numbered
+excerpts of the original answer. Invalid indices and unsupported decisive grades
+still fail without recording evidence or mastery.
 `orchestrator.start(..., materials=retrieval_result)` can select materials before
 planning a new session. Selection and private criteria remain backend data.
 

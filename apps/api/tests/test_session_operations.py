@@ -211,7 +211,7 @@ def test_independent_adapters_publish_one_transition_and_exchange(tmp_path, kind
         assert len(first.list('alice', OFFERING)) == 1
         context = RequestContext(request_id='inspect', learner_id='alice', session_id=sid)
         snapshot = agent1.read(context)
-        assert len(first.messages('alice', sid)) == {'start': 1, 'message': 3, 'answer': 3, 'continue': 4}[kind]
+        assert len(first.messages('alice', sid)) == {'start': 1, 'message': 3, 'answer': 4, 'continue': 5}[kind]
         if kind in {'answer', 'continue'}:
             assert len(snapshot.active_topic.assessment_records) == 1
         assert len(snapshot.history) == (1 if kind in {'answer', 'message', 'continue'} else 0)

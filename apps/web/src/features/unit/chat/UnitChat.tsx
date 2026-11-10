@@ -82,10 +82,10 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
         )}
         {error && (
           <p className="mt-4 text-sm text-bad" role="alert">
-            Your message couldn’t be sent: {error.message}
+            This step couldn’t finish: {error.message}
           </p>
         )}
-        <div ref={end} />
+        <div ref={end} className="scroll-mb-40" />
       </div>
 
       {/* Pinned to the bottom of the viewport; the gradient fades messages scrolling under it. */}

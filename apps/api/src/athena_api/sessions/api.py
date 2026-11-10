@@ -3,7 +3,7 @@
 import sqlite3
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, Request
 from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError
 
 from ..auth import LecturerResolver, StudentResolver, lecturer_dependency, student_dependency
@@ -54,6 +54,10 @@ class SessionWithMessages(BaseModel):
     messages: list[Message]
 
 
+class TranscriptionOut(BaseModel):
+    text: str
+
+
 def sessions_router(service: SessionService, resolve_student: StudentResolver) -> APIRouter:
     router = APIRouter(prefix="/units/{offering_id}/sessions", tags=["sessions"])
     Student = student_dependency(resolve_student)
@@ -96,6 +100,25 @@ def sessions_router(service: SessionService, resolve_student: StudentResolver) -
     def get(offering_id: str, session_id: str, sid: Student):
         session, messages = run(service.get, sid, offering_id, session_id)
         return SessionWithMessages(session=LearningSessionOut.of(session), messages=messages)
+
+    @router.post('/{session_id}/transcriptions', response_model=TranscriptionOut, openapi_extra={
+        'requestBody': {'required': True, 'content': {
+            mime: {'schema': {'type': 'string', 'format': 'binary'}}
+            for mime in ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav']
+        }},
+    })
+    async def transcribe(offering_id: str, session_id: str, request: Request, response: Response, sid: Student):
+        from .transcription import transcribe_answer, MAX_AUDIO_BYTES
+        run(service._get, sid, session_id, offering_id)
+        audio = bytearray()
+        async for chunk in request.stream():
+            if len(audio) + len(chunk) > MAX_AUDIO_BYTES:
+                raise HTTPException(413, 'This recording is too large. Record a shorter answer.')
+            audio.extend(chunk)
+        text = await transcribe_answer(bytes(audio), request.headers.get('content-type', ''))
+        run(service._get, sid, session_id, offering_id)
+        response.headers['Cache-Control'] = 'no-store'
+        return TranscriptionOut(text=text)
 
     @router.patch("/{session_id}", response_model=LearningSessionOut)
     def rename(offering_id: str, session_id: str, body: RenameBody, sid: Student):

@@ -35,6 +35,10 @@ export function SourceList({
 }) {
   const [error, setError] = useState<string | null>(null)
   const note = origin ? originNote[origin] : null
+  // Several verified quotations can resolve to the same passage or clip. Keep
+  // all evidence in storage, but open its full source through one stable chip.
+  const keyFor = (s: SourceReference) => `${s.kind}:${s.sourceId}:${s.kind === 'video' ? s.segmentId : s.passageId}`
+  const unique = sources.filter((s, index) => sources.findIndex(other => keyFor(other) === keyFor(s)) === index)
   if (sources.length === 0 && !note) return null
 
   return (
@@ -43,8 +47,8 @@ export function SourceList({
       {note && <p className="text-xs text-muted">ⓘ {note}</p>}
       {sources.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label="Sources">
-          {sources.map((s) => (
-            <li key={s.kind === 'video' ? s.segmentId : s.passageId}>
+          {unique.map((s) => (
+            <li key={keyFor(s)}>
               <button
                 type="button"
                 onClick={() => { setError(null); void open(offeringId, s).catch(e => setError(e instanceof Error ? e.message : 'Source unavailable.')) }}

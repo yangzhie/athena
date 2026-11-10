@@ -71,6 +71,14 @@ def test_max_clips():
     assert len(LectureMaterial(lectures(), max_clips=1).for_goal(OFF, "insertion sort shell sort cards")) == 1
 
 
+def test_goal_context_is_only_needed_for_underspecified_followups():
+    from athena_api.sessions.material import needs_goal_context
+    for question in ['Why?', 'Can you give another example?', 'How do these differ?', 'More detail please']:
+        assert needs_goal_context(question), question
+    for question in ['Explain pruning', 'How does pruning reduce overfitting?', 'What is regression versus classification?']:
+        assert not needs_goal_context(question), question
+
+
 def test_agent_tutor_starts_the_agent_with_the_materials():
     seen = {}
 

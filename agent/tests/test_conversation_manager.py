@@ -47,6 +47,17 @@ def test_request_for_explanation_keeps_goal():
     assert store.read(context).active_topic.learning_state.goal == 'Bubble Sort'
 
 
+def test_related_aside_cannot_silently_switch_the_learning_goal():
+    context, store, mock, manager = setup([
+        {'intent': 'topic_change', 'new_goal': 'Decision trees'},
+        {'text': 'Pruning removes branches that do not improve generalisation.'},
+    ])
+    reply = asyncio.run(manager.send(context, 'As a related example, how does pruning reduce overfitting?'))
+    assert reply.knowledge_origin == 'general'
+    assert store.read(context).active_topic.learning_state.goal == 'Bubble Sort'
+    assert store.read(context).archived_topics == [] and len(mock.calls) == 2
+
+
 def test_ambiguous_intent_asks_without_changing_focus():
     context, store, mock, manager = setup([
         {'intent': 'ambiguous', 'clarification_question': 'Do you mean graphs or sorting?'},

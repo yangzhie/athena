@@ -9,6 +9,7 @@ import NotFound from '../pages/NotFound'
 export const router = createBrowserRouter([
   {
     element: <AppLayout />,
+    hydrateFallbackElement: <p role="status" className="p-8 text-sm text-muted">Loading Athena…</p>,
     errorElement: <RouteError />,
     loader: layoutLoader,
     children: [

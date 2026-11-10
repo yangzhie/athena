@@ -1,6 +1,7 @@
 """Transactional multi-turn conversation handling over an injected LLM."""
 
 from typing import Literal, Self
+import re
 
 from pydantic import Field, model_validator
 
@@ -86,6 +87,13 @@ class ConversationManager:
             decision = await self._llm.generate(
                 self._messages(topic.model_copy(update={'knowledge': None, 'current_activity': None}), incoming.content, _ROUTE, IntentDecision), IntentDecision,
             )
+            if decision.intent == 'topic_change' and re.search(
+                r'\b(as (?:a|an) (?:related )?example|as (?:a|an) aside|related question|by the way|for comparison)\b',
+                incoming.content, re.I,
+            ):
+                # A related aside should get an answer, not silently replace the
+                # student's goal and launch another multi-call diagnostic plan.
+                decision = IntentDecision(intent='clarification')
             if decision.intent == 'ambiguous':
                 reply = ConversationReply(
                     text=decision.clarification_question,

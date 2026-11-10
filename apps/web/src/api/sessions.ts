@@ -62,6 +62,13 @@ const toMessage = (m: MessageDto): ChatMessage => ({
 
 const base = (offeringId: string) => `/units/${encodeURIComponent(offeringId)}/sessions`
 
+export async function transcribeAnswer(offeringId: string, sessionId: string, audio: Blob, signal?: AbortSignal): Promise<string> {
+  const result = await call<components['schemas']['TranscriptionOut']>(`${base(offeringId)}/${encodeURIComponent(sessionId)}/transcriptions`, {
+    method: 'POST', body: audio, signal, headers: { 'Content-Type': audio.type || 'audio/webm' },
+  })
+  return result.text
+}
+
 export const hasPendingSession = (offeringId: string) => hasPendingOperation(base(offeringId))
 
 export async function recoverSession(offeringId: string) {

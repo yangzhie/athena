@@ -120,6 +120,7 @@ def test_rent_answer_progresses_when_retrieved_material_cannot_support_next_step
             'shown': 'A numerical rent amount' if correct else 'A class label'}
     response = client.post(f'{BASE}/{sid}/answers', json=body)
     assert response.status_code == 200, response.json()
+    assert response.json()[1]['content'].startswith('That choice is correct.' if correct else 'That choice is incorrect.')
     next_activity = response.json()[-1]['activity']
     assert next_activity['kind'] == ('question' if correct else 'explanation')
     assert next_activity['knowledge_origin'] == 'general' and next_activity['sources'] == []

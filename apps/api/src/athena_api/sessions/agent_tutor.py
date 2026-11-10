@@ -20,7 +20,7 @@ from athena_agent.memory import LearnerScopedMemory, LearningMemoryStore
 from athena_agent.orchestrator import LearningOrchestrator
 from athena_agent.retrieval import RetrievalResult
 
-from .material import MaterialProvider
+from .material import MaterialProvider, needs_goal_context
 from .models import LearningSession
 from .operations import Operation
 from .tutor import TutorError, TutorReply
@@ -167,7 +167,7 @@ class AgentTutor:
                 # goal must not crowd its passages out of the five-item context.
                 question = operation.payload['text']
                 items = self.material.for_goal(session.offering_id, question)
-                if not items:
+                if not items and needs_goal_context(question):
                     items = self.material.for_goal(session.offering_id, query)
             else:
                 items = self.material.for_goal(session.offering_id, query)
@@ -249,7 +249,16 @@ class AgentTutor:
         activity = await self._run(
             self._orchestrator(session).answer(self._context(session), answer, hint_used=hint_used)
         )
-        return [activity_reply(activity)]
+        topic = self.store.read(self._context(session)).active_topic
+        record = next((r for r in topic.assessment_records if r.answer.question_id == question_id), None) if topic else None
+        replies = []
+        if record is not None:
+            # Assessment feedback is learner evidence, not an unsupported course
+            # claim. Show it before the next task without an extra model call.
+            replies.append(TutorReply(record.assessment.feedback,
+                                      sources=[r.model_dump(mode='json') for r in record.assessment.sources]))
+        replies.append(activity_reply(activity))
+        return replies
 
     async def continue_(self, session: LearningSession, activity_id: str) -> list[TutorReply]:
         activity = await self._run(self._orchestrator(session).continue_learning(self._context(session), activity_id))

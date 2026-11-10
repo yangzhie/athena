@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Badge, Button, type Tone } from '../../../components/ui'
 import { cn } from '../../../lib/cn'
 import type { AgentActivity } from '../../../types'
+import { VoiceAnswerInput } from '../../../components/quiz/VoiceAnswerInput'
 
 interface Props {
   activity: AgentActivity
@@ -10,6 +11,7 @@ interface Props {
   busy: boolean
   onAnswer: (input: { choiceId?: string; text?: string; shown: string }) => void
   onContinue: () => void
+  transcribe?: (audio: Blob, signal: AbortSignal) => Promise<string>
 }
 
 const outcome: Record<string, { label: string; icon: string; tone: Tone }> = {
@@ -20,14 +22,15 @@ const outcome: Record<string, { label: string; icon: string; tone: Tone }> = {
 }
 
 /** Renders one agent activity inside the chat, with answer or continue controls when it's open. */
-export function ActivityCard({ activity, open, busy, onAnswer, onContinue }: Props) {
+export function ActivityCard({ activity, open, busy, onAnswer, onContinue, transcribe }: Props) {
   const [text, setText] = useState('')
+  const [voiceBusy, setVoiceBusy] = useState(false)
 
   if (activity.kind === 'question') {
     const q = activity.question
     const submitText = (e: FormEvent) => {
       e.preventDefault()
-      if (text.trim()) onAnswer({ text: text.trim(), shown: text.trim() })
+      if (text.trim() && !busy && !voiceBusy) onAnswer({ text: text.trim(), shown: text.trim() })
     }
     return (
       <div className="rounded-xl border border-line bg-surface p-4">
@@ -53,16 +56,14 @@ export function ActivityCard({ activity, open, busy, onAnswer, onContinue }: Pro
         )}
         {q.kind === 'open_ended' && open && (
           <form onSubmit={submitText} className="mt-3 space-y-2">
-            <textarea
+            <VoiceAnswerInput key={activity.activity_id}
               value={text}
-              onChange={(e) => setText(e.target.value)}
-              rows={3}
-              placeholder="Your answer"
-              aria-label="Your answer"
+              onChange={setText}
+              transcribe={transcribe}
+              onBusyChange={setVoiceBusy}
               disabled={busy}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
             />
-            <Button type="submit" size="sm" disabled={!text.trim() || busy}>
+            <Button type="submit" size="sm" disabled={!text.trim() || busy || voiceBusy}>
               Answer
             </Button>
           </form>

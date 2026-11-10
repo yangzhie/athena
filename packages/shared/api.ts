@@ -735,6 +735,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/units/{offering_id}/sessions/{session_id}/transcriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transcribe */
+        post: operations["transcribe_units__offering_id__sessions__session_id__transcriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/units/{offering_id}/shared-sessions": {
         parameters: {
             query?: never;
@@ -1446,6 +1463,11 @@ export interface components {
             concept_id?: string | null;
             /** Title */
             title: string;
+        };
+        /** TranscriptionOut */
+        TranscriptionOut: {
+            /** Text */
+            text: string;
         };
         /** TurnBody */
         TurnBody: {
@@ -3038,6 +3060,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LearningSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transcribe_units__offering_id__sessions__session_id__transcriptions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                offering_id: string;
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "audio/mp4": string;
+                "audio/ogg": string;
+                "audio/wav": string;
+                "audio/webm": string;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscriptionOut"];
                 };
             };
             /** @description Validation Error */

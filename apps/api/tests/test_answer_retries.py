@@ -134,9 +134,9 @@ def test_host_storage_failure_rolls_back_exchange_and_retry_reconciles_agent(tmp
         client, mock, _ = client_for(reopened, agent, [])
         response = client.post(f"{BASE}/{sid}/answers", json=body)
         assert response.status_code == 200, response.text
-        assert len(response.json()) == 2 and mock.calls == []
+        assert len(response.json()) == 3 and mock.calls == []
         assert client.post(f"{BASE}/{sid}/answers", json=body).json() == response.json()
-        assert len(client.get(f"{BASE}/{sid}").json()["messages"]) == 3
+        assert len(client.get(f"{BASE}/{sid}").json()["messages"]) == 4
     reopened.close()
 
 

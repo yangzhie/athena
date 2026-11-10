@@ -124,6 +124,13 @@ All routes are scoped to the signed-in student; another student's session id giv
 
 | `POST /units/{offering}/sessions/{id}/answers` | `{question_id, choice_id \| text, shown}` → the learner's answer and the tutor's next messages |
 | `POST /units/{offering}/sessions/{id}/continue` | `{activity_id}` → move on after a teaching step |
+| `POST /units/{offering}/sessions/{id}/transcriptions` | raw WebM/MP4/Ogg/WAV audio (2 MiB maximum) → `{text}` for student review |
+
+Dictation requires ownership of the session and uses `ATHENA_TRANSCRIPTION_MODEL`
+(default `gpt-transcribe`) with the server's key. Audio is not stored, logged or
+added to conversation history. The transcript is a draft until the student submits
+it as an ordinary answer. Recording in the browser stops after 60 seconds.
+Provider failures preserve typed input and do not retry paid transcription calls.
 
 The tutor is the adaptive learning agent in `agent/`, used in-process
 (`sessions/agent_tutor.py`). One session here is one agent session with the

@@ -54,6 +54,13 @@ class EvaluationDraft(Contract):
     evidence_quotes: list[NonBlankString] = Field(default_factory=list)
 
 
+class IndexedEvaluationDraft(Contract):
+    outcome: AssessmentOutcome
+    feedback: NonBlankString
+    confidence: Confidence
+    evidence_indices: list[Annotated[int, Field(ge=0)]] = Field(default_factory=list)
+
+
 class MisconceptionFinding(Contract):
     description: NonBlankString
     status: Literal['suspected', 'supported']
