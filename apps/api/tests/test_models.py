@@ -75,7 +75,7 @@ def test_bank_round_trips_through_json():
 def test_card_and_log_models():
     now = datetime(2026, 11, 10, tzinfo=UTC)
     card = CardState(student_id="s1", item_id="i1", fsrs={"card_id": 1}, due=now)
-    assert card.recent_variant_ids == [] and card.last_wrong_variant_id is None
+    assert card.recent_variant_ids == [] and card.wrong_variant_ids == []
     log = ReviewLogEntry(student_id="s1", item_id="i1", variant_id="v1", correct=False, rating="again", reviewed_at=now)
     assert log.duration_ms is None
     with pytest.raises(ValidationError):

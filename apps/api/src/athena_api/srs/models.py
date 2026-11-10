@@ -119,8 +119,9 @@ class CardState(Model):
     due: datetime
     #: Variant ids shown most recently, oldest first. Used to rotate wording.
     recent_variant_ids: list[NonBlank] = Field(default_factory=list)
-    #: The wording last answered wrong; never shown again as the next attempt.
-    last_wrong_variant_id: NonBlank | None = None
+    #: Wordings this student answered wrong. Never shown to them again: a retry
+    #: always uses a different wording (or a live rephrase when none are left).
+    wrong_variant_ids: list[NonBlank] = Field(default_factory=list)
 
 
 Rating = Literal["again", "hard", "good", "easy"]
