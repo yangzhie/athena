@@ -119,6 +119,17 @@ which the web app renders as question cards and teaching steps.
 
 Agent memory lives in its own database, `ATHENA_AGENT_DB` (default `data/agent.db`).
 
+**Unit material.** When a session starts, the unit's **approved** lecture clips are
+ranked against the student's goal (BM25 keywords; title and summary weigh 3× the
+transcript; `sessions/material.py`) and the top 5 go to the agent as materials. It
+grounds its teaching in them and cites clips (agent `VideoReference`), which the web
+app opens in the side panel. If the agent finds the clips don't cover the goal, the
+session starts without material and the agent labels its answers as general knowledge.
+
+**Context budget.** The agent's default budget (16 KiB, counted in bytes) is too
+small once transcripts are attached; `apps/api` gives it 128 KiB (about 32k tokens).
+Override with `ATHENA_AGENT_CONTEXT_BYTES`.
+
 ## SRS design
 
 - A unit's **bank** holds **items**. An item is one idea to remember, with several

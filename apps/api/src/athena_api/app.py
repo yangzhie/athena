@@ -12,6 +12,7 @@ from .lectures.service import LectureService
 from .lectures.store import SqliteLectureStore
 from .sessions.agent_tutor import agent_tutor_from_env
 from .sessions.api import sessions_router
+from .sessions.material import LectureMaterial
 from .sessions.service import SessionService
 from .sessions.tutor import PlaceholderTutor
 from .sessions.store import SqliteSessionStore
@@ -42,7 +43,8 @@ def create_app(
         db = Path(os.environ.get("ATHENA_DB", "data/athena.db"))
         lectures = lectures or LectureService(SqliteLectureStore(db))
         srs = srs or SrsService(SqliteStore(db), rephraser=_rephraser())
-        sessions = sessions or SessionService(SqliteSessionStore(db), tutor=agent_tutor_from_env() or PlaceholderTutor())
+        tutor = agent_tutor_from_env(material=LectureMaterial(lectures)) or PlaceholderTutor()
+        sessions = sessions or SessionService(SqliteSessionStore(db), tutor=tutor)
     app.include_router(srs_router(srs, resolve_student))
     app.include_router(bank_router(BankAdmin(srs.store), resolve_lecturer))
     app.include_router(sessions_router(sessions, resolve_student))

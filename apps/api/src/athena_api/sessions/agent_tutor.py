@@ -10,14 +10,22 @@ import uuid
 from pathlib import Path
 
 from athena_agent.activities import ClientCapabilities
+from athena_agent.context import ContextBudget, ContextBudgetError, ContextBuilder
 from athena_agent.contracts import RequestContext
 from athena_agent.learning import LearningActivity, MultipleChoiceAnswer, TextAnswer
 from athena_agent.llm import LLM
 from athena_agent.memory import LearnerScopedMemory, LearningMemoryStore
 from athena_agent.orchestrator import LearningOrchestrator
+from athena_agent.retrieval import RetrievalResult
 
+from .material import MaterialProvider
 from .models import LearningSession
 from .tutor import TutorError, TutorReply
+
+#: The agent's context budget, in UTF-8 bytes (its cautious stand-in for tokens).
+#: Its default (16 KiB) is too small once lecture transcripts are attached; ~128 KiB is
+#: about 32k tokens, well within current models. ATHENA_AGENT_CONTEXT_BYTES overrides it.
+DEFAULT_CONTEXT_BYTES = 131_072
 
 #: Agent error codes → HTTP status. Messages shown to the student stay generic.
 _STATUS = {
@@ -46,9 +54,22 @@ def activity_reply(activity: LearningActivity) -> TutorReply:
 
 
 class AgentTutor:
-    def __init__(self, store: LearningMemoryStore, llm: LLM, *, capabilities: ClientCapabilities | None = None):
+    def __init__(
+        self,
+        store: LearningMemoryStore,
+        llm: LLM,
+        *,
+        capabilities: ClientCapabilities | None = None,
+        material: MaterialProvider | None = None,
+        context_bytes: int | None = None,
+    ):
         self.store = store
         self.llm = llm
+        #: Picks the unit's approved lecture clips for each session's goal.
+        self.material = material
+        self.context_budget = ContextBudget(
+            context_window=context_bytes or int(os.environ.get("ATHENA_AGENT_CONTEXT_BYTES", DEFAULT_CONTEXT_BYTES))
+        )
         # The web app renders text for now; richer formats (diagrams, widgets) come later.
         self.capabilities = capabilities or ClientCapabilities(formats=["text"])
 
@@ -56,11 +77,19 @@ class AgentTutor:
         return RequestContext(request_id=uuid.uuid4().hex, learner_id=session.student_id, session_id=session.id)
 
     def _orchestrator(self, session: LearningSession) -> LearningOrchestrator:
-        return LearningOrchestrator(LearnerScopedMemory(self.store, session.student_id), self.llm)
+        return LearningOrchestrator(
+            LearnerScopedMemory(self.store, session.student_id), self.llm,
+            context_builder=ContextBuilder(self.context_budget),
+        )
 
     async def _run(self, coro):
         try:
             return await coro
+        except ContextBudgetError:
+            raise TutorError(
+                "This session has more material and history than the tutor can read at once. Start a new session "
+                "for the next idea.", 413,
+            ) from None
         except Exception as e:  # agent errors carry a code; anything else is a 500
             code = getattr(e, "code", None)
             if code is None:
@@ -75,10 +104,29 @@ class AgentTutor:
             status = _STATUS.get(code, 500)
             raise TutorError(messages.get(status, "The tutor couldn't complete that."), status) from None
 
+    def materials_for(self, session: LearningSession) -> RetrievalResult | None:
+        items = self.material.for_goal(session.offering_id, session.goal) if self.material else []
+        return RetrievalResult.model_validate({"items": items}) if items else None
+
     async def start(self, session: LearningSession) -> list[TutorReply]:
-        activity = await self._run(
-            self._orchestrator(session).start(self._context(session), session.goal, capabilities=self.capabilities)
-        )
+        """Start the agent with the goal and, as grounding, the unit's best-matching approved clips.
+
+        If the agent finds those clips don't cover the goal, start without them: the
+        agent then teaches from general knowledge and labels its answers that way.
+        """
+        materials = self.materials_for(session)
+        try:
+            activity = await self._run(
+                self._orchestrator(session).start(
+                    self._context(session), session.goal, materials=materials, capabilities=self.capabilities,
+                )
+            )
+        except TutorError as e:
+            if materials is None or e.status != 409:
+                raise
+            activity = await self._run(
+                self._orchestrator(session).start(self._context(session), session.goal, capabilities=self.capabilities)
+            )
         return [activity_reply(activity)]
 
     async def message(self, session: LearningSession, text: str) -> list[TutorReply]:
@@ -105,7 +153,7 @@ class AgentTutor:
         return [activity_reply(activity)]
 
 
-def agent_tutor_from_env() -> AgentTutor | None:
+def agent_tutor_from_env(material: MaterialProvider | None = None) -> AgentTutor | None:
     """The agent with OpenAI and durable memory, if configured; else None.
 
     ATHENA_TUTOR=placeholder forces the placeholder (e.g. while there are no API credits);
@@ -130,7 +178,7 @@ def agent_tutor_from_env() -> AgentTutor | None:
         return None
     path = Path(os.environ.get("ATHENA_AGENT_DB", "data/agent.db"))
     path.parent.mkdir(parents=True, exist_ok=True)
-    return AgentTutor(SQLiteLearningMemory(path), llm)
+    return AgentTutor(SQLiteLearningMemory(path), llm, material=material)
 
 
 class ScriptedDemoTutor(AgentTutor):
@@ -158,13 +206,18 @@ class ScriptedDemoTutor(AgentTutor):
         llm = self._llms.setdefault(
             session.id, ReliableLLM(MockLLM(self.fixture["responses"]), policy=RetryPolicy(max_attempts=1))
         )
-        return LearningOrchestrator(LearnerScopedMemory(self.store, session.student_id), llm)
+        return LearningOrchestrator(
+            LearnerScopedMemory(self.store, session.student_id), llm, context_builder=ContextBuilder(self.context_budget)
+        )
 
     async def start(self, session: LearningSession) -> list[TutorReply]:
         from athena_agent.knowledge import KnowledgeService
         from athena_agent.retrieval import MockRetriever
 
-        replies = await super().start(session)
+        activity = await self._run(
+            self._orchestrator(session).start(self._context(session), session.goal, capabilities=self.capabilities)
+        )
+        replies = [activity_reply(activity)]
         # The script expects its materials to be selected right after the start.
         memory = LearnerScopedMemory(self.store, session.student_id)
         await KnowledgeService(memory, MockRetriever([self.fixture["materials"]])).retrieve(
