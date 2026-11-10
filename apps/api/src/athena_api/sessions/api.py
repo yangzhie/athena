@@ -1,8 +1,9 @@
 """HTTP routes for learning sessions. Scoped to the signed-in student throughout."""
 
+import sqlite3
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError
 
 from ..auth import LecturerResolver, StudentResolver, lecturer_dependency, student_dependency
@@ -10,6 +11,8 @@ from .models import LearningSessionOut, Message, SharedMessage, SharedSessionSum
 from .service import NotFound, SessionService
 from .shared import NotShared, SharedSessions
 from .tutor import TutorError
+
+OperationId = Annotated[str | None, Header(alias="Idempotency-Key", min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")]
 
 Text = Annotated[str, StringConstraints(min_length=1, pattern=r"\S")]
 
@@ -58,6 +61,8 @@ def sessions_router(service: SessionService, resolve_student: StudentResolver) -
     def run(fn, *args):
         try:
             return fn(*args)
+        except sqlite3.Error:
+            raise HTTPException(503, "Session storage is unavailable. Retry the same submission.") from None
         except NotFound as e:
             raise HTTPException(404, str(e)) from None
         except ValidationError:
@@ -66,6 +71,8 @@ def sessions_router(service: SessionService, resolve_student: StudentResolver) -
     async def arun(fn, *args, **kwargs):
         try:
             return await fn(*args, **kwargs)
+        except sqlite3.Error:
+            raise HTTPException(503, "Session storage is unavailable. Retry the same submission.") from None
         except NotFound as e:
             raise HTTPException(404, str(e)) from None
         except TutorError as e:
@@ -76,8 +83,13 @@ def sessions_router(service: SessionService, resolve_student: StudentResolver) -
         return [LearningSessionOut.of(s) for s in service.list(sid, offering_id)]
 
     @router.post("", response_model=SessionWithMessages, status_code=201)
-    async def create(offering_id: str, body: CreateBody, sid: Student):
-        session, messages = await arun(service.create, sid, offering_id, body.goal)
+    async def create(offering_id: str, body: CreateBody, sid: Student, operation_id: OperationId = None):
+        session, messages = await arun(service.create, sid, offering_id, body.goal, operation_id)
+        return SessionWithMessages(session=LearningSessionOut.of(session), messages=messages)
+
+    @router.post("/operations/{operation_id}/retry", response_model=SessionWithMessages)
+    async def recover(offering_id: str, operation_id: str, sid: Student):
+        session, messages = await arun(service.recover, sid, offering_id, operation_id)
         return SessionWithMessages(session=LearningSessionOut.of(session), messages=messages)
 
     @router.get("/{session_id}", response_model=SessionWithMessages)
@@ -105,8 +117,8 @@ def sessions_router(service: SessionService, resolve_student: StudentResolver) -
         return Response(status_code=204)
 
     @router.post("/{session_id}/messages", response_model=list[Message])
-    async def send(offering_id: str, session_id: str, body: MessageBody, sid: Student):
-        return await arun(service.send, sid, offering_id, session_id, body.text)
+    async def send(offering_id: str, session_id: str, body: MessageBody, sid: Student, operation_id: OperationId = None):
+        return await arun(service.send, sid, offering_id, session_id, body.text, operation_id)
 
     @router.post("/{session_id}/answers", response_model=list[Message])
     async def answer(offering_id: str, session_id: str, body: AnswerBody, sid: Student):

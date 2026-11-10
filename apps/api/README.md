@@ -1,8 +1,7 @@
 # apps/api
 
-Athena's API service: a FastAPI modular monolith. It starts with the **SRS**
-module (spaced repetition per unit); the tutor orchestrator, auth and other
-modules join later.
+Athena's FastAPI modular monolith serves private learning sessions, the in-process
+adaptive tutor, Practice (SRS), approved lecture clips and anonymous session sharing.
 
 ## Setup and test
 
@@ -13,11 +12,19 @@ uv sync
 uv run pytest
 ```
 
+The API tests use real in-process ASGI requests with a test-only polling selector
+(`tests/http_client.py`). Its event loop checks queued callbacks at least every
+10 ms, including in sandboxes where cross-thread socket wakeups are unavailable.
+Routes, authentication dependencies, worker threads and storage run normally;
+no permissions or network server are required. To verify answer replay, restart
+recovery, failed-write reconciliation and ownership with explicitly selected
+offline model fixtures, run `uv run pytest tests/test_answer_retries.py`.
+
 ## Run
 
 ```sh
 uv run athena-srs load-starter    # once: CSE5ALG and CSE5DMI starter banks
-ATHENA_DEV_STUDENT_ID=dev-student ATHENA_DEV_LECTURER_ID=dev-lecturer uv run uvicorn athena_api.app:create_app --factory --reload
+ATHENA_TUTOR=demo ATHENA_DEV_STUDENT_ID=dev-student ATHENA_DEV_LECTURER_ID=dev-lecturer uv run uvicorn athena_api.app:create_app --factory --reload
 ```
 
 Live rephrasing turns on when `OPENAI_API_KEY` and `OPENAI_MODEL` are set (the
@@ -113,11 +120,76 @@ which the web app renders as question cards and teaching steps.
 
 | Value | Tutor |
 | --- | --- |
-| *(unset)* | the agent with OpenAI if `OPENAI_API_KEY` and `OPENAI_MODEL` are set, else the placeholder |
-| `placeholder` | canned text replies, no questions (e.g. while there are no API credits) |
-| `demo` | the agent replaying its scripted Bubble Sort journey: try the full UI without OpenAI |
+| *(unset)* or `ai` | the agent with configured `OPENAI_API_KEY` and `OPENAI_MODEL`; missing configuration returns 503 |
+| `placeholder` | explicitly selected, labelled canned text replies; no questions |
+| `demo` | explicitly selected, labelled synthetic Bubble Sort fixture; in-memory agent state is lost on restart |
+
+Unknown modes return an unavailable tutor. `GET /tutor/status` identifies `mode`,
+`available` (configuration/storage readiness, without a provider probe), and
+`scripted`. Provider/model/storage failures return an error; they never switch to
+canned replies. No model call is made to check status. The setup command above
+explicitly selects offline fixtures. AI operation uses the existing upward `.env`
+loader and preserves process configuration. Credentials alone do not authorize
+paid verification: live acceptance remains blocked until explicit opt-in (H5).
 
 Agent memory lives in its own database, `ATHENA_AGENT_DB` (default `data/agent.db`).
+
+**Answer retries.** The question ID identifies one accepted answer within a
+student's session. Identical retries return the original stored learner and tutor
+messages (including IDs and timestamps), even after later turns or a restart.
+Changing the choice, trimmed answer text, or `hint_used` returns 409; `shown` is
+only a display label and cannot rewrite an accepted answer. The host saves the
+exchange, session timestamp and private retry receipt atomically. If that write
+fails after the agent accepts the answer, retry the same submission: the agent
+replays its transition and the host saves the missing exchange. Concurrent host
+writes keep the first committed exchange. The web chat merges stored message IDs
+so a replay doesn't duplicate the visible answer.
+
+Retry receipts are private, scoped to the owning student and session, excluded
+from lecturer projections, and deleted with the host session. Existing databases
+gain the receipt table automatically. Answers saved before receipt support cannot
+be safely compared because their submitted choice/hint metadata was not retained;
+resubmitting those questions returns 409 with a refresh instruction.
+
+**Coordinated operations and recovery.** Creation and chat accept an optional
+`Idempotency-Key` header (1–128 letters, digits, underscores or hyphens). The web
+adapter always supplies one; other clients must retain it to retry after an
+uncertain response. The same key and normalized payload replay the exact stored
+result. Reusing a key with different input returns 409. Without a key, creation
+and chat are intentionally new operations; two new sessions with the same goal
+have separate conversations. Answers use their question ID; continuation uses its
+teaching activity ID and always replays its accepted result.
+
+The private host journal reserves the operation before invoking the tutor. The
+agent stages its transition and commits its result receipt with the same atomic
+snapshot/revision comparison. The host then publishes the entire exchange,
+updated timestamp, answer receipt where applicable, and completion outcome in one
+transaction. An interrupted host write leaves the old conversation intact and the
+operation pending. Retrying after reopening both databases uses the accepted agent
+receipt without another model call or duplicate assessment evidence. Independent
+adapters converge on the winning stored transition. Concurrent different operations
+in one session return 409 until the pending operation is recovered. Invalid input
+that the tutor rejected before publication can be corrected; transient failures
+remain pending for retry. Storage failures return a safe 503, never database details.
+
+`POST /units/{offering}/sessions/operations/{operation_id}/retry` recovers using the
+server's saved input and returns `{session, messages}`. Operation IDs are
+`start:<key>`, `message:<key>`, `answer:<question_id>` or `continue:<activity_id>`.
+Lookup requires the authenticated owner and offering; identifiers confer no access.
+The browser retains only the random key and a request digest in tab storage, not
+submitted text. Refreshing the session retries its pending chat operation; refreshing
+the session list recovers pending creation. When storage is disabled, retry identity
+lasts only for the current page. A changed submission after an uncertain response
+asks the student to refresh first. Pending operations never appear as completed
+exchanges or half-created sessions.
+
+Host journal records are removed with the host session. Agent operation receipts
+remain backend-only and are excluded from conversation/learning exports and shared
+session projections. The agent database automatically adds a separate private
+receipt column to existing records. Complete cross-service deletion/expiry remains
+the later lifecycle batch; this batch does not claim to remove existing agent memory
+when a host session is deleted. Scripted demo agent state is deliberately ephemeral
+and cannot resume a lost in-memory transition after a restart.
 
 **Unit material.** When a session starts, the unit's **approved** lecture clips are
 ranked against the student's goal (BM25 keywords; title and summary weigh 3× the

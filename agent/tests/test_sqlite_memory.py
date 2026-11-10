@@ -119,3 +119,35 @@ def test_bundled_memory_evaluation():
     from athena_agent.evaluation import evaluate_fixture
     fixture = json.loads((Path(__file__).parent / 'fixtures/memory_journey.json').read_text())
     assert asyncio.run(evaluate_fixture(fixture))['passed']
+
+
+def test_upgrade_private_operation_receipts_are_atomic_and_not_exported(tmp_path):
+    path = tmp_path / 'old-memory.sqlite'
+    # A database created before host operation receipts were introduced.
+    with sqlite3.connect(path) as db:
+        db.execute('CREATE TABLE learning_sessions (learner_id TEXT NOT NULL, session_id TEXT NOT NULL, revision INTEGER NOT NULL, version INTEGER NOT NULL, conversation_json TEXT NOT NULL, learning_json TEXT NOT NULL, PRIMARY KEY (learner_id, session_id))')
+    with SQLiteLearningMemory(path) as store:
+        store.create(context())
+        before = store.read(context())
+        updated = before.model_copy(deep=True)
+        updated.operation_results['op'] = {'request': {'kind': 'message'}, 'replies': [{'content': 'Saved'}]}
+        updated.history.append(ConversationTurn(user_text='Question', assistant_text='Saved'))
+        with sqlite3.connect(path) as db:
+            db.execute("CREATE TRIGGER fail_save BEFORE UPDATE ON learning_sessions BEGIN SELECT RAISE(ABORT, 'failed write'); END")
+        with pytest.raises(MemoryUnavailableError):
+            store._save(context(), updated)
+        assert store.read(context()) == before
+        with sqlite3.connect(path) as db:
+            db.execute('DROP TRIGGER fail_save')
+        saved = store._save(context(), updated)
+        assert 'operation_results' not in store.load_conversation(context()).model_dump()
+        assert 'operation_results' not in store.load_learning(context()).model_dump()
+    with SQLiteLearningMemory(path) as store:
+        assert store.read(context()) == saved
+        # Unrelated conversation updates must preserve the private receipt.
+        store.append_turn(context(), ConversationTurn(user_text='Next', assistant_text='Reply'))
+        assert store.read(context()).operation_results == saved.operation_results
+        with sqlite3.connect(path) as db:
+            db.execute("UPDATE learning_sessions SET operations_json='invalid json'")
+        with pytest.raises(MemoryUnavailableError):
+            store.read(context())

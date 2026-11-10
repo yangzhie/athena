@@ -15,7 +15,6 @@ from .sessions.api import sessions_router, shared_sessions_router
 from .sessions.shared import SharedSessions
 from .sessions.material import LectureMaterial
 from .sessions.service import SessionService
-from .sessions.tutor import PlaceholderTutor
 from .sessions.store import SqliteSessionStore
 from .srs.api import srs_router
 from .srs.bank_admin import BankAdmin
@@ -44,8 +43,16 @@ def create_app(
         db = Path(os.environ.get("ATHENA_DB", "data/athena.db"))
         lectures = lectures or LectureService(SqliteLectureStore(db))
         srs = srs or SrsService(SqliteStore(db), rephraser=_rephraser())
-        tutor = agent_tutor_from_env(material=LectureMaterial(lectures)) or PlaceholderTutor()
-        sessions = sessions or SessionService(SqliteSessionStore(db), tutor=tutor)
+        if sessions is None:
+            tutor = agent_tutor_from_env(material=LectureMaterial(lectures))
+            sessions = SessionService(SqliteSessionStore(db), tutor=tutor)
+
+    @app.get("/tutor/status")
+    def tutor_status() -> dict:
+        return {"mode": getattr(sessions.tutor, "mode", "injected"),
+                "available": getattr(sessions.tutor, "available", True),
+                "scripted": getattr(sessions.tutor, "mode", "injected") in {"demo", "placeholder"}}
+
     app.include_router(srs_router(srs, resolve_student))
     app.include_router(bank_router(BankAdmin(srs.store), resolve_lecturer))
     app.include_router(sessions_router(sessions, resolve_student))

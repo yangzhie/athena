@@ -18,6 +18,18 @@ npm test         # Vitest tests under src/; Node's test runner is kept separate
 - `src/api/`: data access. API-backed sessions and reviews, with mock adapters for capabilities not connected yet.
 - `src/types/`, `src/mocks/`, `src/lib/`: domain types, mock data, helpers.
 
+## Session retries
+
+Creation and chat use durable API operation identifiers. After an uncertain response,
+the tab retains only a random identifier and request digest, so retrying the same input
+does not add duplicate messages. Refresh recovers pending creation from the session
+list and pending chat before loading the conversation, using server-owned input.
+Answers and teaching continuation replay by question/activity ID. Failed exchanges
+are removed from the optimistic thread until confirmed, and replayed stored message
+IDs merge once. With browser storage disabled, retry identity lasts until page reload.
+Use `ATHENA_TUTOR=demo` explicitly for the scripted offline journey; unconfigured AI
+returns an unavailable error. See the API README for service modes and recovery limits.
+
 ## Playground integration
 
 Open a learning session, then follow its Playground link or a suggested scene. The route is

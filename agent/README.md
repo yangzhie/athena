@@ -542,6 +542,16 @@ The offline fixture `tests/fixtures/memory_journey.json` verifies SQLite reopen,
 current-activity resumption, duplicate replay, and learner isolation with colliding
 session IDs through `athena_agent.evaluation`.
 
+The host API also stores private operation results on `ConversationSession` in
+`operation_results`. Its tutor adapter stages a whole transition in memory, then
+publishes the transition and replay receipt together with one create/compare-and-save.
+SQLite stores these receipts in a separate `operations_json` column, added
+non-destructively to existing version 1 databases. Conversation and learning exports
+exclude them; unrelated updates preserve them. A failed SQLite write publishes
+neither history nor receipt. The host uses this boundary to reconcile creation,
+chat, answers and continuation after a failed host exchange write or restart.
+These receipts are host-managed backend data, outside model prompts and API views.
+
 ## Selected learning materials
 
 `KnowledgeService(store, retriever).retrieve(context, query, source_ids=None,

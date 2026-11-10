@@ -1,9 +1,10 @@
 import pytest
-from fastapi.testclient import TestClient
+from .http_client import TestClient
 
 from athena_api.app import create_app
 from athena_api.lectures.service import LectureService
 from athena_api.lectures.store import MemoryLectureStore
+from athena_api.sessions.tutor import PlaceholderTutor
 from athena_api.sessions.service import SessionService
 from athena_api.sessions.store import MemorySessionStore, SqliteSessionStore
 from athena_api.srs.service import SrsService
@@ -18,7 +19,7 @@ SHARED = f"/units/{UNIT}/shared-sessions"
 def client(request, tmp_path):
     store = MemorySessionStore() if request.param == "memory" else SqliteSessionStore(tmp_path / "s.db")
     who = {"student": "alice-12345", "lecturer": "dr-liu"}
-    app = create_app(srs=SrsService(MemoryStore()), sessions=SessionService(store), lectures=LectureService(MemoryLectureStore()),
+    app = create_app(srs=SrsService(MemoryStore()), sessions=SessionService(store, tutor=PlaceholderTutor()), lectures=LectureService(MemoryLectureStore()),
                      resolve_student=lambda _r: who["student"], resolve_lecturer=lambda _r, _o: who["lecturer"])
     c = TestClient(app)
     c.who = who

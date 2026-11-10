@@ -89,6 +89,8 @@ class ConversationSession(Contract):
     history: list[ConversationTurn] = Field(default_factory=list)
     active_topic: TopicContext | None = None
     archived_topics: list[TopicContext] = Field(default_factory=list)
+    # Host operation receipts are private, excluded from conversation/learning exports.
+    operation_results: dict[str, dict] = Field(default_factory=dict)
     revision: int = Field(default=0, ge=0)
 
 

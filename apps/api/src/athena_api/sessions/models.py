@@ -47,6 +47,19 @@ class Message(Model):
     created_at: datetime
 
 
+class AnswerReceipt(Model):
+    """Private retry data, never part of a student or lecturer projection."""
+
+    question_id: NonBlank
+    choice_id: str | None
+    text: str | None
+    hint_used: bool
+    messages: list[Message] = Field(default_factory=list)
+
+    def same_submission(self, other: "AnswerReceipt") -> bool:
+        return self.model_dump(exclude={"messages"}) == other.model_dump(exclude={"messages"})
+
+
 class LearningSessionOut(BaseModel):
     """What the student gets back: no student id."""
 

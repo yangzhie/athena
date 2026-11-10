@@ -15,10 +15,11 @@ from athena_agent.llm import DependencyError, MockLLM
 from athena_agent.memory import LearnerScopedMemory
 from athena_agent.reliable_llm import ReliableLLM, RetryPolicy
 from athena_agent.retrieval import MockRetriever
-from fastapi.testclient import TestClient
+from .http_client import TestClient
 
 from athena_api.app import create_app
 from athena_api.sessions.agent_tutor import AgentTutor
+from athena_api.sessions.tutor import PlaceholderTutor
 from athena_api.sessions.service import SessionService
 from athena_api.sessions.store import MemorySessionStore
 from athena_api.srs.service import SrsService
@@ -107,7 +108,7 @@ def test_answer_needs_exactly_one_of_choice_or_text(body):
 
 def test_placeholder_tutor_rejects_answers():
     who = {"id": "alice"}
-    client = TestClient(create_app(srs=SrsService(MemoryStore()), sessions=SessionService(MemorySessionStore()),
+    client = TestClient(create_app(srs=SrsService(MemoryStore()), sessions=SessionService(MemorySessionStore(), tutor=PlaceholderTutor()),
                                    resolve_student=lambda _r: who["id"]))
     sid = client.post(BASE, json={"goal": "x"}).json()["session"]["id"]
     r = client.post(f"{BASE}/{sid}/answers", json={"question_id": "q", "choice_id": "a", "shown": "a"})

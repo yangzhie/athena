@@ -1,5 +1,6 @@
 import type { AgentActivity, ChatMessage, KnowledgeOrigin, LearningSession, SourceReference } from '../types'
 import { call } from './client'
+import { operationCall, recoverPendingOperation } from './operations'
 
 /** Session as the API returns it (snake_case). */
 interface SessionDto {
@@ -82,18 +83,17 @@ const toMessage = (m: MessageDto): ChatMessage => ({
 const base = (offeringId: string) => `/units/${encodeURIComponent(offeringId)}/sessions`
 
 export async function listSessions(offeringId: string): Promise<LearningSession[]> {
+  await recoverPendingOperation(base(offeringId), base(offeringId))
   return (await call<SessionDto[]>(base(offeringId))).map(toSession)
 }
 
 export async function createSession(offeringId: string, goal: string) {
-  const r = await call<{ session: SessionDto; messages: MessageDto[] }>(base(offeringId), {
-    method: 'POST',
-    body: JSON.stringify({ goal }),
-  })
+  const r = await operationCall<{ session: SessionDto; messages: MessageDto[] }>(base(offeringId), { goal })
   return { session: toSession(r.session), messages: r.messages.map(toMessage) }
 }
 
 export async function getSession(offeringId: string, sessionId: string) {
+  await recoverPendingOperation(`${base(offeringId)}/${encodeURIComponent(sessionId)}/messages`, base(offeringId))
   const r = await call<{ session: SessionDto; messages: MessageDto[] }>(`${base(offeringId)}/${encodeURIComponent(sessionId)}`)
   return { session: toSession(r.session), messages: r.messages.map(toMessage) }
 }
@@ -113,11 +113,7 @@ export async function deleteSession(offeringId: string, sessionId: string) {
 
 /** Sends the learner's message; returns [learner message, tutor reply] as stored. */
 export async function sendSessionMessage(offeringId: string, sessionId: string, text: string, signal?: AbortSignal) {
-  const r = await call<MessageDto[]>(`${base(offeringId)}/${encodeURIComponent(sessionId)}/messages`, {
-    method: 'POST',
-    body: JSON.stringify({ text }),
-    signal,
-  })
+  const r = await operationCall<MessageDto[]>(`${base(offeringId)}/${encodeURIComponent(sessionId)}/messages`, { text }, signal)
   return r.map(toMessage)
 }
 

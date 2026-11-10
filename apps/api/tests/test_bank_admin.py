@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 import pytest
-from fastapi.testclient import TestClient
+from .http_client import TestClient
 
 from athena_api.app import create_app
 from athena_api.sessions.service import SessionService

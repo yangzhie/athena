@@ -43,10 +43,14 @@ class Tutor(Protocol):
 
 
 class PlaceholderTutor:
-    """Used when the agent isn't configured (no OpenAI key/model) or ATHENA_TUTOR=placeholder."""
+    """Explicitly selected canned replies; never a configuration fallback."""
+
+    mode = "placeholder"
+    available = True
 
     async def start(self, session: LearningSession) -> list[TutorReply]:
         return [TutorReply(
+            "Placeholder tutor (canned replies).\n\n"
             f"Let’s work on “{session.goal}”. To start, tell me what you already know about it, "
             "or where you get stuck. I’ll pitch things from there."
         )]
@@ -64,3 +68,18 @@ class PlaceholderTutor:
 
     async def continue_(self, session, activity_id):
         raise TutorError("The placeholder tutor doesn't teach in steps.", 400)
+
+
+class UnavailableTutor:
+    mode = "unavailable"
+    available = False
+
+    def __init__(self, reason: str):
+        self.reason = reason
+
+    async def start(self, *_args, **_kwargs):
+        raise TutorError(f"The AI tutor is unavailable. {self.reason}", 503)
+
+    message = start
+    answer = start
+    continue_ = start
