@@ -19,7 +19,7 @@ from .lectures.store import SqliteLectureStore
 from .sessions.agent_tutor import agent_tutor_from_env
 from .sessions.api import sessions_router, shared_sessions_router
 from .sessions.shared import SharedSessions
-from .sessions.material import LectureMaterial
+from .sessions.material import LectureMaterial, OfferingMaterial
 from .sessions.service import SessionService
 from .sessions.store import SqliteSessionStore
 from .srs.api import srs_router
@@ -79,6 +79,8 @@ def create_app(
         app.state.spaces = spaces
         app.include_router(spaces_router(spaces))
         materials = Materials(spaces, os.environ.get('ATHENA_MATERIAL_ROOT', str(spaces.path.parent / 'materials')))
+        if getattr(sessions.tutor, 'mode', None) == 'ai':
+            sessions.tutor.material = OfferingMaterial(materials, lectures)
         app.state.materials = materials
         app.include_router(materials_router(materials))
     else:

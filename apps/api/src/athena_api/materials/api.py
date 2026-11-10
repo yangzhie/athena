@@ -70,11 +70,18 @@ def materials_router(materials: Materials):
         visible(request, offering_id, id)
         return materials.passages(offering_id, id)
 
+    @router.get('/{id}/passages/{passage_id}')
+    def passage(offering_id: str, id: str, passage_id: str, request: Request):
+        visible(request, offering_id, id)
+        return materials.passage(offering_id, id, passage_id)
+
     @router.get('/{id}/file')
     def source_file(offering_id: str, id: str, request: Request):
         row = visible(request, offering_id, id)
         if row['kind'] != 'document':
             raise HTTPException(404, 'Recordings are available through approved lecture clips.')
+        if not Path(row['storage_path']).is_file():
+            raise HTTPException(503, 'The original source file is unavailable. Restore it or upload a new version.')
         return FileResponse(row['storage_path'], filename=row['filename'], content_disposition_type='attachment',
                             headers={'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, no-store'})
 

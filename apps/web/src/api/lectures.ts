@@ -1,5 +1,4 @@
 import type { LectureClip, LectureRecording } from '../types'
-import { lectureRecordings } from '../mocks/lectures'
 import { call } from './client'
 
 /** A lecture as the API gives students: approved clips only, no transcripts. */
@@ -44,18 +43,8 @@ const toLecture = (l: StudentLectureDto): LectureRecording => ({
   clips: l.clips.map(toClip),
 })
 
-/**
- * An offering's lectures as students see them, newest week first.
- * From apps/api (lectures imported with `athena-lectures import`). Units with none
- * there, or when the API isn't running, fall back to the hand-written demo lectures.
- */
+/** An Offering's approved clips; unavailable/empty responses never select fixtures. */
 export async function listLectures(offeringId: string): Promise<LectureRecording[]> {
-  let lectures: LectureRecording[] = []
-  try {
-    lectures = (await call<StudentLectureDto[]>(`/units/${encodeURIComponent(offeringId)}/lectures`)).map(toLecture)
-  } catch {
-    // API unavailable: use the demo data below.
-  }
-  const source = lectures.length > 0 ? lectures : lectureRecordings.filter((r) => r.offeringId === offeringId)
-  return [...source].sort((a, b) => b.week - a.week)
+  const lectures = (await call<StudentLectureDto[]>(`/units/${encodeURIComponent(offeringId)}/lectures`)).map(toLecture)
+  return lectures.sort((a, b) => b.week - a.week)
 }

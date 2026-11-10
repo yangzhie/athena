@@ -47,7 +47,7 @@ class Materials:
             return dict(zip([col[0] for col in cursor.description], row, strict=True))
 
     def view(self, row):
-        result = {key: row[key] for key in ['id', 'source_id', 'version', 'offering_id', 'filename', 'kind', 'size', 'status', 'published', 'error']}
+        result = {key: row[key] for key in ['id', 'source_id', 'version', 'offering_id', 'filename', 'kind', 'size', 'status', 'published', 'error', 'created_at']}
         result['published'] = bool(result['published'])
         return result
 
@@ -138,3 +138,12 @@ class Materials:
         with self.lock:
             return [dict(id=r[0], page=r[1], section=r[2], text=r[3]) for r in self.db.execute(
                 'SELECT id,page,section,text FROM document_passages WHERE material_id=? ORDER BY rowid', (id,))]
+
+    def passage(self, offering, material, passage):
+        row = self.get(offering, material)
+        with self.lock:
+            result = self.db.execute('SELECT id,page,section,text FROM document_passages WHERE material_id=? AND id=?',
+                                     (material, passage)).fetchone()
+        if not result:
+            raise HTTPException(404, 'Source passage not found.')
+        return dict(id=result[0], page=result[1], section=result[2], text=result[3], filename=row['filename'], version=row['version'])

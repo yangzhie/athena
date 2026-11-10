@@ -108,7 +108,10 @@ class AgentTutor:
                 503: "The tutor is unavailable right now. Try again later.",
             }
             status = _STATUS.get(code, 500)
-            raise TutorError(messages.get(status, "The tutor couldn't complete that."), status) from None
+            message = messages.get(status, "The tutor couldn't complete that.")
+            if code == 'conflicting_sources':
+                message = "Your unit sources conflict. Resolve the conflicting material before retrying this learning step."
+            raise TutorError(message, status, code=code) from None
 
     async def operation(self, operation: Operation) -> list[TutorReply]:
         return await self._run(self._operation(operation))
@@ -145,6 +148,23 @@ class AgentTutor:
             staged.create(context, snapshot=original)
         worker = copy.copy(self)
         worker.store = staged
+        if original and original.active_topic and self.material is not None:
+            from athena_agent.knowledge import KnowledgeService
+            topic = original.active_topic
+            query = topic.learning_state.goal
+            if topic.roadmap:
+                concept = next((c for c in topic.roadmap.graph.concepts if c.concept_id == topic.learning_state.current_concept_id), None)
+                if concept:
+                    query += ' ' + concept.title
+            if operation.kind == 'message':
+                query += ' ' + operation.payload['text'][:300]
+            items = self.material.for_goal(session.offering_id, query)
+            knowledge = KnowledgeService(LearnerScopedMemory(staged, session.student_id))
+            if items:
+                await knowledge.supply(context, RetrievalResult.model_validate({'items': items}))
+            else:
+                # A successful empty retrieval means explicitly labelled general knowledge.
+                await knowledge.use_general_knowledge(context)
         if operation.kind == "start":
             replies = await worker.start(session)
         elif operation.kind == "message":
@@ -191,7 +211,7 @@ class AgentTutor:
                 )
             )
         except TutorError as e:
-            if materials is None or e.status != 409:
+            if materials is None or e.code != "insufficient_evidence":
                 raise
             activity = await self._run(
                 self._orchestrator(session).start(self._context(session), session.goal, capabilities=self.capabilities)

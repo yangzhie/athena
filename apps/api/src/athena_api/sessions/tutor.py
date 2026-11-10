@@ -18,9 +18,10 @@ class TutorReply:
 class TutorError(RuntimeError):
     """The tutor couldn't do it. `status` is the HTTP status to report."""
 
-    def __init__(self, message: str, status: int = 503):
+    def __init__(self, message: str, status: int = 503, *, code: str | None = None):
         super().__init__(message)
         self.status = status
+        self.code = code
 
 
 class Tutor(Protocol):

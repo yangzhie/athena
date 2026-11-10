@@ -91,6 +91,9 @@ export function UnitViewNav({ onNavigate }: SidebarActionProps) {
         )}
       </div>
       <div className="space-y-0.5 border-t border-line pt-3">
+        <NavLink to={`/units/${id}/library`} onClick={onNavigate} className={linkClass}>
+          <span aria-hidden>📚</span> Material library
+        </NavLink>
         <NavLink to={`/units/${id}/clips`} onClick={onNavigate} className={linkClass}>
           <span aria-hidden>🎬</span> Lecture clips
         </NavLink>

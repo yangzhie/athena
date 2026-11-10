@@ -25,7 +25,7 @@ export default function UnitLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         {offering.can_manage && <Link to={`/units/${offering.id}/manage`} className="mb-4 text-sm text-accent hover:underline">Manage study space</Link>}
         {offering.status === 'draft' && <p className="mb-4 rounded-lg bg-warn/15 p-3 text-sm">Draft study space. Publish it before starting a learning session.</p>}
-        <Outlet />
+        <Outlet key={offering.id} />
       </div>
       {!onPlayground && <SidePanel key={offering.id} offering={offering} />}
     </div>

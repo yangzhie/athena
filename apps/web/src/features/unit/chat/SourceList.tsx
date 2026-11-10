@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { listLectures } from '../../../api/lectures'
 import { formatTimestamp } from '../../../lib/format'
 import type { KnowledgeOrigin, SourceReference } from '../../../types'
@@ -19,7 +20,8 @@ async function open(offeringId: string, s: SourceReference) {
   if (s.kind === 'document') return openInPanel(offeringId, { kind: 'source', source: s })
   const lecture = (await listLectures(offeringId)).find((l) => l.id === s.sourceId)
   const clip = lecture?.clips.find((c) => c.id === s.segmentId)
-  if (lecture && clip) openInPanel(offeringId, { kind: 'clip', clip, lecture })
+  if (!lecture || !clip) throw new Error('This cited clip is unavailable or is no longer approved.')
+  openInPanel(offeringId, { kind: 'clip', clip, lecture })
 }
 
 export function SourceList({
@@ -31,11 +33,13 @@ export function SourceList({
   sources?: SourceReference[]
   origin?: KnowledgeOrigin
 }) {
+  const [error, setError] = useState<string | null>(null)
   const note = origin ? originNote[origin] : null
   if (sources.length === 0 && !note) return null
 
   return (
     <div className="mt-3 space-y-2">
+      {error && <p role="alert" className="text-xs text-bad">{error}</p>}
       {note && <p className="text-xs text-muted">ⓘ {note}</p>}
       {sources.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label="Sources">
@@ -43,7 +47,7 @@ export function SourceList({
             <li key={s.kind === 'video' ? s.segmentId : s.passageId}>
               <button
                 type="button"
-                onClick={() => void open(offeringId, s)}
+                onClick={() => { setError(null); void open(offeringId, s).catch(e => setError(e instanceof Error ? e.message : 'Source unavailable.')) }}
                 title={s.quote}
                 className="inline-flex max-w-72 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-muted transition-colors hover:border-accent hover:text-ink"
               >

@@ -206,12 +206,22 @@ the later lifecycle batch; this batch does not claim to remove existing agent me
 when a host session is deleted. Scripted demo agent state is deliberately ephemeral
 and cannot resume a lost in-memory transition after a restart.
 
-**Unit material.** When a session starts, the unit's **approved** lecture clips are
-ranked against the student's goal (BM25 keywords; title and summary weigh 3× the
-transcript; `sessions/material.py`) and the top 5 go to the agent as materials. It
-grounds its teaching in them and cites clips (agent `VideoReference`), which the web
-app opens in the side panel. If the agent finds the clips don't cover the goal, the
-session starts without material and the agent labels its answers as general knowledge.
+**Unit material.** In the normal anonymous application, one Offering-scoped
+provider ranks ready published document passages and approved lecture clips using
+BM25 title/body matching. It selects up to five results and bounds long transcript
+excerpts. New published versions replace older versions in retrieval, while old
+immutable passages remain available to saved citations. Every subsequent tutor
+operation refreshes selection using the current goal, Concept title and discussion.
+Accepted operation retries replay the original response and references.
+
+If initial material has insufficient coverage, the agent may start with explicitly
+labelled general knowledge. Conflicting sources always return an actionable 409;
+they are never discarded through that fallback. Model grounding checks verify exact
+source quotes. Private question criteria remain internal. The source panel resolves
+cited passages through `GET /units/{offering}/materials/{version}/passages/{id}`;
+original files are downloaded only through authorised endpoints. The web material
+library and lecture list do not silently select fixture data when the API is empty
+or unavailable. Explicitly injected host adapters can still use `LectureMaterial`.
 
 **Context budget.** The agent's default budget (16 KiB, counted in bytes) is too
 small once transcripts are attached; `apps/api` gives it 128 KiB (about 32k tokens).

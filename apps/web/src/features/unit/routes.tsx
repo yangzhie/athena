@@ -1,3 +1,4 @@
+import LibraryView from './library/LibraryView'
 import StudySpaceView from '../spaces/StudySpaceView'
 import { Navigate } from 'react-router'
 import type { Feature } from '../../app/feature'
@@ -25,6 +26,7 @@ export const unitFeature: Feature = {
       children: [
         { index: true, element: <NewSessionView /> },
         { path: 'manage', element: <StudySpaceView /> },
+        { path: 'library', element: <LibraryView /> },
         { path: 's/:sessionId', element: <SessionView /> },
         { path: 'clips', element: <ClipsView />, loader: clipsLoader },
         { path: 'review', element: <ReviewView />, loader: clipsLoader },
