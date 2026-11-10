@@ -38,6 +38,9 @@ what changed. With `--offering`, the web app's Lecture clips view picks the
 lecture up automatically when run locally (see `apps/web/src/api/lectures.ts`). Needs `OPENAI_API_KEY`, and `OPENAI_MODEL` unless `--llm-model` is given,
 in the environment or the repo's `.env`.
 
+To try everything without an LLM (no API key or credits), add `--no-llm <topic-id>`:
+the lecture is cut into plain 10-minute parts labelled with that topic.
+
 ## Transcribe only
 
 ```sh

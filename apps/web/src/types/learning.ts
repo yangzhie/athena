@@ -1,4 +1,5 @@
 import type { KnowledgeOrigin, SourceReference } from './sources'
+import type { AgentActivity } from './tutor'
 
 /** A global idea that topics map to, e.g. "subnetting" or "overfitting". */
 export interface Concept {
@@ -36,10 +37,15 @@ export interface Mastery {
 
 export interface ChatMessage {
   id: string
-  role: 'tutor' | 'learner'
+  /** lecturer = a reply from the unit's lecturer in a session the student shared. */
+  role: 'tutor' | 'learner' | 'lecturer'
   content: string
   /** Material the reply is based on. Tutor messages only. */
   sources?: SourceReference[]
   knowledgeOrigin?: KnowledgeOrigin
+  /** Tutor messages from the agent: the question, explanation, feedback, ... behind it. */
+  activity?: AgentActivity
+  /** Learner messages that answer a question: that question's id. */
+  answerFor?: string
   createdAt: string
 }

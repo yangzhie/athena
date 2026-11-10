@@ -6,6 +6,10 @@ React + TypeScript + Vite + Tailwind v4 frontend. Runs on mock data for now.
 npm run dev      # from the repo root, or from this folder
 ```
 
+```sh
+npm test         # Vitest (pure logic, e.g. clip suggestions)
+```
+
 ## Structure
 
 - `src/app/`: router, layout and the feature registry (`features.ts`).

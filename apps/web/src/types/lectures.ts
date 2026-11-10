@@ -10,6 +10,8 @@ export interface LectureRecording {
   status: RecordingStatus
   /** Empty while processing. */
   clips: LectureClip[]
+  /** Where to stream the recording from (apps/api), if it can be played. */
+  mediaUrl?: string
   /** True when clips came from lecture indexing and the lecturer hasn't approved them yet. */
   draft?: boolean
 }
@@ -24,6 +26,8 @@ export interface LectureClip {
   recordingId: string
   title: string
   topic: string
+  /** The unit topic id (e.g. "insertion-sort"), used to match clips to questions. */
+  topicId?: string
   summary: string
   startS: number
   endS: number

@@ -1,7 +1,18 @@
 import type { LectureClip, LectureRecording } from '../types'
 
+/** Topic label → the unit topic id used by SRS questions (so mock clips can be suggested). */
+const TOPIC_IDS: Record<string, string> = {
+  Overfitting: 'overfitting',
+  'Cross-validation': 'cross-validation',
+  'k-means': 'k-means',
+  'Density-based clustering': 'clustering',
+  'Bubble sort': 'bubble-sort',
+  'Big-O notation': 'complexity-search',
+  Hashing: 'hash-tables',
+}
+
 const clip = (recordingId: string, id: string, startS: number, endS: number, topic: string, title: string, summary: string): LectureClip =>
-  ({ id: `${recordingId}-${id}`, recordingId, startS, endS, topic, title, summary })
+  ({ id: `${recordingId}-${id}`, recordingId, startS, endS, topic, topicId: TOPIC_IDS[topic], title, summary })
 
 /** m:ss → seconds, to keep the mock readable. */
 const t = (mmss: string) => {
