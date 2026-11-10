@@ -22,7 +22,8 @@ from .models import (
     ShortVariant,
     Variant,
 )
-from .scheduler import grade, make_scheduler, new_card, pick_variant, review
+from .rephrase import Rephraser, RephraseError, rephrase
+from .scheduler import base_for_rephrase, fallback_variant, grade, make_scheduler, new_card, pick_variant, review
 from .store import Attempt, SrsStore
 
 #: New items introduced per student, per unit, per day.
@@ -69,6 +70,8 @@ class SrsService:
     scheduler: fsrs.Scheduler = field(default_factory=make_scheduler)
     rng: random.Random = field(default_factory=random.Random)
     new_per_day: int = NEW_PER_DAY
+    #: Writes a new wording when a student runs out of fresh ones. None disables it.
+    rephraser: Rephraser | None = None
 
     def _bank(self, offering_id: str) -> Bank:
         bank = self.store.get_bank(offering_id)
@@ -97,19 +100,36 @@ class SrsService:
         candidates: list[tuple[Item, CardState]] = [(items[c.item_id], c) for c in due]
         candidates += [(i, new_card(student_id, i.id, now)) for i in unseen]
         for item, card in candidates:
-            pick = pick_variant(item, card, self.rng)
-            if pick.variant is not None:  # items needing a live rephrase wait for step 6
+            variant = pick_variant(item, card, self.rng).variant or self._new_wording(bank, item, card)
+            if variant is not None:
                 return {
                     "done": False,
                     "item_id": item.id,
                     "topic_id": item.topic_id,
                     "is_new": item.id not in cards,
-                    "question": question_view(pick.variant),
+                    "question": question_view(variant),
                     "remaining": {"due": len(due), "new": len(unseen)},
                 }
 
         upcoming = [c.due for c in cards.values() if c.due > now]
         return {"done": True, "next_due_at": min(upcoming) if upcoming else None}
+
+    def _new_wording(self, bank: Bank, item: Item, card: CardState) -> Variant | None:
+        """Live rephrase (saved as pending), else a fallback wording, else None (item waits)."""
+        if self.rephraser is not None:
+            try:
+                variant = rephrase(item, base_for_rephrase(item, card), self.rephraser, self.rng)
+            except RephraseError:
+                variant = None
+            if variant is not None:
+                updated = item.model_copy(update={"variants": [*item.variants, variant]})
+                self.store.put_bank(bank.model_copy(update={"items": [updated if i.id == item.id else i for i in bank.items]}))
+                # Remember it on the student's card, so a page refresh reuses it instead of writing another.
+                if self.store.get_card(card.student_id, item.id) is not None:
+                    mine = card.model_copy(update={"live_variant_ids": [*card.live_variant_ids, variant.id]})
+                    self.store.put_card(mine, bank.offering_id, created_at=self.clock())
+                return variant
+        return fallback_variant(item, card)
 
     # --- answering ------------------------------------------------------------------------
 

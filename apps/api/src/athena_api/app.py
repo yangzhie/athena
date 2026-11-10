@@ -5,7 +5,9 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 
+from .env import load_dotenv
 from .srs.api import StudentResolver, srs_router
+from .srs.rephrase import OpenAIRephraser, RephraseError
 from .srs.service import SrsService
 from .srs.store import SqliteStore, SrsStore
 
@@ -31,7 +33,16 @@ def create_app(
         return {"status": "ok"}
 
     if srs is None:
+        load_dotenv()
         store: SrsStore = SqliteStore(Path(os.environ.get("ATHENA_DB", "data/athena.db")))
-        srs = SrsService(store)
+        srs = SrsService(store, rephraser=_rephraser())
     app.include_router(srs_router(srs, resolve_student))
     return app
+
+
+def _rephraser() -> OpenAIRephraser | None:
+    """Live rephrasing when OpenAI is configured; otherwise items fall back to existing wordings."""
+    try:
+        return OpenAIRephraser(os.environ.get("ATHENA_REPHRASE_MODEL") or None)
+    except RephraseError:
+        return None

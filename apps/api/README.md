@@ -20,6 +20,11 @@ uv run athena-srs load-starter    # once: CSE5ALG and CSE5DMI starter banks
 ATHENA_DEV_STUDENT_ID=dev-student uv run uvicorn athena_api.app:create_app --factory --reload
 ```
 
+Live rephrasing turns on when `OPENAI_API_KEY` and `OPENAI_MODEL` are set (the
+repo's `.env` is read automatically; `ATHENA_REPHRASE_MODEL` overrides the model).
+Without them, items fall back to existing wordings and never repeat one the
+student got wrong.
+
 Data goes to `data/athena.db` (gitignored; override with `ATHENA_DB`). Interactive
 docs at http://127.0.0.1:8000/docs. `ATHENA_DEV_STUDENT_ID` stands in for SSO: every
 request is that student. Without it, SRS routes return 401.
@@ -51,5 +56,5 @@ request is that student. Without it, SRS routes return 401.
 - [x] 3. Storage (SQLite) and API routes (`srs/store.py`, `srs/service.py`, `srs/api.py`)
 - [x] 4. Starter banks for CSE5ALG and CSE5DMI (`srs/starter_banks.py`, `athena-srs` command)
 - [ ] 5. Review screen in the web app
-- [ ] 6. Live rephrasing when variants run out
+- [x] 6. Live rephrasing when variants run out (`srs/rephrase.py`)
 - [ ] 7. Bank generator from unit material

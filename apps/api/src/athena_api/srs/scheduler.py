@@ -70,7 +70,8 @@ def pick_variant(item: Item, card: CardState, rng: random.Random | None = None) 
     """
     rng = rng or random.Random()
     wrong = set(card.wrong_variant_ids)
-    candidates = [v for v in item.variants if v.id not in wrong and v.status == "approved"]
+    mine = set(card.live_variant_ids)
+    candidates = [v for v in item.variants if v.id not in wrong and (v.status == "approved" or v.id in mine)]
     if not candidates:
         return Pick(None, "needs a live rephrase: no approved wording left that the student hasn't got wrong")
 
@@ -84,6 +85,27 @@ def pick_variant(item: Item, card: CardState, rng: random.Random | None = None) 
         return Pick(None, "needs a live rephrase: retrying after a wrong answer and every other wording was just seen")
     least_recent = min(candidates, key=lambda v: recent.index(v.id))
     return Pick(least_recent, "least recently seen wording")
+
+
+def fallback_variant(item: Item, card: CardState) -> Variant | None:
+    """When a live rephrase isn't possible: the least recently seen approved wording the
+    student hasn't got wrong. None if every one was answered wrong (never repeat those)."""
+    wrong = set(card.wrong_variant_ids)
+    candidates = [v for v in item.variants if v.id not in wrong and v.status == "approved"]
+    if not candidates:
+        return None
+    recent = card.recent_variant_ids
+    return min(candidates, key=lambda v: recent.index(v.id) if v.id in recent else -1)
+
+
+def base_for_rephrase(item: Item, card: CardState) -> Variant:
+    """Which approved wording to rewrite: the one the student most recently got wrong, else any."""
+    approved = [v for v in item.variants if v.status == "approved"] or list(item.variants)
+    for vid in reversed(card.wrong_variant_ids):
+        v = item.variant(vid)
+        if v is not None and v.status == "approved":
+            return v
+    return approved[0]
 
 
 # --- Grading ------------------------------------------------------------------------------
