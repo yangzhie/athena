@@ -325,3 +325,44 @@ private Practice questions or profile notes. Metrics require at least five disti
 Environments, with the same suppression per Concept/category. Counts describe
 anonymous Environments and sessions, not verified individual students. Insufficient
 real data yields an explicit empty state, without silently mixing in sample data.
+
+### Private Playground engine and Python worker
+
+Build the server adapter from the same TypeScript modules used by the browser:
+
+```sh
+npm run build:headless -w @athena/playground
+```
+
+The API persists private scene checkpoints, committed events, proposals and retry
+receipts under each owned learning session. Requests include catalog version,
+operation ID and expected revision. Stale revisions and conflicting retries return
+409. Browser-supplied execution results and transient animation actions are rejected.
+Canvas checks are interaction feedback, never assessment/mastery evidence.
+
+Run Python execution as a separate process (from `apps/api`):
+
+```sh
+docker pull python:3.12-slim
+uv run python -m athena_api.execution.worker
+```
+
+Only this private worker needs Docker access. It shares `ATHENA_DB` with the API;
+there is no public execution port. Set `ATHENA_PYTHON_IMAGE` to a locally installed
+image (prefer an audited digest in deployment). Images are never pulled during a
+job. Each execution gets an ephemeral container, UID 65534, no networking or
+mounts, read-only root, dropped capabilities, no-new-privileges, a 16 MiB temporary
+workspace, 256 MiB RAM, 32 processes and one CPU. Source is limited to 16 KiB,
+wall time to five seconds and combined stdout/stderr to 64 KiB. The queue holds
+at most 16 waiting jobs and at most two run concurrently; one browser identity
+can have two pending jobs. Cancellation and worker interruption remove containers;
+stale jobs become explicitly unavailable instead of being re-executed silently.
+
+Verified results have `real-run` provenance. Variable inspection and instruction
+tracing are explicitly unsupported (`values: {}`, `trace: []`), while graph probes
+remain conceptual local calculations. Infrastructure errors never become a
+successful or simulated Python result. To exercise real isolation locally:
+
+```sh
+ATHENA_TEST_DOCKER=1 uv run pytest tests/test_execution_worker.py
+```

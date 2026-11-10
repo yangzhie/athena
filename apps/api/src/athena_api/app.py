@@ -5,6 +5,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from .playground.service import Playgrounds
+from .playground.api import playground_router
 from .learning.service import LearningMemory
 from .learning.api import learning_router
 from .materials.store import Materials
@@ -81,6 +83,9 @@ def create_app(
             student = request.state.student_id
             return student if spaces.manages(student, offering) else None
 
+        playgrounds = Playgrounds(spaces, sessions)
+        app.state.playgrounds = playgrounds
+        app.include_router(playground_router(playgrounds))
         sessions.environment_resolver = spaces.environment
         app.state.spaces = spaces
         app.include_router(spaces_router(spaces))

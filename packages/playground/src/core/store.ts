@@ -96,9 +96,25 @@ export class Playground {
   private modules: Record<string, AnyModule>
   private runtimes: Runtimes
 
-  constructor(modules: AnyModule[], runtimes: Runtimes) {
+  private headless: boolean
+
+  constructor(modules: AnyModule[], runtimes: Runtimes, headless = false) {
+    this.headless = headless
     this.modules = Object.fromEntries(modules.map((m) => [m.type, m]))
     this.runtimes = runtimes
+  }
+
+  /** Trusted server checkpoint only. Never restore a client-supplied state. */
+  checkpoint() {
+    return { state: structuredClone(this.state), events: this.events.slice(-100), seq: this.seq, ids: this.ids }
+  }
+
+  restore(checkpoint: ReturnType<Playground['checkpoint']>) {
+    this.state = structuredClone(checkpoint.state)
+    this.events = structuredClone(checkpoint.events)
+    this.seq = checkpoint.seq
+    this.ids = checkpoint.ids
+    this.listeners.forEach((l) => l())
   }
 
   // ─── Subscriptions ──────────────────────────────────────────────────────
@@ -261,7 +277,7 @@ export class Playground {
 
     if ((opts.onBehalfOf ?? actor) === 'student') this.runChecks(action, state)
 
-    if (mod.effect) {
+    if (mod.effect && !this.headless) {
       await mod.effect(state, action, {
         runtimes: this.runtimes,
         dispatch: (a) => this.dispatch({ ...a, objectId: obj.id }, 'system', { onBehalfOf: opts.onBehalfOf ?? actor }),
@@ -369,16 +385,14 @@ export class Playground {
     if (!visible) this.set({ viewport: fit(r, this.size, 48, zoom) })
   }
 
-  acceptProposal(id: string) {
+  async acceptProposal(id: string) {
     const p = this.state.proposals.find((x) => x.id === id)
     if (!p) return
     this.set({ proposals: this.state.proposals.filter((x) => x.id !== id) })
     this.emit({ kind: 'proposal', proposalId: id, objectId: p.objectId, status: 'accepted' })
     if (p.config) this.applyConfig(p.objectId, p.config, 'agent')
-    void (async () => {
-      for (const a of p.actions) await this.dispatch(a, 'agent')
-      if (p.thenDemonstrate?.length) await this.demonstrate(p.objectId, p.thenDemonstrate)
-    })()
+    for (const a of p.actions) await this.dispatch(a, 'agent')
+    if (p.thenDemonstrate?.length) await this.demonstrate(p.objectId, p.thenDemonstrate)
   }
 
   rejectProposal(id: string) {
@@ -485,6 +499,7 @@ export class Playground {
     clearTimeout(this.highlightTimer)
     this.set({ highlight: h })
     this.focusObject(h.objectId)
+    if (this.headless) return
     this.highlightTimer = setTimeout(() => this.set({ highlight: null }), 6000)
   }
 
@@ -504,6 +519,16 @@ export class Playground {
     this.focusObject(...targets)
     this.set({ demonstrating: objectId })
     this.emit({ kind: 'demonstration', objectId, status: 'started' })
+    if (this.headless) {
+      try {
+        for (const { objectId: target, ...a } of actions)
+          await this.dispatch({ ...a, objectId: target ?? objectId } as Action, 'agent', { demonstration: true })
+      } finally {
+        this.set({ demonstrating: null })
+        this.emit({ kind: 'demonstration', objectId, status: 'finished' })
+      }
+      return { ok: true, status: 'done' }
+    }
     await sleep(250)
     try {
       // Swapping two plugs is shown as two moves of the hand.
@@ -634,6 +659,8 @@ export class Playground {
       case 'update_config': {
         const obj = this.state.objects[call.input.objectId]
         if (!obj) return { ok: false, error: `unknown object '${call.input.objectId}'` }
+        const errors = validate(this.modules[obj.type].about.config, { ...obj.config, ...call.input.config })
+        if (errors.length) return { ok: false, error: errors.join('\n') }
         if (obj.modifiedBy === 'student') {
           return this.propose({ objectId: obj.id, summary: call.input.reason, actions: [], config: call.input.config })
         }
