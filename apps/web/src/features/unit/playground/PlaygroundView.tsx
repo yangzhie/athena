@@ -27,13 +27,19 @@ function SessionPlayground({ session }: { session: LearningSession }) {
   const state = useSyncExternalStore(playground.subscribe, playground.getState)
   const { messages, sending: streaming, error } = useThread(session.id)
   const busy = usePlaygroundBusy(session.id)
-  const end = useRef<HTMLDivElement>(null)
+  const thread = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (sceneId) void openScene(offering, session.id, sceneId)
   }, [offering, session.id, sceneId])
   useEffect(() => {
-    end.current?.scrollIntoView({ block: 'end' })
+    // Chat uses document scrolling; don't carry its scroll position into the canvas view.
+    window.scrollTo(0, 0)
+  }, [session.id])
+  useEffect(() => {
+    // Scroll only the thread, never the document containing the canvas.
+    const el = thread.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [messages.length])
   useEffect(() => {
     // Handy for poking at the canvas from the devtools console.
@@ -49,12 +55,12 @@ function SessionPlayground({ session }: { session: LearningSession }) {
   const openId = openActivityId(messages)
 
   return (
-    <div className="flex flex-1 flex-col gap-4 pb-4 xl:h-[calc(100svh-var(--topbar-h)-3.5rem)] xl:flex-row">
-      <section className="relative h-[65svh] min-w-0 overflow-hidden rounded-2xl border border-line xl:h-auto xl:flex-1">
+    <div className="flex flex-1 flex-col gap-4 pb-4 xl:h-[calc(100svh-var(--topbar-h)-3.5rem)] xl:flex-none xl:flex-row">
+      <section className="relative h-[65svh] min-h-0 min-w-0 shrink-0 overflow-hidden rounded-2xl border border-line xl:h-auto xl:flex-1">
         <LearningCanvas playground={playground} />
       </section>
 
-      <aside className="flex min-h-[24rem] flex-col overflow-hidden rounded-2xl border border-line bg-surface xl:w-[24rem] xl:shrink-0 2xl:w-[28rem]">
+      <aside className="flex h-[24rem] min-h-0 shrink-0 flex-col overflow-hidden rounded-2xl border border-line bg-surface xl:h-auto xl:w-[24rem] 2xl:w-[28rem]">
         <header className="flex items-center gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0 flex-1">
             <p className="text-xs text-muted">{offering.unit.code} · Playground</p>
@@ -65,7 +71,7 @@ function SessionPlayground({ session }: { session: LearningSession }) {
           </Link>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
+        <div ref={thread} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
           {messages.map((m) => (
             <MessageBubble
               key={m.id}
@@ -104,7 +110,6 @@ function SessionPlayground({ session }: { session: LearningSession }) {
           )}
           {busy && <p className="text-xs text-muted">The demo tutor is thinking…</p>}
           {error && <p className="text-sm text-bad" role="alert">{error.message}</p>}
-          <div ref={end} />
         </div>
 
         <div className="space-y-2 border-t border-line p-3">

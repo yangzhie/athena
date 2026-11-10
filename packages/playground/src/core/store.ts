@@ -87,8 +87,11 @@ export class Playground {
   private seq = 0
   private ids = 0
   private root: HTMLElement | null = null
+  private resizeObserver: ResizeObserver | null = null
+  private lastSize: { w: number; h: number } | null = null
+  private needsFit = false
   private highlightTimer: ReturnType<typeof setTimeout> | undefined
-  /** Objects of a freshly opened scene still waiting for their real size; fit once all have one. */
+  /** Cards awaiting their real size after opening or deferred tutor work; fit once all have one. */
   private unmeasured = new Set<ObjectId>()
   private modules: Record<string, AnyModule>
   private runtimes: Runtimes
@@ -193,7 +196,26 @@ export class Playground {
   // ─── Host wiring (called by LearningCanvas) ─────────────────────────────
 
   attach(el: HTMLElement | null) {
+    this.resizeObserver?.disconnect()
+    this.resizeObserver = null
     this.root = el
+    if (!el) return
+
+    // Cards added while detached still need their real DOM size on return.
+    if (this.needsFit) this.unmeasured = new Set(this.state.order.filter((id) => !this.frameless(this.state.objects[id].type)))
+    const resize = () => {
+      if (this.root !== el) return
+      const w = el.clientWidth
+      const h = el.clientHeight
+      if (!w || !h) return
+      const changed = !this.lastSize || w !== this.lastSize.w || h !== this.lastSize.h
+      this.lastSize = { w, h }
+      // Preserve a student's pan/zoom across route changes if the size is unchanged.
+      if (changed || this.needsFit) this.fitView()
+    }
+    this.resizeObserver = new ResizeObserver(resize)
+    this.resizeObserver.observe(el)
+    resize()
   }
 
   /** Container size in screen pixels, read live so it is never stale. */
@@ -281,7 +303,7 @@ export class Playground {
 
   setObjectSize(id: ObjectId, w: number, h: number) {
     const obj = this.state.objects[id]
-    if (!obj) return
+    if (!obj || w <= 0 || h <= 0) return
     if (obj.rect.w !== w || obj.rect.h !== h) this.patchObject(id, { rect: { ...obj.rect, w, h } })
     if (this.unmeasured.delete(id) && this.unmeasured.size === 0) this.fitView()
   }
@@ -322,6 +344,11 @@ export class Playground {
   }
 
   fitView() {
+    if (!this.root?.clientWidth || !this.root?.clientHeight) {
+      this.needsFit = true
+      return
+    }
+    this.needsFit = false
     const b = bounds(this.state.order.map((id) => this.state.objects[id].rect))
     if (b) this.set({ viewport: fit(b, this.size) })
   }
@@ -330,6 +357,11 @@ export class Playground {
   focusObject(...ids: ObjectId[]) {
     const r = bounds(ids.map((id) => this.state.objects[id]?.rect).filter((x) => x !== undefined))
     if (!r) return
+    // Tutor work can finish while Chat is open; don't frame it in a fictitious container.
+    if (!this.root?.clientWidth || !this.root?.clientHeight) {
+      this.needsFit = true
+      return
+    }
     const { x, y, zoom } = this.state.viewport
     const sx = r.x * zoom + x
     const sy = r.y * zoom + y
