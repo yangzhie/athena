@@ -13,3 +13,12 @@ export function formatTimestamp(totalSeconds: number) {
 export function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
+
+/** "05:12" → 312, "1:02:05" → 3725, "75" → 75. Null if it isn't a valid time. */
+export function parseTimestamp(text: string): number | null {
+  const parts = text.trim().split(':')
+  if (parts.length === 0 || parts.length > 3 || parts.some((p) => !/^\d+$/.test(p))) return null
+  const nums = parts.map(Number)
+  if (nums.slice(1).some((n) => n >= 60)) return null
+  return nums.reduce((total, n) => total * 60 + n, 0)
+}

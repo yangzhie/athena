@@ -5,12 +5,16 @@ import type { clipsLoader } from '../loader'
 import { UnitHeader } from '../UnitHeader'
 import { useOffering } from '../useOffering'
 import { openInPanel, usePanel } from '../panel/panelStore'
+import { studentView } from '../review/applyReview'
+import { useDecisions } from '../review/reviewStore'
 import { ClipRow } from './ClipRow'
 
 /** The unit's lecture clips: recordings split by topic by lecture indexing, newest week first. */
 export default function ClipsView() {
   const offering = useOffering()
-  const { lectures } = useLoaderData<typeof clipsLoader>()
+  const decisions = useDecisions()
+  // Students only ever see approved clips, with the lecturer's edits applied.
+  const lectures = useLoaderData<typeof clipsLoader>().lectures.map((l) => studentView(l, decisions))
   const clipCount = lectures.reduce((n, l) => n + l.clips.length, 0)
   const panel = usePanel(offering.id)
   const playingId = panel?.kind === 'clip' ? panel.clip.id : null
@@ -34,7 +38,8 @@ export default function ClipsView() {
           <section key={lecture.id} className="overflow-hidden rounded-xl border border-line bg-surface">
             <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
               <h2 className="font-semibold">
-                Week {lecture.week} · {lecture.title}
+                {lecture.week > 0 && `Week ${lecture.week} · `}
+                {lecture.title}
               </h2>
               <span className="flex items-center gap-2 text-xs text-muted">
                 {formatTimestamp(lecture.durationS)}
@@ -47,7 +52,9 @@ export default function ClipsView() {
               <p className="px-5 py-4 text-sm text-muted">
                 {lecture.status === 'processing'
                   ? 'Being split into clips. Check back soon.'
-                  : 'No approved clips yet.'}
+                  : lecture.draft
+                    ? 'Your lecturer is reviewing the clips for this lecture.'
+                    : 'No clips for this lecture.'}
               </p>
             ) : (
               <ol className="divide-y divide-line">

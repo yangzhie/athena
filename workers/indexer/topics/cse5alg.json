@@ -1,0 +1,18 @@
+{
+  "unit": "CSE5ALG Algorithms and Data Structures",
+  "source": "Subject Learning Guide, Semester 1 2026: weekly learning focus",
+  "topics": [
+    {"id": "complexity-search", "name": "Complexity Analysis and Search", "description": "Big-O and running time analysis; linear and binary search."},
+    {"id": "insertion-sort", "name": "Insertion Sort"},
+    {"id": "merge-sort", "name": "Merge Sort", "description": "Divide and conquer sorting; recurrences."},
+    {"id": "radix-sort", "name": "Radix Sort", "description": "Non-comparison sorting: counting, bucket and radix sort."},
+    {"id": "binary-search-trees", "name": "Binary Search Trees"},
+    {"id": "red-black-trees", "name": "Red Black Trees", "description": "Balanced search trees; rotations and recolouring."},
+    {"id": "hash-tables", "name": "Hash Tables", "description": "Hash functions, collisions, chaining, open addressing."},
+    {"id": "b-trees", "name": "B-Trees"},
+    {"id": "heaps", "name": "Heaps", "description": "Binary heaps, priority queues, heapsort."},
+    {"id": "graphs", "name": "Graphs", "description": "Representations, BFS, DFS, topological sort."},
+    {"id": "weighted-graphs", "name": "Weighted Graphs", "description": "Shortest paths and minimum spanning trees."},
+    {"id": "greedy-dp", "name": "Greedy Algorithms and Dynamic Programming"}
+  ]
+}

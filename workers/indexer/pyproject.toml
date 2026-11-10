@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "athena-indexer"
+version = "0.1.0"
+description = "Lecture indexing: turns a lecture recording into topic-labelled clips."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "faster-whisper>=1.1,<2",
+    "openai>=2,<3",
+    "pydantic>=2.12,<3",
+]
+
+[project.scripts]
+index-lecture = "athena_indexer.pipeline:main"
+
+[dependency-groups]
+dev = ["pytest>=8.3,<10"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/athena_indexer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"

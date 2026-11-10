@@ -8,8 +8,10 @@ export interface LectureRecording {
   week: number
   durationS: number
   status: RecordingStatus
-  /** Approved clips only. Empty while processing. */
+  /** Empty while processing. */
   clips: LectureClip[]
+  /** True when clips came from lecture indexing and the lecturer hasn't approved them yet. */
+  draft?: boolean
 }
 
 /**
@@ -25,4 +27,6 @@ export interface LectureClip {
   summary: string
   startS: number
   endS: number
+  /** False until a lecturer approves it. Undefined means approved (hand-written mocks). */
+  approved?: boolean
 }
