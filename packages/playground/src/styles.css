@@ -26,3 +26,13 @@
     opacity: 0.2;
   }
 }
+
+/* A pendulum swinging between ±--pg-amplitude; one alternate leg is half a period. */
+@keyframes pg-swing {
+  from {
+    transform: rotate(calc(-1 * var(--pg-amplitude)));
+  }
+  to {
+    transform: rotate(var(--pg-amplitude));
+  }
+}

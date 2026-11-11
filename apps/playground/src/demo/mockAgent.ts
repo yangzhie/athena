@@ -52,7 +52,7 @@ export class MockAgent {
       })
       return
     }
-    if (/show me|demonstrat|right way|演示/i.test(text) && this.runner.showMe()) return
+    if (/show me|demonstrat|right way/i.test(text) && this.runner.showMe()) return
     this.runner.ask(about, text)
   }
 }
