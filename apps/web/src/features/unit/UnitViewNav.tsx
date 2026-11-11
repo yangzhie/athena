@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { NavLink, useMatch } from 'react-router'
 import type { SidebarActionProps } from '../../app/feature'
 import { useRole } from '../../app/role'
+import { Icon } from '../../components/ui'
 import { cn } from '../../lib/cn'
 import { refreshSrsSummary, useSrsSummary } from './practice/summaryStore'
 import { hasNewReply, useSeen } from './sessions/seenStore'
@@ -9,8 +10,8 @@ import { refreshSessions, useSessionList } from './sessions/sessionStore'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors',
-    isActive ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-line/60 hover:text-ink',
+    'flex items-center gap-2 rounded-md px-3 py-1.5 text-[0.95rem] transition-colors',
+    isActive ? 'font-semibold text-ink [&_.label]:highlight' : 'text-muted hover:bg-bg hover:text-ink',
   )
 
 /**
@@ -46,16 +47,16 @@ export function UnitViewNav({ onNavigate }: SidebarActionProps) {
     return (
       <nav aria-label="This unit" className="space-y-0.5">
         <NavLink to={`/units/${id}/insights`} onClick={onNavigate} className={linkClass}>
-          <span aria-hidden>📊</span> Offering insights
+          <Icon name="chart" /> <span className="label">Offering insights</span>
         </NavLink>
         <NavLink to={`/units/${id}/review`} onClick={onNavigate} className={linkClass}>
-          <span aria-hidden>🎬</span> Review clips
+          <Icon name="film" /> <span className="label">Review clips</span>
         </NavLink>
         <NavLink to={`/units/${id}/questions`} onClick={onNavigate} className={linkClass}>
-          <span aria-hidden>📝</span> Review questions
+          <Icon name="list" /> <span className="label">Review questions</span>
         </NavLink>
         <NavLink to={`/units/${id}/shared`} onClick={onNavigate} className={linkClass}>
-          <span aria-hidden>💬</span> Shared sessions
+          <Icon name="chat" /> <span className="label">Shared sessions</span>
         </NavLink>
       </nav>
     )
@@ -64,16 +65,16 @@ export function UnitViewNav({ onNavigate }: SidebarActionProps) {
   return (
     <nav aria-label="This unit" className="space-y-3">
       <div>
-        <p className="mb-1 px-3 text-xs font-medium tracking-wide text-muted uppercase">Sessions</p>
+        <p className="mb-1 px-3 text-xs font-semibold tracking-[0.14em] text-muted uppercase">Sessions</p>
         <NavLink to={`/units/${id}`} end onClick={onNavigate} className={linkClass}>
-          <span aria-hidden>＋</span> New session
+          <Icon name="plus" /> <span className="label">New session</span>
         </NavLink>
         {sessions.length > 0 && (
           <ul className="mt-0.5 max-h-56 space-y-0.5 overflow-y-auto">
             {sessions.map((s) => (
               <li key={s.id}>
                 <NavLink to={`/units/${id}/s/${s.id}`} onClick={onNavigate} className={linkClass} title={s.goal}>
-                  <span className="truncate">{s.title}</span>
+                  <span className="label truncate">{s.title}</span>
                   {s.shared && (
                     <span className="ml-auto shrink-0 text-xs" title="Shared with your lecturer" aria-label="shared with your lecturer">
                       👁
@@ -95,16 +96,16 @@ export function UnitViewNav({ onNavigate }: SidebarActionProps) {
       </div>
       <div className="space-y-0.5 border-t border-line pt-3">
         <NavLink to={`/units/${id}/library`} onClick={onNavigate} className={linkClass}>
-          <span aria-hidden>📚</span> Material library
+          <Icon name="book" /> <span className="label">Material library</span>
         </NavLink>
         <NavLink to={`/units/${id}/clips`} onClick={onNavigate} className={linkClass}>
-          <span aria-hidden>🎬</span> Lecture clips
+          <Icon name="film" /> <span className="label">Lecture clips</span>
         </NavLink>
         <NavLink to={`/units/${id}/practice`} onClick={onNavigate} className={linkClass}>
-          <span aria-hidden>🧠</span> Practice
+          <Icon name="cards" /> <span className="label">Practice</span>
           {due > 0 && (
             <span
-              className="ml-auto rounded-full bg-accent px-1.5 text-xs font-medium text-white tabular-nums"
+              className="ml-auto rounded-full bg-margin px-1.5 text-xs font-semibold text-surface tabular-nums"
               aria-label={`${due} to review`}
             >
               {due}

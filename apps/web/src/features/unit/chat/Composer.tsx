@@ -42,7 +42,8 @@ export function Composer({ placeholder, streaming, disabled = false, onSend, onS
   return (
     <form
       onSubmit={submit}
-      className="flex items-end gap-2 rounded-2xl border border-line bg-surface p-2 shadow-sm focus-within:border-accent"
+      // A ruled line to write on, not a chat box.
+      className="flex items-end gap-2 rounded-md border-b-2 border-line bg-surface/80 px-1 pt-1 pb-1.5 backdrop-blur transition-colors focus-within:border-accent"
     >
       <textarea
         ref={ref}
@@ -53,7 +54,7 @@ export function Composer({ placeholder, streaming, disabled = false, onSend, onS
         rows={1}
         placeholder={placeholder}
         aria-label="Message Athena"
-        className="max-h-[200px] min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-[0.9375rem] outline-none placeholder:text-muted"
+        className="max-h-[200px] min-h-10 flex-1 resize-none bg-transparent px-2 py-2 outline-none placeholder:text-muted placeholder:italic"
       />
       {streaming ? (
         <button
@@ -61,7 +62,7 @@ export function Composer({ placeholder, streaming, disabled = false, onSend, onS
           onClick={onStop}
           aria-label="Stop generating"
           title="Stop generating"
-          className="grid size-10 shrink-0 place-items-center rounded-xl bg-ink text-bg transition hover:opacity-85"
+          className="grid size-9 shrink-0 place-items-center rounded-md bg-ink text-bg transition hover:opacity-85"
         >
           <span className="size-3 rounded-sm bg-current" />
         </button>
@@ -71,11 +72,9 @@ export function Composer({ placeholder, streaming, disabled = false, onSend, onS
           disabled={!canSend}
           aria-label="Send message"
           title="Send (Enter)"
-          className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent text-white transition hover:opacity-90 disabled:opacity-40"
+          className="h-9 shrink-0 rounded-md px-3 text-sm font-semibold text-accent transition hover:bg-accent-soft disabled:opacity-40"
         >
-          <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-            <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          Ask ↵
         </button>
       )}
     </form>

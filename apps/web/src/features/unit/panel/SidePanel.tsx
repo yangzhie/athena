@@ -19,7 +19,7 @@ function title(content: PanelContent) {
 /**
  * The unit's right-hand panel. Shows one item the tutor or the learner opened:
  * a sandbox, a lecture clip, and later slides or other sources.
- * 1280px+: docked beside the page. Narrower: hidden until something opens, then a sheet over the page.
+ * Hidden until something opens. Then 1280px+: docked beside the page; narrower: a sheet over the page.
  */
 export function SidePanel({ offering }: { offering: Offering }) {
   const content = usePanel(offering.id)
@@ -45,13 +45,13 @@ export function SidePanel({ offering }: { offering: Offering }) {
           'shrink-0',
           // Narrow screens: slide-over sheet, only when something is open.
           content ? 'fixed inset-y-0 right-0 z-40 w-full max-w-md p-3' : 'hidden',
-          // Wide screens: always docked, sticky below the top bar.
-          'xl:static xl:z-auto xl:block xl:w-[24rem] xl:max-w-none xl:p-0 2xl:w-[28rem]',
+          // Wide screens: docked beside the page while something is open, sticky below the top bar.
+          content && 'xl:static xl:z-auto xl:block xl:w-[24rem] xl:max-w-none xl:p-0 2xl:w-[28rem]',
         )}
       >
-        <section className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-surface xl:sticky xl:top-[calc(var(--topbar-h)+1.5rem)] xl:h-[calc(100svh-var(--topbar-h)-3rem)]">
+        <section className="flex h-full flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-[0_12px_32px_-22px_color-mix(in_oklab,var(--color-ink)_50%,transparent)] xl:sticky xl:top-[calc(var(--topbar-h)+1.5rem)] xl:h-[calc(100svh-var(--topbar-h)-3rem)]">
           <header className="flex items-center gap-3 border-b border-line px-5 py-3">
-            <h2 className="min-w-0 flex-1 truncate font-semibold">{content ? title(content) : 'Side panel'}</h2>
+            <h2 className="min-w-0 flex-1 truncate font-semibold">{content ? title(content) : ''}</h2>
             {content && <Badge>{renderers[content.kind].label}</Badge>}
             {content && (
               <button
@@ -67,24 +67,7 @@ export function SidePanel({ offering }: { offering: Offering }) {
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {content ? (
-              <Body key={JSON.stringify(content)} content={content} />
-            ) : (
-              <div className="flex h-full items-center justify-center p-6">
-                <div className="max-w-xs text-center">
-                  <div className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-accent-soft text-accent" aria-hidden>
-                    <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth={1.75}>
-                      <rect x="3" y="4" width="18" height="16" rx="2.5" />
-                      <path d="M15 4v16" />
-                    </svg>
-                  </div>
-                  <p className="font-medium">Nothing open yet</p>
-                  <p className="mt-1 text-sm text-muted">
-                    Lecture clips, sandboxes and sources the tutor suggests open here, next to what you're doing.
-                  </p>
-                </div>
-              </div>
-            )}
+            {content && <Body key={JSON.stringify(content)} content={content} />}
           </div>
         </section>
       </aside>

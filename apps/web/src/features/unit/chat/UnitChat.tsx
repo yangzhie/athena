@@ -5,12 +5,13 @@ import { Composer } from './Composer'
 import { MessageBubble } from './MessageBubble'
 import { answer, continueLearning, sendMessage, stopWaiting, useThread } from './chatStore'
 import { openActivityId } from './activity'
+import { lessonProgress } from './lessonProgress'
 
 function nearBottom() {
   return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160
 }
 
-/** One learning session's chat: messages above, prompt box pinned to the bottom. */
+/** One learning session as a lesson: the tutor's steps down the page, sources in the margin, a quiet line to ask on. */
 export function UnitChat({ offering, session }: { offering: Offering; session: LearningSession }) {
   const { messages, sending: streaming, error } = useThread(session.id)
   const end = useRef<HTMLDivElement>(null)
@@ -26,6 +27,7 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
   }, [messages.length, last?.content])
 
   const openId = openActivityId(messages)
+  const { questionNumber } = lessonProgress(messages)
 
   const send = (text: string) => {
     bumpSession(session)
@@ -33,7 +35,7 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col">
+    <div className="flex w-full flex-1 flex-col">
       {/* Announce reply state once, rather than every streamed word. */}
       <p className="sr-only" role="status">
         {streaming ? 'Athena is replying' : last?.role === 'tutor' ? 'Athena replied' : ''}
@@ -42,9 +44,9 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
       <div className="flex flex-1 flex-col py-6">
         {messages.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
-            <h2 className="text-2xl font-semibold tracking-tight">{session.title}</h2>
+            <h2 className="text-2xl font-semibold">A blank page</h2>
             <p className="mt-2 max-w-md text-muted">
-              Ask anything about it. Answers will be based on {offering.unit.code}'s material.
+              Ask anything about {session.title}. Answers are based on {offering.unit.code}'s material.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               {offering.suggestions.map((s) => (
@@ -52,7 +54,7 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
                   key={s}
                   type="button"
                   onClick={() => send(s)}
-                  className="rounded-full border border-line bg-surface px-4 py-2 text-sm transition-colors hover:bg-line/50"
+                  className="rounded-md border border-line bg-surface px-4 py-2 text-sm transition-colors hover:border-accent hover:text-accent"
                 >
                   {s}
                 </button>
@@ -60,11 +62,13 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-8">
             {messages.map((m) => (
               <MessageBubble
                 key={m.id}
                 message={m}
+                layout="lesson"
+                number={m.activity?.kind === 'question' ? questionNumber[m.activity.activity_id] : undefined}
                 pending={streaming && m.id.startsWith('pending-') && m.role === 'tutor'}
                 offeringId={offering.id}
                 sessionId={session.id}
@@ -89,15 +93,16 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
       </div>
 
       {/* Pinned to the bottom of the viewport; the gradient fades messages scrolling under it. */}
-      <div className="sticky bottom-0 bg-linear-to-t from-bg from-70% to-transparent pt-4 pb-4 md:pb-6">
+      <div className="sticky bottom-0 bg-linear-to-t from-bg from-70% to-transparent pt-6 pb-4 @2xl:pr-[13rem] md:pb-6">
+        <p className="mb-1 px-1 text-xs font-semibold tracking-[0.14em] text-muted uppercase">Stuck? Ask about this step</p>
         <Composer
-          placeholder={`Message ${offering.unit.code} tutor`}
+          placeholder={`Ask anything about ${session.title}…`}
           streaming={streaming}
           onSend={send}
           onStop={() => stopWaiting(session.id)}
         />
-        <p className="mt-2 text-center text-xs text-muted">
-          Athena can make mistakes. Check important answers against your unit's material.
+        <p className="mt-2 px-1 text-xs text-muted">
+          Answers cite {offering.unit.code}'s material in the margin. Anything marked general knowledge isn't from it.
         </p>
       </div>
     </div>
