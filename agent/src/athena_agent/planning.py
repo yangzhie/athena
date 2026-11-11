@@ -1,12 +1,13 @@
 """Explicit learning-planning services, independent of conversation message handling."""
 
 from typing import Annotated, Literal, Self, Sequence
+import re
 
 from pydantic import Field, create_model, model_validator
 
 from ._schema import Contract, NonBlankString
 from .context import ContextBuilder
-from .grounding import generate_grounded
+from .grounding import generate_learning_content
 from .conversation import ConversationError, ConversationTurn, InMemoryConversationStore, TopicContext
 from .contracts import RequestContext
 from .memory import LearningMemoryStore
@@ -14,7 +15,7 @@ from .learning import LearningState
 from .llm import LLM, Model, InvalidOutputError, Message
 from .reliable_llm import ReliableLLM
 from .retrieval import RetrievalResult
-from .roadmap import Concept, ConceptGraph, EnrichedConcept, EnrichedGraph, ObjectiveBatch, Roadmap, RoadmapRevision, TopicScope
+from .roadmap import Concept, ConceptGraph, ConceptObjectives, EnrichedConcept, EnrichedGraph, ObjectiveBatch, Roadmap, RoadmapRevision, TopicScope
 
 
 class GoalInterpretation(Contract):
@@ -52,7 +53,7 @@ class PlanningService:
             model,
             **({'additional_context': inputs} if inputs is not None else {}),
         )
-        return await generate_grounded(self._llm, self.context_builder, topic, messages, model)
+        return await generate_learning_content(self._llm, self.context_builder, topic, messages, model)
 
     async def interpret_goal(
         self, text: str, clarification_turns: Sequence[ConversationTurn] = (),
@@ -85,6 +86,10 @@ class PlanningService:
     async def identify_graph(self, goal: str, scope: TopicScope, *, knowledge: RetrievalResult | None = None) -> ConceptGraph:
         scope = TopicScope.model_validate(scope.model_dump())
         limit = self.policy.initial_concept_limit
+        focused_comparison = scope.scope == 'narrow' and bool(re.search(
+            r'\b(difference between|compare|comparison|versus|vs\.?|distinguish)\b', goal, re.I))
+        if focused_comparison:
+            limit = 1
         bounded = create_model(
             'BoundedConceptGraph', __base__=ConceptGraph,
             concepts=(Annotated[list[Concept], Field(min_length=1, max_length=limit)], ...),
@@ -92,10 +97,15 @@ class PlanningService:
         result = await self._call(
             TopicContext(learning_state=LearningState(goal=goal), knowledge=knowledge), goal,
             f'Identify at most {limit} relevant concepts and their prerequisites. '
+            + ('Use one integrated Concept covering the comparison. Do not split the same distinction '
+               'into repeated vocabulary, target-type and category-encoding lessons. ' if focused_comparison else '') +
             'Use stable, distinct concept IDs and only prerequisites included in this graph. '
             'For broad subjects generate a manageable initial foundation, not an entire course, '
             'and set partial_coverage=true. For narrow topics cover the goal directly and '
-            'mark whether coverage remains incomplete. Do not generate lessons or assume mastery.',
+            'mark whether coverage remains incomplete. For a focused comparison, start with the distinguishing '
+            'decision or relationship the learner asked about. Do not build a long chain of trivial vocabulary '
+            'prerequisites before addressing that question. Include prerequisites only when understanding the '
+            'requested concept actually depends on them. Do not generate lessons or assume mastery.',
             bounded, inputs={'scope': scope.model_dump()},
         )
         if scope.scope == 'broad' and not result.partial_coverage:
@@ -109,13 +119,19 @@ class PlanningService:
         state = LearningState.model_validate(learner_state.model_dump()) if learner_state else LearningState(goal=goal)
         if state.goal != goal:
             raise ConversationError('Learner evidence must belong to the requested goal.')
+        allowed_ids = Literal[tuple(concept.concept_id for concept in graph.concepts)]
+        objective_type = create_model('ExistingConceptObjectives', __base__=ConceptObjectives, concept_id=(allowed_ids, ...))
+        objective_batch = create_model('ObjectiveBatch', __base__=ObjectiveBatch,
+                                      concepts=(Annotated[list[objective_type], Field(min_length=len(graph.concepts), max_length=len(graph.concepts))], ...))
         objectives = await self._call(
             TopicContext(learning_state=state, knowledge=knowledge), goal,
             'For every supplied concept, return its existing ID, one or more concise '
             'observable learning objectives, and beginner/intermediate/advanced difficulty. '
+            'Objectives should require explaining, applying, contrasting or interpreting the central concept; '
+            'do not reduce a comparison goal to identifying an explicitly named input or output. '
             'Use supplied learner evidence where available, without inventing proficiency. '
             'Return each ID exactly once; do not add concepts or change their meanings.',
-            ObjectiveBatch, inputs={'graph': graph.model_dump()},
+            objective_batch, inputs={'graph': graph.model_dump()},
         )
         by_id = {item.concept_id: item for item in objectives.concepts}
         if set(by_id) != {concept.concept_id for concept in graph.concepts}:

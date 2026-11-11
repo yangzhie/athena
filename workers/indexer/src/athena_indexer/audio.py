@@ -23,7 +23,11 @@ class AudioError(RuntimeError):
 def _run(cmd: list[str]) -> str:
     if shutil.which(cmd[0]) is None:
         raise AudioError(f"{cmd[0]} is not installed or not on PATH")
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    cmd = [cmd[0], "-protocol_whitelist", "file,pipe", *cmd[1:]]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    except subprocess.TimeoutExpired:
+        raise AudioError(f"{cmd[0]} exceeded its processing limit") from None
     if proc.returncode != 0:
         tail = "\n".join(proc.stderr.strip().splitlines()[-5:])
         raise AudioError(f"{cmd[0]} failed: {tail}")
@@ -122,7 +126,7 @@ def read_samples(path: Path):
     if shutil.which("ffmpeg") is None:
         raise AudioError("ffmpeg is not installed or not on PATH")
     proc = subprocess.run(
-        ["ffmpeg", "-nostdin", "-v", "error", "-i", str(path), "-f", "f32le", "-ac", "1", "-ar", str(SAMPLE_RATE), "-"],
+        ["ffmpeg", "-protocol_whitelist", "file,pipe", "-nostdin", "-v", "error", "-i", str(path), "-f", "f32le", "-ac", "1", "-ar", str(SAMPLE_RATE), "-"],
         capture_output=True,
     )
     if proc.returncode != 0:

@@ -84,7 +84,7 @@ export default function ReviewView() {
       {error?.status === 403 && (
         <Card title="The API doesn’t recognise you as a lecturer">
           <p className="text-sm text-muted">
-            Start the API with <code>ATHENA_DEV_LECTURER_ID=dev-lecturer</code> to act as a lecturer in development.
+            Lecturer access requires a server-issued invite and management permission for this Offering.
           </p>
         </Card>
       )}

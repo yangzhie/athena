@@ -4,7 +4,7 @@ import { bumpSession } from '../sessions/sessionStore'
 import { Composer } from './Composer'
 import { MessageBubble } from './MessageBubble'
 import { answer, continueLearning, sendMessage, stopWaiting, useThread } from './chatStore'
-import type { ChatMessage } from '../../../types'
+import { openActivityId } from './activity'
 
 function nearBottom() {
   return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160
@@ -65,8 +65,9 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
               <MessageBubble
                 key={m.id}
                 message={m}
-                pending={streaming && m === last}
+                pending={streaming && m.id.startsWith('pending-') && m.role === 'tutor'}
                 offeringId={offering.id}
+                sessionId={session.id}
                 open={!!m.activity && m.activity.activity_id === openId}
                 busy={streaming}
                 onAnswer={(a) => {
@@ -81,10 +82,10 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
         )}
         {error && (
           <p className="mt-4 text-sm text-bad" role="alert">
-            Your message couldn’t be sent: {error.message}
+            This step couldn’t finish: {error.message}
           </p>
         )}
-        <div ref={end} />
+        <div ref={end} className="scroll-mb-40" />
       </div>
 
       {/* Pinned to the bottom of the viewport; the gradient fades messages scrolling under it. */}
@@ -101,20 +102,4 @@ export function UnitChat({ offering, session }: { offering: Offering; session: L
       </div>
     </div>
   )
-}
-
-/**
- * The activity waiting on the learner: the latest activity, if it's a question not yet
- * answered or a teaching step not yet continued from. Earlier ones are read-only.
- */
-function openActivityId(messages: ChatMessage[]): string | null {
-  const i = messages.findLastIndex((m) => m.activity)
-  if (i < 0) return null
-  const a = messages[i].activity!
-  const after = messages.slice(i + 1)
-  if (a.kind === 'question') {
-    return after.some((m) => m.answerFor === a.question.question_id) ? null : a.activity_id
-  }
-  if (a.kind === 'explanation') return a.activity_id
-  return null
 }

@@ -1,9 +1,10 @@
 import { asApiError, type ApiError } from '../../../api/client'
+import { generateScene } from '../../../api/playground'
 import { answerQuestion, continueSession, getSession, sendSessionMessage, type AnswerInput } from '../../../api/sessions'
 import { createKeyedStore } from '../../../lib/keyedStore'
-import type { ChatMessage, LearningSession } from '../../../types'
+import type { ChatMessage, LearningSession, Offering } from '../../../types'
 
-/** One learning session's chat, loaded from and saved by apps/api. */
+/** One API-backed learning session, with clearly labelled, local-only Playground messages. */
 export interface Thread {
   status: 'loading' | 'ready' | 'missing' | 'error'
   session?: LearningSession
@@ -16,24 +17,37 @@ export interface Thread {
 const EMPTY: Thread = { status: 'loading', messages: [], sending: false }
 const store = createKeyedStore<Thread>(EMPTY)
 const controllers = new Map<string, AbortController>()
+const loads = new Map<string, symbol>()
 
 export const useThread = store.use
+export const getThread = store.get
 
-/** Fetch the session's messages. Without `refresh`, a thread already loaded is reused. */
+const chronological = (messages: ChatMessage[]) =>
+  messages.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+
+/** Fetch the session's messages. Refreshes retain local demo messages in this browser tab. */
 export async function loadThread(offeringId: string, sessionId: string, { refresh = false } = {}) {
   const current = store.get(sessionId)
-  if (current.sending || (current.status === 'ready' && !refresh)) return
+  if (current.sending || (current.status === 'ready' && current.session?.offeringId === offeringId && !refresh)) return
+  const request = Symbol()
+  loads.set(sessionId, request)
   try {
     const { session, messages } = await getSession(offeringId, sessionId)
-    if (store.get(sessionId).sending) return  // a turn started meanwhile; it brings its own messages
-    store.set(sessionId, { status: 'ready', session, messages, sending: false })
+    if (loads.get(sessionId) !== request) return
+    const local = store.get(sessionId).messages.filter((m) => m.via === 'playground')
+    store.set(sessionId, { status: 'ready', session, messages: chronological([...messages, ...local]), sending: false })
   } catch (e) {
+    if (loads.get(sessionId) !== request) return
     const error = asApiError(e)
-    store.set(sessionId, { ...EMPTY, status: error.status === 404 ? 'missing' : 'error', error })
+    const previous = error.status === 404 || error.status === 403 || error.status === 401 ? EMPTY : store.get(sessionId)
+    store.set(sessionId, { ...previous, status: error.status === 404 ? 'missing' : 'error', error })
+  } finally {
+    if (loads.get(sessionId) === request) loads.delete(sessionId)
   }
 }
 
 export function seedThread(session: LearningSession, messages: ChatMessage[]) {
+  loads.delete(session.id)
   store.set(session.id, { status: 'ready', session, messages, sending: false })
 }
 
@@ -43,16 +57,38 @@ export function updateThreadSession(session: LearningSession) {
 }
 
 export function forgetThread(sessionId: string) {
+  loads.delete(sessionId)
   controllers.get(sessionId)?.abort()
+  controllers.delete(sessionId)
   store.set(sessionId, { ...EMPTY, status: 'missing' })
 }
 
 let seq = 0
 const tempId = () => `pending-${Date.now()}-${seq++}`
 
+/** Local demo output is never submitted to the API or included in a shared session. */
+export function postToThread(sessionId: string, message: Pick<ChatMessage, 'content' | 'playground'> & { role: 'tutor' | 'learner' }) {
+  const t = store.get(sessionId)
+  if (t.status !== 'ready' || !t.session) return
+  const local: ChatMessage = { ...message, id: `playground-${seq++}`, via: 'playground', createdAt: new Date().toISOString() }
+  store.set(sessionId, { ...t, messages: [...t.messages, local] })
+}
+
+/** Keep the Playground recommendation without replacing the real agent's reply with a mock. */
+export async function suggestPlayground(offering: Offering, sessionId: string, text: string) {
+  const current = store.get(sessionId)
+  if (current.status !== 'ready' || current.session?.offeringId !== offering.id) return
+  const offer = await generateScene(offering, text, sessionId)
+  if (!offer) return
+  const latest = store.get(sessionId)
+  if (latest.status !== 'ready' || latest.session?.offeringId !== offering.id) return
+  if (latest.messages.some((m) => m.playground?.sceneId === offer.sceneId)) return
+  postToThread(sessionId, { role: 'tutor', content: 'You can also explore this in the demo Playground.', playground: offer })
+}
+
 /**
  * Run one tutor turn: show the learner's part (if any) and a "thinking" bubble at once,
- * then swap in what the API stored.
+ * then swap in what the API stored. Local demo messages remain separate from that request.
  */
 async function turn(
   sessionId: string,
@@ -62,6 +98,8 @@ async function turn(
 ) {
   const t = store.get(sessionId)
   if (t.sending || t.status !== 'ready') return
+  // A refresh started before this turn must not overwrite the completed reply later.
+  loads.delete(sessionId)
   const now = new Date().toISOString()
   const learner: ChatMessage | null =
     learnerText === null ? null : { id: tempId(), role: 'learner', content: learnerText, answerFor, createdAt: now }
@@ -73,20 +111,28 @@ async function turn(
   controllers.set(sessionId, controller)
   try {
     const saved = await request(controller.signal)
+    if (controllers.get(sessionId) !== controller) return
     const cur = store.get(sessionId)
-    store.set(sessionId, { ...cur, messages: [...cur.messages.filter((m) => !temp.has(m.id)), ...saved], sending: false })
+    const savedIds = new Set(saved.map((m) => m.id))
+    store.set(sessionId, {
+      ...cur,
+      messages: chronological([...cur.messages.filter((m) => !temp.has(m.id) && !savedIds.has(m.id)), ...saved]),
+      sending: false,
+    })
+    return saved
   } catch (e) {
+    if (controllers.get(sessionId) !== controller) return
     const cur = store.get(sessionId)
     const stopped = e instanceof DOMException && e.name === 'AbortError'
     store.set(sessionId, {
       ...cur,
-      // Drop the thinking bubble; an unsent answer is dropped too so the question stays open.
-      messages: cur.messages.filter((m) => m.id !== pending.id && !(learner?.answerFor && m.id === learner.id)),
+      // A failed exchange stays absent until the server confirms the complete result.
+      messages: cur.messages.filter((m) => !temp.has(m.id)),
       sending: false,
       error: stopped ? undefined : asApiError(e),
     })
   } finally {
-    controllers.delete(sessionId)
+    if (controllers.get(sessionId) === controller) controllers.delete(sessionId)
   }
 }
 

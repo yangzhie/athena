@@ -15,10 +15,11 @@ from athena_agent.llm import DependencyError, MockLLM
 from athena_agent.memory import LearnerScopedMemory
 from athena_agent.reliable_llm import ReliableLLM, RetryPolicy
 from athena_agent.retrieval import MockRetriever
-from fastapi.testclient import TestClient
+from .http_client import TestClient
 
 from athena_api.app import create_app
 from athena_api.sessions.agent_tutor import AgentTutor
+from athena_api.sessions.tutor import PlaceholderTutor
 from athena_api.sessions.service import SessionService
 from athena_api.sessions.store import MemorySessionStore
 from athena_api.srs.service import SrsService
@@ -28,11 +29,11 @@ FIXTURE = json.loads((Path(__file__).parents[3] / "agent/tests/fixtures/api_jour
 BASE = "/units/cse5alg-2026-s2/sessions"
 
 
-def make_client(responses):
+def make_client(responses, host_store=None):
     agent_store = InMemoryConversationStore()
     tutor = AgentTutor(agent_store, ReliableLLM(MockLLM(responses), policy=RetryPolicy(max_attempts=1)))
     who = {"id": "alice"}
-    app = create_app(srs=SrsService(MemoryStore()), sessions=SessionService(MemorySessionStore(), tutor=tutor),
+    app = create_app(srs=SrsService(MemoryStore()), sessions=SessionService(host_store or MemorySessionStore(), tutor=tutor),
                      resolve_student=lambda _r: who["id"])
     return TestClient(app), agent_store, who
 
@@ -87,6 +88,141 @@ def test_agent_failure_on_start_leaves_no_half_session():
     assert client.get(BASE).json() == []
 
 
+@pytest.mark.parametrize('correct', [True, False])
+def test_rent_answer_progresses_when_retrieved_material_cannot_support_next_step(correct):
+    from types import SimpleNamespace
+    opening = [
+        {'scope': 'narrow', 'rationale': 'Distinguish two prediction tasks.'},
+        {'partial_coverage': False, 'concepts': [{'concept_id': 'prediction', 'title': 'Prediction',
+            'description': 'Numerical values and class labels', 'prerequisite_ids': []}]},
+        {'concepts': [{'concept_id': 'prediction', 'objectives': ['Distinguish regression and classification'], 'difficulty': 'beginner'}]},
+        {'prompt': 'A model uses an apartment’s size and location to predict its monthly rent. What is the model trained to predict?',
+         'choices': [{'choice_id': 'rent', 'text': 'A numerical rent amount'}, {'choice_id': 'label', 'text': 'A class label'}],
+         'correct_choice_id': 'rent', 'rationale': 'Rent is a numerical target.'},
+    ]
+    missing = {'supported': False, 'evidence': [], 'problem': 'insufficient_evidence'}
+    followup = {'prompt': 'Why is predicting rent regression?', 'expected_reasoning': 'The target is a numerical monthly rent.'}
+    explanation = {'text': 'Regression predicts a numerical amount, such as monthly rent. Classification predicts a label.'}
+    next_draft = followup if correct else explanation
+    after = ([] if correct else [{'misconceptions': [], 'prerequisite_gaps': []}])
+    after += [next_draft, missing, next_draft, missing, next_draft]
+    after += [{'outcome': 'correct', 'feedback': 'The numerical target makes this regression.', 'confidence': 1.0,
+               'evidence_quotes': ['numerical monthly rent']}]
+    client, agent_store, _ = make_client([*opening, *after])
+    created = client.post(BASE, json={'goal': 'Regression versus classification'}).json()
+    sid, activity = created['session']['id'], created['messages'][0]['activity']
+    tutor = client.app.state.sessions.tutor
+    tutor.material = SimpleNamespace(for_goal=lambda *_: [dict(kind='document', source_id='slides', passage_id='overview',
+        title='Lecture overview', text='This lecture introduces supervised learning.')])
+    context = RequestContext(request_id='check', learner_id='alice', session_id=sid)
+    rubric = agent_store.read(context).active_topic.question_records[0].bundle.criteria
+    body = {'question_id': activity['question']['question_id'], 'choice_id': 'rent' if correct else 'label',
+            'shown': 'A numerical rent amount' if correct else 'A class label'}
+    response = client.post(f'{BASE}/{sid}/answers', json=body)
+    assert response.status_code == 200, response.json()
+    assert response.json()[1]['content'].startswith('That choice is correct.' if correct else 'That choice is incorrect.')
+    next_activity = response.json()[-1]['activity']
+    assert next_activity['kind'] == ('question' if correct else 'explanation')
+    assert next_activity['knowledge_origin'] == 'general' and next_activity['sources'] == []
+    snapshot = agent_store.read(context)
+    assert len(snapshot.active_topic.assessment_records) == 1
+    assert snapshot.active_topic.assessment_records[0].assessment.outcome == ('correct' if correct else 'incorrect')
+    assert snapshot.active_topic.question_records[0].bundle.criteria == rubric
+    count = len(tutor.llm._llm.calls)
+    assert client.post(f'{BASE}/{sid}/answers', json=body).json() == response.json()
+    assert len(tutor.llm._llm.calls) == count
+    if correct:
+        # The accepted general-knowledge follow-up is graded using its original
+        # private rubric, even though current retrieval still finds course text.
+        answered = client.post(f'{BASE}/{sid}/answers', json={
+            'question_id': next_activity['question']['question_id'], 'text': 'It predicts numerical monthly rent.',
+            'shown': 'It predicts numerical monthly rent.',
+        })
+        assert answered.status_code == 200, answered.json()
+        assert answered.json()[-1]['activity']['kind'] == 'completion'
+        assert len(agent_store.read(context).active_topic.assessment_records) == 2
+
+
+@pytest.mark.parametrize('mixed', [False, True])
+def test_question_first_answers_preserve_sources_through_retry_restart_and_share(tmp_path, mixed):
+    from types import SimpleNamespace
+    from athena_api.sessions.store import SqliteSessionStore
+    from athena_api.sessions.shared import SharedSessions
+    parts = [{'text': 'Regression predicts numbers; classification predicts labels.', 'origin': 'materials'}]
+    if mixed:
+        parts.append({'text': 'House price prediction is a regression example.', 'origin': 'general'})
+    check = {'supported': True, 'evidence': [{'source_index': 0, 'quote_index': 0}]}
+    responses = [*FIXTURE['responses'][:4], {'intent': 'continue'}, {'parts': parts}, check]
+    path = tmp_path / 'host.db'
+    client, _, _ = make_client(responses, host_store=SqliteSessionStore(path))
+    service = client.app.state.sessions
+    opening = client.post(BASE, json={'goal': 'Bubble Sort'}).json()
+    sid = opening['session']['id']
+    queries = []
+    source = dict(kind='document', source_id='slides-v1', passage_id='page-28', title='Prediction', page=28,
+                  text='Regression predicts numbers.\nClassification predicts labels.')
+    def retrieve(offering, query):
+        queries.append(query)
+        return [source]
+    service.tutor.material = SimpleNamespace(for_goal=retrieve)
+    url = f'{BASE}/{sid}/messages'
+    question = 'What is the difference between regression and classification?'
+    headers = {'Idempotency-Key': 'comparison'}
+    response = client.post(url, json={'text': question}, headers=headers)
+    assert response.status_code == 200, response.json()
+    reply = response.json()[1]
+    assert reply['knowledge_origin'] == ('supplement' if mixed else 'materials')
+    assert reply['sources'][0]['page'] == 28 and reply['sources'][0]['quote'] == source['text']
+    assert queries == [question]
+    if mixed:
+        assert '**General-knowledge addition:**' in reply['content']
+    call_count = len(service.tutor.llm._llm.calls)
+    service.store = SqliteSessionStore(path)  # Reload persisted messages and receipts.
+    assert client.post(url, json={'text': question}, headers=headers).json() == response.json()
+    assert len(service.tutor.llm._llm.calls) == call_count and queries == [question]
+    stored = client.get(f'{BASE}/{sid}').json()['messages']
+    assert next(m for m in stored if m['id'] == reply['id']) == reply
+    assert len([m for m in stored if m['role'] == 'learner']) == 1
+    service.share('alice', 'cse5alg-2026-s2', sid)
+    token = service.store.get('alice', sid).share_token
+    shared = SharedSessions(service.store).view('cse5alg-2026-s2', token)
+    shared_reply = next(m for m in shared.messages if m.content == reply['content'])
+    assert shared_reply.sources == reply['sources'] and shared_reply.knowledge_origin == reply['knowledge_origin']
+    assert shared_reply.id != reply['id']
+
+
+@pytest.mark.parametrize('kind', ['document', 'video'])
+def test_grounded_start_with_multiline_material_preserves_citations_and_replays(kind):
+    from types import SimpleNamespace
+    text = 'Bubble Sort compares adjacent items.\r\nSwap when out of order.\t例子: "3, 1" → "1, 3".\n'
+    source = dict(kind=kind, source_id='uploaded', title='Uploaded material')
+    if kind == 'document':
+        source.update(passage_id='page-4', text=text, page=4)
+    else:
+        source.update(segment_id='approved-clip', transcript=text, start_seconds=12.5, end_seconds=29.0)
+    support = {'supported': True, 'evidence': [{'source_index': 0, 'quote_index': 0}]}
+    responses = [item for generated in FIXTURE['responses'][:4] for item in (generated, support)]
+    client, _, _ = make_client(responses)
+    tutor = client.app.state.sessions.tutor
+    tutor.material = SimpleNamespace(for_goal=lambda offering, goal: [source])
+    headers = {'Idempotency-Key': 'multiline-start'}
+    first = client.post(BASE, json={'goal': 'Bubble Sort'}, headers=headers)
+    assert first.status_code == 201, first.json()
+    opening = first.json()['messages'][0]
+    citation = opening['sources'][0]
+    assert citation['quote'] == text and citation['source_id'] == 'uploaded'
+    assert opening['knowledge_origin'] == 'materials'
+    if kind == 'document':
+        assert citation['passage_id'] == 'page-4' and citation['page'] == 4
+    else:
+        assert citation['segment_id'] == 'approved-clip' and citation['start_seconds'] == 12.5
+    assert len(tutor.llm._llm.calls) == 8
+    replay = client.post(BASE, json={'goal': 'Bubble Sort'}, headers=headers)
+    assert replay.json() == first.json()
+    assert len(tutor.llm._llm.calls) == 8
+    assert len(client.get(BASE).json()) == 1
+
+
 def test_agent_sessions_are_per_student():
     client, _, who = make_client(FIXTURE["responses"])
     sid = client.post(BASE, json={"goal": FIXTURE["goal"]}).json()["session"]["id"]
@@ -107,7 +243,7 @@ def test_answer_needs_exactly_one_of_choice_or_text(body):
 
 def test_placeholder_tutor_rejects_answers():
     who = {"id": "alice"}
-    client = TestClient(create_app(srs=SrsService(MemoryStore()), sessions=SessionService(MemorySessionStore()),
+    client = TestClient(create_app(srs=SrsService(MemoryStore()), sessions=SessionService(MemorySessionStore(), tutor=PlaceholderTutor()),
                                    resolve_student=lambda _r: who["id"]))
     sid = client.post(BASE, json={"goal": "x"}).json()["session"]["id"]
     r = client.post(f"{BASE}/{sid}/answers", json={"question_id": "q", "choice_id": "a", "shown": "a"})

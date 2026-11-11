@@ -1,9 +1,10 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from fastapi.testclient import TestClient
+from .http_client import TestClient
 
 from athena_api.app import create_app
+from athena_api.sessions.tutor import PlaceholderTutor
 from athena_api.sessions.service import SessionService
 from athena_api.sessions.store import MemorySessionStore, SqliteSessionStore
 from athena_api.srs.service import SrsService
@@ -26,7 +27,7 @@ class Clock:
 def client(request, tmp_path):
     store = MemorySessionStore() if request.param == "memory" else SqliteSessionStore(tmp_path / "s.db")
     who = {"id": "alice"}
-    app = create_app(srs=SrsService(MemoryStore()), sessions=SessionService(store, clock=Clock()),
+    app = create_app(srs=SrsService(MemoryStore()), sessions=SessionService(store, tutor=PlaceholderTutor(), clock=Clock()),
                      resolve_student=lambda _r: who["id"])
     c = TestClient(app)
     c.who = who
@@ -123,7 +124,7 @@ def test_share_tokens_are_fresh_and_cleared():
     from athena_api.sessions.store import MemorySessionStore as M
     import asyncio
 
-    svc = S(M(), clock=Clock())
+    svc = S(M(), tutor=PlaceholderTutor(), clock=Clock())
     session, _ = asyncio.run(svc.create("alice", UNIT, "clustering"))
     first = svc.share("alice", UNIT, session.id).share_token
     assert svc.unshare("alice", UNIT, session.id).share_token is None

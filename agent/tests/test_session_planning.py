@@ -147,3 +147,19 @@ def test_stale_plan_does_not_overwrite_newer_state(planning_data):
         asyncio.run(PlanningService(Provider(), store=store).plan(context))
     assert store.read(context).active_topic.roadmap is None
     assert store.read(context).active_topic.discussion_focus == 'Newer change'
+
+
+def test_objective_schema_cannot_invent_concept_ids(planning_data):
+    from athena_agent.roadmap import ConceptGraph
+    from athena_agent.planning import PlanningService
+    from athena_agent.llm import MockLLM
+    from pydantic import ValidationError
+    import pytest
+    graph = ConceptGraph.model_validate(planning_data[1])
+    mock = MockLLM([planning_data[2]])
+    asyncio.run(PlanningService(mock).enrich_graph(graph, goal='Bubble Sort'))
+    schema = mock.calls[-1].response_model
+    wrong = dict(planning_data[2])
+    wrong['concepts'] = [{**wrong['concepts'][0], 'concept_id': 'invented-other-id'}]
+    with pytest.raises(ValidationError):
+        schema.model_validate(wrong)

@@ -1,11 +1,13 @@
 """HTTP routes for SRS. Student identity always comes from the server-side resolver."""
 
+import sqlite3
 from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
+from ..request_types import OperationId
 from ..auth import StudentResolver, student_dependency
 
 from .scheduler import ReviewError
@@ -41,6 +43,8 @@ def srs_router(service: SrsService, resolve_student: StudentResolver) -> APIRout
     def run(fn, *args):
         try:
             return fn(*args)
+        except sqlite3.Error:
+            raise HTTPException(503, 'Practice storage is unavailable. Retry the same submission.') from None
         except NotFound as e:
             raise HTTPException(404, str(e)) from None
         except Conflict as e:
@@ -56,12 +60,20 @@ def srs_router(service: SrsService, resolve_student: StudentResolver) -> APIRout
     def next_question(offering_id: str, sid: Student):
         return run(service.next, sid, offering_id)
 
+    @router.post('/operations/{operation_id}/retry')
+    def recover(offering_id: str, operation_id: str, sid: Student):
+        return run(service.recover, sid, offering_id, operation_id)
+
+    @router.get('/pending')
+    def pending(offering_id: str, sid: Student):
+        return run(service.pending, sid, offering_id)
+
     @router.post("/attempts")
-    def answer(offering_id: str, body: AnswerBody, sid: Student):
-        return run(service.answer, sid, offering_id, body.item_id, body.variant_id, body.answer)
+    def answer(offering_id: str, body: AnswerBody, sid: Student, operation_id: OperationId = None):
+        return run(service.answer, sid, offering_id, body.item_id, body.variant_id, body.answer, operation_id)
 
     @router.post("/attempts/{attempt_id}/rating")
-    def rate(offering_id: str, attempt_id: str, body: RatingBody, sid: Student):
-        return run(service.rate, sid, offering_id, attempt_id, body.rating)
+    def rate(offering_id: str, attempt_id: str, body: RatingBody, sid: Student, operation_id: OperationId = None):
+        return run(service.rate, sid, offering_id, attempt_id, body.rating, operation_id)
 
     return router

@@ -90,6 +90,7 @@ A single page:
 - **Left sidebar:** the units the student is enrolled in (hardcoded in the proof of concept: CSE5DMI Data Mining and CSE5ALG Data Structures and Algorithms); for the open unit, the student's learning sessions, Lecture clips and Practice (spaced repetition); and a lecturer button to create a study space.
 - **Main area:** a unit's **learning sessions**: the student starts one per thing they want to learn (e.g. "k-fold cross-validation"), and each is its own tutor chat with that goal (replies above, prompt box at the bottom, sources under each reply). Also the unit's lecture clips grouped by week, and Practice.
 - **Right side panel:** one item opened from the chat or clips: a lecture clip, a cited source passage, or an interactive sandbox.
+- **Playground view** (`units/:offeringId/s/:sessionId/playground`): a canvas for one learning session, with that session's chat beside it instead of the side panel. The tutor offers it from a chat reply. The canvas still uses a demo tutor: its messages and experiments are local to the browser tab, clearly labelled, and never saved or shared. Agent activity answers still go to the session API.
 - **Lecturer view** (a demo "Viewing as" switch in the sidebar until SSO provides roles): create study spaces and review the clips lecture indexing proposes. Students only see clips a lecturer has approved.
 
 ## Repository
@@ -98,6 +99,8 @@ A single page:
   - Each feature lives in `src/features/<name>/` and registers itself in `src/app/features.ts`.
   - Pages only call `src/api/`, which returns mocks today. Swap those function bodies for real API calls and keep their signatures.
   - New side panel content is a new kind in `src/features/unit/panel/types.ts` plus a renderer in `renderers.ts`.
+- `packages/playground/`: the Playground Canvas (canvas, preset object types with their config schemas, scene validation, the component catalog for the model, and the tutor runner). Shipped as TypeScript source. See its README.
+- `apps/playground/`: standalone demo of the Playground with a mock tutor.
 - `agent/`: Python adaptive learning agent (FastAPI, Pydantic, uv, pytest). See `agent/README.md`.
 - `apps/api/`, `workers/`, `packages/shared/`, `infra/`, `docs/`: planned, placeholders only.
 

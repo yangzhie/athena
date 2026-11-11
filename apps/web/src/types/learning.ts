@@ -1,4 +1,5 @@
 import type { KnowledgeOrigin, SourceReference } from './sources'
+import type { PlaygroundOffer } from './playground'
 import type { AgentActivity } from './tutor'
 
 /** A global idea that topics map to, e.g. "subnetting" or "overfitting". */
@@ -26,6 +27,7 @@ export interface Topic {
 
 /** Estimate of how well the learner understands one concept. */
 export interface Mastery {
+  status?: 'unknown' | 'developing' | 'mastered'
   conceptId: string
   /** 0 to 1. */
   estimate: number
@@ -43,6 +45,10 @@ export interface ChatMessage {
   /** Material the reply is based on. Tutor messages only. */
   sources?: SourceReference[]
   knowledgeOrigin?: KnowledgeOrigin
+  /** A demo Playground offered for this learning session. */
+  playground?: PlaygroundOffer
+  /** Local demo message: never sent to the API, saved or shared with a lecturer. */
+  via?: 'playground'
   /** Tutor messages from the agent: the question, explanation, feedback, ... behind it. */
   activity?: AgentActivity
   /** Learner messages that answer a question: that question's id. */

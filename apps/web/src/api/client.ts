@@ -21,7 +21,7 @@ export async function call<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(`/api${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      headers: { ...(init?.body instanceof Blob ? {} : { 'Content-Type': 'application/json' }), ...init?.headers },
     })
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e

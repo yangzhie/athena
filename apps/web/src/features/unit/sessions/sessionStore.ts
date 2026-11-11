@@ -3,6 +3,7 @@ import { asApiError, type ApiError } from '../../../api/client'
 import { createKeyedStore } from '../../../lib/keyedStore'
 import type { LearningSession } from '../../../types'
 import { forgetThread, seedThread } from '../chat/chatStore'
+import { forgetPlayground } from '../playground/session'
 
 /** The student's sessions per unit, from apps/api. */
 export interface SessionList {
@@ -37,6 +38,17 @@ export async function createSession(offeringId: string, goal: string): Promise<L
   return session
 }
 
+export async function recoverSession(offeringId: string): Promise<LearningSession | undefined> {
+  const recovered = await api.recoverSession(offeringId)
+  if (!recovered) {
+    await refreshSessions(offeringId)
+    return
+  }
+  seedThread(recovered.session, recovered.messages)
+  upsert(recovered.session)
+  return recovered.session
+}
+
 export async function renameSession(offeringId: string, sessionId: string, title: string) {
   const session = await api.renameSession(offeringId, sessionId, title)
   upsert(session)
@@ -48,6 +60,7 @@ export async function deleteSession(offeringId: string, sessionId: string) {
   const list = store.get(offeringId)
   store.set(offeringId, { ...list, sessions: list.sessions.filter((s) => s.id !== sessionId) })
   forgetThread(sessionId)
+  forgetPlayground(sessionId)
 }
 
 /** After a message, move the session to the top of the list. */

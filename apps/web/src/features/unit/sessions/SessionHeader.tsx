@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { Button } from '../../../components/ui'
 import type { LearningSession, Offering } from '../../../types'
 import { formatDate } from '../../../lib/format'
-import { updateThreadSession, useThread } from '../chat/chatStore'
+import { loadThread, updateThreadSession, useThread } from '../chat/chatStore'
 import { ShareDialog } from './ShareDialog'
+import { playgroundPath } from './paths'
 import { deleteSession, renameSession, setSharing } from './sessionStore'
 
 /** Session title with rename and delete, and a privacy note. */
@@ -89,6 +90,9 @@ export function SessionHeader({ offering, session }: { offering: Offering; sessi
           )}
         </div>
       )}
+      <Link to={playgroundPath(offering.id, session.id)} className="inline-block text-sm text-accent hover:underline">
+        🧪 Playground
+      </Link>
       {error && (
         <p className="text-sm text-bad" role="alert">
           {error}
@@ -106,14 +110,15 @@ export function SessionHeader({ offering, session }: { offering: Offering; sessi
       ) : (
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted">
           🔒 Private: only you can see this session.
-          <button type="button" onClick={() => setSharingOpen(true)} className="underline hover:text-ink">
+          <button type="button" onClick={() => { void loadThread(offering.id, session.id, { refresh: true }).then(() => setSharingOpen(true)) }} className="underline hover:text-ink">
             Share with lecturer…
           </button>
         </p>
       )}
       <ShareDialog
         open={sharing}
-        messageCount={messages.length}
+        messages={messages}
+        messageCount={messages.filter((m) => !m.via && !m.id.startsWith('pending-')).length}
         onConfirm={share}
         onClose={() => setSharingOpen(false)}
       />

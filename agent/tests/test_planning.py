@@ -93,3 +93,26 @@ def test_blank_scope_goal_never_calls_model():
     with pytest.raises(ValidationError):
         asyncio.run(planner.classify_scope(' '))
     assert mock.calls == []
+
+
+def test_narrow_comparison_has_one_integrated_concept():
+    from athena_agent.roadmap import TopicScope
+    concept = {'concept_id': 'comparison', 'title': 'Target meaning', 'description': 'Contrast the prediction tasks.'}
+    planner, mock = service([{'partial_coverage': False, 'concepts': [concept]}])
+    graph = asyncio.run(planner.identify_graph('Difference between regression and classification',
+        TopicScope(scope='narrow', rationale='One comparison.')))
+    assert len(graph.concepts) == 1
+    assert mock.calls[0].response_model.model_json_schema()['properties']['concepts']['maxItems'] == 1
+    planner, _ = service([{'partial_coverage': False, 'concepts': [concept, {**concept, 'concept_id': 'duplicate'}]}])
+    with pytest.raises(InvalidOutputError):
+        asyncio.run(planner.identify_graph('Compare regression versus classification', TopicScope(scope='narrow', rationale='One comparison.')))
+
+
+def test_broad_comparison_can_still_have_multiple_concepts():
+    from athena_agent.roadmap import TopicScope
+    concepts = [{'concept_id': 'models', 'title': 'Models', 'description': 'Model families.'},
+                {'concept_id': 'evaluation', 'title': 'Evaluation', 'description': 'Evaluation methods.'}]
+    planner, _ = service([{'partial_coverage': True, 'concepts': concepts}])
+    graph = asyncio.run(planner.identify_graph('Compare the main families of machine learning methods',
+        TopicScope(scope='broad', rationale='A broad subject.')))
+    assert len(graph.concepts) == 2
