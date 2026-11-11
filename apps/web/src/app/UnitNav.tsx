@@ -13,7 +13,7 @@ export function UnitNav({ offerings, onNavigate }: { offerings: Offering[]; onNa
           {offerings.map((o) => (
             <li key={o.id}>
               <NavLink
-                to={`/units/${o.id}`}
+                to={o.status === 'draft' ? `/units/${o.id}/manage` : `/units/${o.id}`}
                 onClick={onNavigate}
                 className={({ isActive }) =>
                   cn(
@@ -22,7 +22,7 @@ export function UnitNav({ offerings, onNavigate }: { offerings: Offering[]; onNa
                   )
                 }
               >
-                <span className="block text-sm font-semibold">{o.unit.code}</span>
+                <span className="block text-sm font-semibold">{o.unit.code}{o.status === 'draft' ? ' · Draft' : ''}</span>
                 <span className="block truncate text-xs text-muted">{o.unit.title}</span>
               </NavLink>
             </li>

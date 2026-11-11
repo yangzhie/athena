@@ -71,6 +71,7 @@ export function TitrationView({ object, state, dispatch, preview, demonstrating 
       if (tapDrag.current === null) return
       const opening = tapDrag.current < 0.04 ? 0 : tapDrag.current
       tapDrag.current = null
+      dispatch({ type: 'dispenseTo', volume: state.volume, mode: flowOf(state.opening) === 'stream' ? 'stream' : 'dropwise' })
       dispatch({ type: 'setTap', opening })
     },
   }

@@ -168,6 +168,7 @@ export const codeGraphModule = defineModule<'code-graph', CodeGraphState>({
     return 'body'
   },
   validate(state, action) {
+    if (action.type === 'probe' && (!state.graph || !filterNode(state, action.nodeId))) return 'unknown filter node'
     if (action.type !== 'editCondition') return null
     if (!state.graph) return 'the source does not parse'
     try {

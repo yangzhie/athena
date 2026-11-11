@@ -27,6 +27,7 @@ export interface Topic {
 
 /** Estimate of how well the learner understands one concept. */
 export interface Mastery {
+  status?: 'unknown' | 'developing' | 'mastered'
   conceptId: string
   /** 0 to 1. */
   estimate: number

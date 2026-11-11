@@ -1,4 +1,4 @@
-from fastapi.testclient import TestClient
+from .http_client import TestClient
 
 from athena_api.app import create_app
 

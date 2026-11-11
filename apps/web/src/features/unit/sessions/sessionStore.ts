@@ -38,6 +38,17 @@ export async function createSession(offeringId: string, goal: string): Promise<L
   return session
 }
 
+export async function recoverSession(offeringId: string): Promise<LearningSession | undefined> {
+  const recovered = await api.recoverSession(offeringId)
+  if (!recovered) {
+    await refreshSessions(offeringId)
+    return
+  }
+  seedThread(recovered.session, recovered.messages)
+  upsert(recovered.session)
+  return recovered.session
+}
+
 export async function renameSession(offeringId: string, sessionId: string, title: string) {
   const session = await api.renameSession(offeringId, sessionId, title)
   upsert(session)

@@ -1,12 +1,14 @@
+import { useServerIdentity } from './identity'
 import { createPersistedStore } from '../lib/persistedStore'
 
-/**
- * Who's using the app. A mock switch for the PoC; real roles come from
- * university SSO, and the server must enforce them, never this value.
- */
+/** A display preference. Server-issued lecturer authority is required for lecturer mode. */
 export type Role = 'student' | 'lecturer'
 
 const store = createPersistedStore<Role>('athena.role', 'student')
 
-export const useRole = store.use
+export const useRole = (): Role => {
+  const preference = store.use()
+  const identity = useServerIdentity()
+  return identity.role === 'lecturer' ? preference : 'student'
+}
 export const setRole = (role: Role) => store.set(role)

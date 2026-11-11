@@ -1,8 +1,7 @@
 # apps/api
 
-Athena's API service: a FastAPI modular monolith. It starts with the **SRS**
-module (spaced repetition per unit); the tutor orchestrator, auth and other
-modules join later.
+Athena's FastAPI modular monolith serves private learning sessions, the in-process
+adaptive tutor, Practice (SRS), approved lecture clips and anonymous session sharing.
 
 ## Setup and test
 
@@ -13,11 +12,19 @@ uv sync
 uv run pytest
 ```
 
+The API tests use real in-process ASGI requests with a test-only polling selector
+(`tests/http_client.py`). Its event loop checks queued callbacks at least every
+10 ms, including in sandboxes where cross-thread socket wakeups are unavailable.
+Routes, authentication dependencies, worker threads and storage run normally;
+no permissions or network server are required. To verify answer replay, restart
+recovery, failed-write reconciliation and ownership with explicitly selected
+offline model fixtures, run `uv run pytest tests/test_answer_retries.py`.
+
 ## Run
 
 ```sh
 uv run athena-srs load-starter    # once: CSE5ALG and CSE5DMI starter banks
-ATHENA_DEV_STUDENT_ID=dev-student ATHENA_DEV_LECTURER_ID=dev-lecturer uv run uvicorn athena_api.app:create_app --factory --reload
+ATHENA_TUTOR=demo uv run uvicorn athena_api.app:create_app --factory --reload
 ```
 
 Live rephrasing turns on when `OPENAI_API_KEY` and `OPENAI_MODEL` are set (the
@@ -26,8 +33,24 @@ Without them, items fall back to existing wordings and never repeat one the
 student got wrong.
 
 Data goes to `data/athena.db` (gitignored; override with `ATHENA_DB`). Interactive
-docs at http://127.0.0.1:8000/docs. `ATHENA_DEV_STUDENT_ID` stands in for SSO: every
-request is that student. Without it, SRS routes return 401.
+docs at http://127.0.0.1:8000/docs. Normal operation uses an opaque HTTP-only,
+SameSite browser cookie, with the bearer secret stored only as a hash on the server.
+Cookies are Secure on HTTPS; set `ATHENA_SECURE_COOKIES=1` behind a trusted HTTPS proxy.
+No registration or login is required. Keep the creator browser’s cookies: there is
+no identity recovery or capability transfer in this first version.
+
+`GET /offerings` discovers published Offerings and the caller’s own drafts.
+`POST /offerings` requires a server-issued lecturer grant, accepts `{code,title,year,semester}`, and creates a private draft
+and a server-owned management grant for that browser. `POST /offerings/{id}/publish`
+makes it discoverable; `DELETE /offerings/{id}` makes it unavailable. Unknown and
+unpublished Offerings return 404; deleted Offerings return 410. A published Offering
+has exactly one Environment per browser identity, shared by that learner’s sessions.
+The UI role switch and client-supplied identity headers grant no authority.
+
+`create_app(resolve_student=..., resolve_lecturer=...)` remains an explicit trusted
+host/testing seam. Only such injected adapters can opt into the old development
+resolvers. The normal application ignores `ATHENA_DEV_STUDENT_ID` and
+`ATHENA_DEV_LECTURER_ID`; do not use these variables for deployed authorisation.
 
 ## Generate questions from a lecture
 
@@ -54,8 +77,7 @@ them until a lecturer approves them.
 
 ## Lecturer: question bank review
 
-Lecturer-only (403 otherwise). In dev, `ATHENA_DEV_LECTURER_ID` makes every request
-that lecturer for every unit; real roles come from SSO. No student data is returned.
+Creator-management only (403 otherwise), using the server-side grant for this Offering. No student data is returned.
 
 | Route | Does |
 | --- | --- |
@@ -102,6 +124,13 @@ All routes are scoped to the signed-in student; another student's session id giv
 
 | `POST /units/{offering}/sessions/{id}/answers` | `{question_id, choice_id \| text, shown}` → the learner's answer and the tutor's next messages |
 | `POST /units/{offering}/sessions/{id}/continue` | `{activity_id}` → move on after a teaching step |
+| `POST /units/{offering}/sessions/{id}/transcriptions` | raw WebM/MP4/Ogg/WAV audio (2 MiB maximum) → `{text}` for student review |
+
+Dictation requires ownership of the session and uses `ATHENA_TRANSCRIPTION_MODEL`
+(default `gpt-transcribe`) with the server's key. Audio is not stored, logged or
+added to conversation history. The transcript is a draft until the student submits
+it as an ordinary answer. Recording in the browser stops after 60 seconds.
+Provider failures preserve typed input and do not retry paid transcription calls.
 
 The tutor is the adaptive learning agent in `agent/`, used in-process
 (`sessions/agent_tutor.py`). One session here is one agent session with the
@@ -113,18 +142,93 @@ which the web app renders as question cards and teaching steps.
 
 | Value | Tutor |
 | --- | --- |
-| *(unset)* | the agent with OpenAI if `OPENAI_API_KEY` and `OPENAI_MODEL` are set, else the placeholder |
-| `placeholder` | canned text replies, no questions (e.g. while there are no API credits) |
-| `demo` | the agent replaying its scripted Bubble Sort journey: try the full UI without OpenAI |
+| *(unset)* or `ai` | the agent with configured `OPENAI_API_KEY` and `OPENAI_MODEL`; missing configuration returns 503 |
+| `placeholder` | explicitly selected, labelled canned text replies; no questions |
+| `demo` | explicitly selected, labelled synthetic Bubble Sort fixture; in-memory agent state is lost on restart |
+
+Unknown modes return an unavailable tutor. `GET /tutor/status` identifies `mode`,
+`available` (configuration/storage readiness, without a provider probe), and
+`scripted`. Provider/model/storage failures return an error; they never switch to
+canned replies. No model call is made to check status. The setup command above
+explicitly selects offline fixtures. AI operation uses the existing upward `.env`
+loader and preserves process configuration. Credentials alone do not authorize
+paid verification: live acceptance remains blocked until explicit opt-in (H5).
 
 Agent memory lives in its own database, `ATHENA_AGENT_DB` (default `data/agent.db`).
 
-**Unit material.** When a session starts, the unit's **approved** lecture clips are
-ranked against the student's goal (BM25 keywords; title and summary weigh 3× the
-transcript; `sessions/material.py`) and the top 5 go to the agent as materials. It
-grounds its teaching in them and cites clips (agent `VideoReference`), which the web
-app opens in the side panel. If the agent finds the clips don't cover the goal, the
-session starts without material and the agent labels its answers as general knowledge.
+**Answer retries.** The question ID identifies one accepted answer within a
+student's session. Identical retries return the original stored learner and tutor
+messages (including IDs and timestamps), even after later turns or a restart.
+Changing the choice, trimmed answer text, or `hint_used` returns 409; `shown` is
+only a display label and cannot rewrite an accepted answer. The host saves the
+exchange, session timestamp and private retry receipt atomically. If that write
+fails after the agent accepts the answer, retry the same submission: the agent
+replays its transition and the host saves the missing exchange. Concurrent host
+writes keep the first committed exchange. The web chat merges stored message IDs
+so a replay doesn't duplicate the visible answer.
+
+Retry receipts are private, scoped to the owning student and session, excluded
+from lecturer projections, and deleted with the host session. Existing databases
+gain the receipt table automatically. Answers saved before receipt support cannot
+be safely compared because their submitted choice/hint metadata was not retained;
+resubmitting those questions returns 409 with a refresh instruction.
+
+**Coordinated operations and recovery.** Creation and chat accept an optional
+`Idempotency-Key` header (1–128 letters, digits, underscores or hyphens). The web
+adapter always supplies one; other clients must retain it to retry after an
+uncertain response. The same key and normalized payload replay the exact stored
+result. Reusing a key with different input returns 409. Without a key, creation
+and chat are intentionally new operations; two new sessions with the same goal
+have separate conversations. Answers use their question ID; continuation uses its
+teaching activity ID and always replays its accepted result.
+
+The private host journal reserves the operation before invoking the tutor. The
+agent stages its transition and commits its result receipt with the same atomic
+snapshot/revision comparison. The host then publishes the entire exchange,
+updated timestamp, answer receipt where applicable, and completion outcome in one
+transaction. An interrupted host write leaves the old conversation intact and the
+operation pending. Retrying after reopening both databases uses the accepted agent
+receipt without another model call or duplicate assessment evidence. Independent
+adapters converge on the winning stored transition. Concurrent different operations
+in one session return 409 until the pending operation is recovered. Invalid input
+that the tutor rejected before publication can be corrected; transient failures
+remain pending for retry. Storage failures return a safe 503, never database details.
+
+`POST /units/{offering}/sessions/operations/{operation_id}/retry` recovers using the
+server's saved input and returns `{session, messages}`. Operation IDs are
+`start:<key>`, `message:<key>`, `answer:<question_id>` or `continue:<activity_id>`.
+Lookup requires the authenticated owner and offering; identifiers confer no access.
+The browser retains only the random key and a request digest in tab storage, not
+submitted text. Refreshing the session retries its pending chat operation; refreshing
+the session list recovers pending creation. When storage is disabled, retry identity
+lasts only for the current page. A changed submission after an uncertain response
+asks the student to refresh first. Pending operations never appear as completed
+exchanges or half-created sessions.
+
+Host journal records are removed with the host session. Agent operation receipts
+remain backend-only and are excluded from conversation/learning exports and shared
+session projections. The agent database automatically adds a separate private
+receipt column to existing records. Complete cross-service deletion/expiry remains
+the later lifecycle batch; this batch does not claim to remove existing agent memory
+when a host session is deleted. Scripted demo agent state is deliberately ephemeral
+and cannot resume a lost in-memory transition after a restart.
+
+**Unit material.** In the normal anonymous application, one Offering-scoped
+provider ranks ready published document passages and approved lecture clips using
+BM25 title/body matching. It selects up to five results and bounds long transcript
+excerpts. New published versions replace older versions in retrieval, while old
+immutable passages remain available to saved citations. Every subsequent tutor
+operation refreshes selection using the current goal, Concept title and discussion.
+Accepted operation retries replay the original response and references.
+
+If initial material has insufficient coverage, the agent may start with explicitly
+labelled general knowledge. Conflicting sources always return an actionable 409;
+they are never discarded through that fallback. Model grounding checks verify exact
+source quotes. Private question criteria remain internal. The source panel resolves
+cited passages through `GET /units/{offering}/materials/{version}/passages/{id}`;
+original files are downloaded only through authorised endpoints. The web material
+library and lecture list do not silently select fixture data when the API is empty
+or unavailable. Explicitly injected host adapters can still use `LectureMaterial`.
 
 **Context budget.** The agent's default budget (16 KiB, counted in bytes) is too
 small once transcripts are attached; `apps/api` gives it 128 KiB (about 32k tokens).
@@ -150,3 +254,184 @@ Override with `ATHENA_AGENT_CONTEXT_BYTES`.
 - [ ] 5. Review screen in the web app
 - [x] 6. Live rephrasing when variants run out (`srs/rephrase.py`)
 - [x] 7. Bank generator from indexed lectures (`srs/generate.py`, `athena-srs generate`)
+
+## Material upload and processing
+
+Creators upload material from the study-space management screen. PDF, UTF-8 text,
+DOCX and PPTX documents preserve their real page, slide or paragraph locations.
+DOCX pages are not invented. A PDF without extractable text reports that OCR is
+required. Recordings are indexed through the existing lecture pipeline; its clips
+start pending and must be approved by the creator before students see them.
+
+Run both the API and worker from `apps/api/`, sharing `ATHENA_DB` and
+`ATHENA_MATERIAL_ROOT` (defaults: `data/athena.db` and `data/materials`):
+
+```sh
+# Once from the repository root; installs the separate transcription dependencies:
+uv sync --project workers/indexer
+# From apps/api, beside the running API:
+uv run python -m athena_api.materials.worker
+# Or process one pending job and exit:
+uv run python -m athena_api.materials.worker --once
+```
+
+Install FFmpeg/ffprobe and Poppler/pdftotext on the host. The default recording
+command invokes `uv run --project <repository>/workers/indexer index-lecture`;
+`ATHENA_INDEXER_COMMAND` can select an already installed indexer. Whisper runs
+locally and downloads its model on first use (`ATHENA_WHISPER_MODEL`, default
+`small`); segmentation uses the configured OpenAI model. No transcription or
+model call happens inside an upload request. Recordings are limited to four
+hours; processing defaults to a one-hour timeout (`ATHENA_PROCESSING_TIMEOUT`).
+FFmpeg input protocols are restricted to local files/pipes.
+
+Uploads use raw bytes: `POST /units/{offering}/materials?filename=...` returns 202.
+Add `replace=<material-id>` to create an immutable new version; earlier passages
+remain attributable. Defaults are 50 MiB per document and 500 MiB per recording,
+overridable by `ATHENA_DOCUMENT_MAX_BYTES` / `ATHENA_RECORDING_MAX_BYTES`.
+`GET .../materials` shows processing states; creators can `POST .../{id}/retry`
+after a failure and `POST .../{id}/publish` once a document is ready. Students
+can access only ready, published documents and approved lecture clips. Source
+files and extracted passages use authorised endpoints, never public static paths.
+
+The durable SQLite queue uses worker leases and fencing tokens. Restarted workers
+reclaim expired jobs; stale workers cannot publish a later worker’s result.
+Recording transcription keeps its existing per-chunk cache for retries. Failed
+jobs remain visible with a safe explanation; retry is explicit. Keep database,
+material storage and indexing caches on persistent storage and out of Git.
+
+## Learner profile, Practice and class aggregates
+
+`GET /learner/profile` returns only the caller’s cross-unit Concept record.
+`GET /units/{offering}/progress` and `/progress/evidence` project that caller’s
+Concept status, concise notes and traceable assessment references. Fresh sessions
+have fresh conversations; prior Concept knowledge can inform diagnosis but cannot
+replace independent assessment. Unknown/developing/mastered states come from the
+agent’s evidence-based mastery rules, never from a scheduled review or canvas click.
+Scripted demo/placeholder output does not create learning evidence or analytics.
+
+A small explicit canonical Concept catalogue supports safe cross-unit identity.
+Unknown Concepts stay scoped to the Offering and meaning; arbitrary generated
+Concept IDs are not aggregated together. Creators can define `/units/{offering}/topics`
+and map them to `/concepts/catalogue` or an explicit course Concept. Those Topics
+also guide subsequent recording indexing. Private generated titles never become
+lecturer-facing labels; analytics use an “Other course concepts” category instead.
+
+Tutor assessment evidence creates private Practice items per learner/Offering/Concept.
+These and their live rewordings never enter the lecturer’s public bank. Practice
+uses the existing FSRS scheduler; only the owning learner can answer or inspect its
+feedback. `Idempotency-Key` on attempts and ratings stores the original result
+atomically with the attempt/card/log. Identical retries replay it; conflicting input
+returns 409. A failed transaction publishes no partial grade or schedule. Saved
+unrated feedback is restored after refresh. Recovery endpoints return committed
+results without asking the browser to retain private answer text.
+
+`GET /units/{offering}/insights` requires a server-issued lecturer grant and this Offering’s management grant. It reads
+only offering-local events: canonical Concept, outcome, fixed gap category and
+internal contribution references. It never reads chat text, learner answers,
+private Practice questions or profile notes. Metrics require at least five distinct
+Environments, with the same suppression per Concept/category. Counts describe
+anonymous Environments and sessions, not verified individual students. Insufficient
+real data yields an explicit empty state, without silently mixing in sample data.
+
+### Private Playground engine and Python worker
+
+Build the server adapter from the same TypeScript modules used by the browser:
+
+```sh
+npm run build:headless -w @athena/playground
+```
+
+The API persists private scene checkpoints, committed events, proposals and retry
+receipts under each owned learning session. Requests include catalog version,
+operation ID and expected revision. Stale revisions and conflicting retries return
+409. Browser-supplied execution results and transient animation actions are rejected.
+Canvas checks are interaction feedback, never assessment/mastery evidence.
+
+Run Python execution as a separate process (from `apps/api`):
+
+```sh
+docker pull python:3.12-slim
+uv run python -m athena_api.execution.worker
+```
+
+Only this private worker needs Docker access. It shares `ATHENA_DB` with the API;
+there is no public execution port. Set `ATHENA_PYTHON_IMAGE` to a locally installed
+image (prefer an audited digest in deployment). Images are never pulled during a
+job. Each execution gets an ephemeral container, UID 65534, no networking or
+mounts, read-only root, dropped capabilities, no-new-privileges, a 16 MiB temporary
+workspace, 256 MiB RAM, 32 processes and one CPU. Source is limited to 16 KiB,
+wall time to five seconds and combined stdout/stderr to 64 KiB. The queue holds
+at most 16 waiting jobs and at most two run concurrently; one browser identity
+can have two pending jobs. Cancellation and worker interruption remove containers;
+stale jobs become explicitly unavailable instead of being re-executed silently.
+
+Verified results have `real-run` provenance. Variable inspection and instruction
+tracing are explicitly unsupported (`values: {}`, `trace: []`), while graph probes
+remain conceptual local calculations. Infrastructure errors never become a
+successful or simulated Python result. To exercise real isolation locally:
+
+```sh
+ATHENA_TEST_DOCKER=1 uv run pytest tests/test_execution_worker.py
+```
+
+The normal web Playground uses the AI tutor and persisted session state. It no
+longer loads prepared scenes or the demo `mockAsk`. Open the session's Playground
+and ask for an experiment; the model composes a scene from the live component
+catalogue and Offering material. Validation permits two repair attempts before a
+text explanation. All tools run through TypeScript validation and actual outcomes
+are returned to the model before its reply is published. Student-modified work
+requires confirmation before config resets or whole-scene replacement.
+
+Playground turns have durable operation IDs and resume after interrupted host
+writes. Questions and tutor explanations enter the same private session transcript,
+including when shared explicitly. Lecturer replies are excluded from model input
+and never execute tools. Completed Python jobs are interpreted once using their
+actual source/output; that interpretation and canvas checks never create mastery
+or Practice evidence. Use the session's independent assessments for that evidence.
+
+### Private-content retention and deletion
+
+The API's lifespan task sweeps private content every minute. Set
+`ATHENA_PRIVATE_RETENTION_DAYS` (positive number, default 30). A session expires
+30 days after creation, even if it is still being used; Practice receipts, attempts,
+review logs and scheduling state also have bounded retention. Course material is
+shared Offering content and survives private-session expiry.
+
+Deletion first persists a cleanup request and revokes sharing. Pending cleanup
+hides the session immediately, resumes after failure/restart, removes host chat,
+agent snapshots/receipts, Playground history/proposals/turns, execution source and
+output, and the session's private evidence. Related Practice variants and scheduling
+state are reset; remaining Concepts are rebuilt from surviving independent evidence.
+Container names enter a durable cleanup queue consumed by the execution worker;
+no Docker privileges are granted to the API. Neither raw content nor individual-linked
+analytics events are retained after deletion. Historical aggregate rollups are not
+retained in this first version, so metrics reflect surviving events.
+
+Shared conversations include saved Playground discussion. Each share remaps message,
+activity, question, choice and Concept references, and revocation takes effect on
+subsequent access immediately. Lecturer replies are atomic with current share checks.
+Private rubrics/internal state are excluded. Apply the same retention policy to
+backups; deleting active SQLite rows cannot erase older operator-managed backups.
+
+
+### Lecturer-only course management
+
+Anonymous identities start as students. Only server-authorised lecturers can create
+Units/Offerings. Uploads, publishing, Topics, clip review, question review and
+Offering analytics additionally require management permission for that Offering.
+A browser role switch, request header, or legacy creator grant is insufficient.
+Students can discover published Offerings, read published material and approved
+clips, and use private sessions, Practice, progress and Playground.
+
+The local administrator issues a one-use invite, using the API's database:
+
+```sh
+# From the repository root; match ATHENA_DB if configured differently.
+apps/api/.venv/bin/python -m athena_api.spaces.cli create-lecturer-invite
+```
+
+The lecturer enters it under **Lecturer access** in the sidebar. The code expires
+after 24 hours, is stored only as a hash, and cannot be redeemed twice. There is
+no registration/login account or student-supplied role/identity. Existing creator
+browsers must also redeem an invite before managing their previous Offerings.
+Keep browser cookies; the lecturer grant and Offering ownership are server-owned.

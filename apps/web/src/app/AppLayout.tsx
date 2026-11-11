@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import { Link, Outlet, useLoaderData } from 'react-router'
+import { IdentityContext } from './identity'
 import { cn } from '../lib/cn'
 import { features } from './features'
 import type { layoutLoader } from './layoutLoader'
@@ -10,13 +11,13 @@ import { useSidebar } from './useSidebar'
 const sidebarActions = features.flatMap((f) => (f.sidebarAction ? [{ id: f.id, Action: f.sidebarAction }] : []))
 
 export default function AppLayout() {
-  const { offerings } = useLoaderData<typeof layoutLoader>()
+  const { offerings, identity } = useLoaderData<typeof layoutLoader>()
   const { open, isDesktop, toggle, closeDrawer } = useSidebar()
   // Phones always have the top bar (the drawer covers it); desktop only when collapsed.
   const showTopBar = !isDesktop || !open
 
   return (
-    <div
+    <IdentityContext.Provider value={identity}><div
       className="flex min-h-svh"
       // Pages use this to place sticky panels below the top bar (e.g. the sandbox).
       style={{ '--topbar-h': showTopBar ? '4.25rem' : '0px' } as CSSProperties}
@@ -74,6 +75,6 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
-    </div>
+    </div></IdentityContext.Provider>
   )
 }

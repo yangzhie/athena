@@ -66,6 +66,7 @@ export const titrationModule = defineModule<'titration', TitrationState>({
       burette: s.object({ capacity: s.number('mL', 10, 100), dropVolume: s.number('mL', 0.01, 0.2) }),
     }),
     actions: {
+      setTap: '{opening}: tap opening from 0 (closed) to 1 (fully open)',
       newTrial: '{}: refill the flask (throws the current attempt away; the student is asked first)',
       dispenseTo: '{volume, mode: "stream" | "dropwise"}: run titrant in to this burette reading',
       swirl: '{}: mix the flask',

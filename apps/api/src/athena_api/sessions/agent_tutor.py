@@ -5,8 +5,10 @@ goal. The agent's memory is scoped to the student (LearnerScopedMemory), and the
 learner id comes from our server-side auth, never the client.
 """
 
+import copy
 import os
 import uuid
+from dataclasses import asdict
 from pathlib import Path
 
 from athena_agent.activities import ClientCapabilities
@@ -18,8 +20,9 @@ from athena_agent.memory import LearnerScopedMemory, LearningMemoryStore
 from athena_agent.orchestrator import LearningOrchestrator
 from athena_agent.retrieval import RetrievalResult
 
-from .material import MaterialProvider
+from .material import MaterialProvider, needs_goal_context
 from .models import LearningSession
+from .operations import Operation
 from .tutor import TutorError, TutorReply
 
 #: The agent's context budget, in UTF-8 bytes (its cautious stand-in for tokens).
@@ -54,6 +57,9 @@ def activity_reply(activity: LearningActivity) -> TutorReply:
 
 
 class AgentTutor:
+    mode = "ai"
+    available = True
+
     def __init__(
         self,
         store: LearningMemoryStore,
@@ -67,6 +73,7 @@ class AgentTutor:
         self.llm = llm
         #: Picks the unit's approved lecture clips for each session's goal.
         self.material = material
+        self.profile_provider = None
         self.context_budget = ContextBudget(
             context_window=context_bytes or int(os.environ.get("ATHENA_AGENT_CONTEXT_BYTES", DEFAULT_CONTEXT_BYTES))
         )
@@ -102,7 +109,101 @@ class AgentTutor:
                 503: "The tutor is unavailable right now. Try again later.",
             }
             status = _STATUS.get(code, 500)
-            raise TutorError(messages.get(status, "The tutor couldn't complete that."), status) from None
+            message = messages.get(status, "The tutor couldn't complete that.")
+            if code == 'conflicting_sources':
+                message = "Your unit sources conflict. Resolve the conflicting material before retrying this learning step."
+            raise TutorError(message, status, code=code) from None
+
+    async def operation(self, operation: Operation) -> list[TutorReply]:
+        return await self._run(self._operation(operation))
+
+    async def _operation(self, operation: Operation) -> list[TutorReply]:
+        """Publish an agent transition and its replay result in the same snapshot.
+
+        Model calls run against an isolated copy. A failed host write can replay
+        this private receipt after restart without repeating the transition.
+        """
+        from athena_agent.conversation import InMemoryConversationStore, SessionNotFoundError, ConversationError
+
+        session = operation.session
+        context = self._context(session)
+        try:
+            original = self.store.read(context)
+        except SessionNotFoundError:
+            original = None
+        signature = {"kind": operation.kind, "payload": operation.payload}
+
+        def replay(snapshot):
+            receipt = snapshot.operation_results.get(operation.id) if snapshot else None
+            if receipt is None:
+                return None
+            if receipt["request"] != signature:
+                raise TutorError("Operation identifier already used for a different request.", 409)
+            return [TutorReply(**r) for r in receipt["replies"]]
+
+        previous = replay(original)
+        if previous is not None:
+            return previous
+        staged = InMemoryConversationStore()
+        if original:
+            staged.create(context, snapshot=original)
+        worker = copy.copy(self)
+        worker.store = staged
+        if self.profile_provider and self.mode == 'ai':
+            from ..learning.service import LearnerAwareLLM
+            profile = self.profile_provider(session.student_id)
+            if profile:
+                worker.llm = LearnerAwareLLM(self.llm, profile)
+        if original and original.active_topic and self.material is not None:
+            from athena_agent.knowledge import KnowledgeService
+            topic = original.active_topic
+            query = topic.learning_state.goal
+            if topic.roadmap:
+                concept = next((c for c in topic.roadmap.graph.concepts if c.concept_id == topic.learning_state.current_concept_id), None)
+                if concept:
+                    query += ' ' + concept.title
+            if operation.kind == 'message':
+                # The student's question is the primary retrieval query. A broad
+                # goal must not crowd its passages out of the five-item context.
+                question = operation.payload['text']
+                items = self.material.for_goal(session.offering_id, question)
+                if not items and needs_goal_context(question):
+                    items = self.material.for_goal(session.offering_id, query)
+            else:
+                items = self.material.for_goal(session.offering_id, query)
+            knowledge = KnowledgeService(LearnerScopedMemory(staged, session.student_id))
+            if items:
+                await knowledge.supply(context, RetrievalResult.model_validate({'items': items}))
+            else:
+                # A successful empty retrieval means explicitly labelled general knowledge.
+                await knowledge.use_general_knowledge(context)
+        if operation.kind == "start":
+            replies = await worker.start(session)
+        elif operation.kind == "message":
+            replies = await worker.message(session, **operation.payload)
+        elif operation.kind == "answer":
+            replies = await worker.answer(session, **operation.payload)
+        elif operation.kind == "continue":
+            replies = await worker.continue_(session, **operation.payload)
+        else:
+            raise TutorError("Unknown tutor operation.", 400)
+        snapshot = staged.read(context)
+        snapshot.operation_results[operation.id] = {"request": signature, "replies": [asdict(r) for r in replies]}
+        try:
+            if original is None:
+                self.store.create(context, snapshot=snapshot)
+            else:
+                snapshot.revision = original.revision
+                self.store._save(context, snapshot)
+        except ConversationError as error:
+            if error.code != "invalid_request":
+                raise
+            # An independent adapter may have won the compare-and-save race.
+            accepted = replay(self.store.read(context))
+            if accepted is not None:
+                return accepted
+            raise TutorError("The session changed. Retry this operation.", 409) from None
+        return replies
 
     def materials_for(self, session: LearningSession) -> RetrievalResult | None:
         items = self.material.for_goal(session.offering_id, session.goal) if self.material else []
@@ -122,7 +223,7 @@ class AgentTutor:
                 )
             )
         except TutorError as e:
-            if materials is None or e.status != 409:
+            if materials is None or e.code != "insufficient_evidence":
                 raise
             activity = await self._run(
                 self._orchestrator(session).start(self._context(session), session.goal, capabilities=self.capabilities)
@@ -131,7 +232,9 @@ class AgentTutor:
 
     async def message(self, session: LearningSession, text: str) -> list[TutorReply]:
         result = await self._run(self._orchestrator(session).message(self._context(session), text))
-        replies = [TutorReply(result.reply.text)]
+        replies = [TutorReply(result.reply.text,
+                              sources=[r.model_dump(mode='json') for r in result.reply.sources],
+                              knowledge_origin=result.reply.knowledge_origin)]
         if result.activity is not None:
             replies.append(activity_reply(result.activity))
         return replies
@@ -146,39 +249,53 @@ class AgentTutor:
         activity = await self._run(
             self._orchestrator(session).answer(self._context(session), answer, hint_used=hint_used)
         )
-        return [activity_reply(activity)]
+        topic = self.store.read(self._context(session)).active_topic
+        record = next((r for r in topic.assessment_records if r.answer.question_id == question_id), None) if topic else None
+        replies = []
+        if record is not None:
+            # Assessment feedback is learner evidence, not an unsupported course
+            # claim. Show it before the next task without an extra model call.
+            replies.append(TutorReply(record.assessment.feedback,
+                                      sources=[r.model_dump(mode='json') for r in record.assessment.sources]))
+        replies.append(activity_reply(activity))
+        return replies
 
     async def continue_(self, session: LearningSession, activity_id: str) -> list[TutorReply]:
         activity = await self._run(self._orchestrator(session).continue_learning(self._context(session), activity_id))
         return [activity_reply(activity)]
 
 
-def agent_tutor_from_env(material: MaterialProvider | None = None) -> AgentTutor | None:
-    """The agent with OpenAI and durable memory, if configured; else None.
+def agent_tutor_from_env(material: MaterialProvider | None = None):
+    """Configured AI by default; offline/placeholder modes require explicit selection."""
+    from .tutor import PlaceholderTutor, UnavailableTutor
 
-    ATHENA_TUTOR=placeholder forces the placeholder (e.g. while there are no API credits);
-    ATHENA_TUTOR=demo replays the agent's scripted journey (no OpenAI needed).
-    The agent keeps its memory in its own database (ATHENA_AGENT_DB, default data/agent.db):
-    its tables must not share a file with ours.
-    """
-    mode = os.environ.get("ATHENA_TUTOR", "").strip().lower()
+    mode = os.environ.get("ATHENA_TUTOR", "ai").strip().lower() or "ai"
     if mode == "placeholder":
-        return None
+        return PlaceholderTutor()
     if mode == "demo":
         fixture = Path(__file__).resolve().parents[5] / "agent/tests/fixtures/api_journey.json"
-        return ScriptedDemoTutor(fixture)
+        try:
+            return ScriptedDemoTutor(fixture)
+        except (OSError, ValueError):
+            return UnavailableTutor("The scripted demo fixture is unavailable.")
+    if mode != "ai":
+        return UnavailableTutor("Unknown ATHENA_TUTOR mode.")
     from athena_agent.llm import LLMError
     from athena_agent.openai_llm import OpenAILLM, OpenAISettings
     from athena_agent.reliable_llm import ReliableLLM
     from athena_agent.sqlite_memory import SQLiteLearningMemory
 
     try:
-        llm = ReliableLLM(OpenAILLM(OpenAISettings.from_env()))
+        from ..operations import BoundedLLM
+        llm = ReliableLLM(BoundedLLM(OpenAILLM(OpenAISettings.from_env())))
     except LLMError:
-        return None
-    path = Path(os.environ.get("ATHENA_AGENT_DB", "data/agent.db"))
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return AgentTutor(SQLiteLearningMemory(path), llm, material=material)
+        return UnavailableTutor("Configure OPENAI_API_KEY and OPENAI_MODEL for the AI tutor.")
+    path = Path(os.environ.get("ATHENA_AGENT_DB", str(Path(os.environ.get("ATHENA_DB", "data/athena.db")).parent / "agent.db")))
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return AgentTutor(SQLiteLearningMemory(path), llm, material=material)
+    except Exception:
+        return UnavailableTutor("Tutor storage is unavailable.")
 
 
 class ScriptedDemoTutor(AgentTutor):
@@ -189,6 +306,8 @@ class ScriptedDemoTutor(AgentTutor):
     The content is that script's (a synthetic Bubble Sort lesson) whatever goal is typed,
     and agent state is in memory, so it's lost when the API restarts.
     """
+
+    mode = "demo"
 
     def __init__(self, fixture_path: Path):
         import json
@@ -217,7 +336,9 @@ class ScriptedDemoTutor(AgentTutor):
         activity = await self._run(
             self._orchestrator(session).start(self._context(session), session.goal, capabilities=self.capabilities)
         )
-        replies = [activity_reply(activity)]
+        opening = activity_reply(activity)
+        opening.content = "Scripted demo: synthetic Bubble Sort fixture; state is lost on restart.\n\n" + opening.content
+        replies = [opening]
         # The script expects its materials to be selected right after the start.
         memory = LearnerScopedMemory(self.store, session.student_id)
         await KnowledgeService(memory, MockRetriever([self.fixture["materials"]])).retrieve(

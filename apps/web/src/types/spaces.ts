@@ -12,6 +12,8 @@ export type Semester = 'Semester 1' | 'Semester 2' | 'Summer'
  */
 export interface Offering {
   id: string
+  status?: 'draft' | 'published' | 'deleted'
+  can_manage?: boolean
   unit: Unit
   year: number
   semester: Semester

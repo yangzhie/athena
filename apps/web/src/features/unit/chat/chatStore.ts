@@ -113,9 +113,10 @@ async function turn(
     const saved = await request(controller.signal)
     if (controllers.get(sessionId) !== controller) return
     const cur = store.get(sessionId)
+    const savedIds = new Set(saved.map((m) => m.id))
     store.set(sessionId, {
       ...cur,
-      messages: chronological([...cur.messages.filter((m) => !temp.has(m.id)), ...saved]),
+      messages: chronological([...cur.messages.filter((m) => !temp.has(m.id) && !savedIds.has(m.id)), ...saved]),
       sending: false,
     })
     return saved
@@ -125,8 +126,8 @@ async function turn(
     const stopped = e instanceof DOMException && e.name === 'AbortError'
     store.set(sessionId, {
       ...cur,
-      // Drop the thinking bubble; an unsent answer is dropped too so the question stays open.
-      messages: cur.messages.filter((m) => m.id !== pending.id && !(learner?.answerFor && m.id === learner.id)),
+      // A failed exchange stays absent until the server confirms the complete result.
+      messages: cur.messages.filter((m) => !temp.has(m.id)),
       sending: false,
       error: stopped ? undefined : asApiError(e),
     })

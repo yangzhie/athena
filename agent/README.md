@@ -542,6 +542,16 @@ The offline fixture `tests/fixtures/memory_journey.json` verifies SQLite reopen,
 current-activity resumption, duplicate replay, and learner isolation with colliding
 session IDs through `athena_agent.evaluation`.
 
+The host API also stores private operation results on `ConversationSession` in
+`operation_results`. Its tutor adapter stages a whole transition in memory, then
+publishes the transition and replay receipt together with one create/compare-and-save.
+SQLite stores these receipts in a separate `operations_json` column, added
+non-destructively to existing version 1 databases. Conversation and learning exports
+exclude them; unrelated updates preserve them. A failed SQLite write publishes
+neither history nor receipt. The host uses this boundary to reconcile creation,
+chat, answers and continuation after a failed host exchange write or restart.
+These receipts are host-managed backend data, outside model prompts and API views.
+
 ## Selected learning materials
 
 `KnowledgeService(store, retriever).retrieve(context, query, source_ids=None,
@@ -559,40 +569,68 @@ max_results=5)` accepts host-authorized external results through the same typed
 selection contract, scope validation, topic storage, and snapshot copying.
 It requires no retriever. Malformed or out-of-scope supplied data is an invalid
 request; unavailable retrieval is a dependency failure. An empty external result
-remains an explicit empty selection rather than silently enabling general knowledge.
+remains an explicit empty selection. Explanations may answer it as labelled general
+knowledge; assessment evaluation uses the accepted question's private criteria
+and exact learner-answer evidence, rather than newly retrieved passages.
 
 Selected materials now enter the bounded planning, teaching, and assessment
 context. Source-based generation requests only supported domain content and runs
-a second structured support check requiring exact quotes resolving to selected
-passages/transcripts. Unsupported content or fabricated evidence fails before
-state publication; empty selections cannot silently produce general-knowledge
-content. Semantic support still depends on model judgement, while quote/reference
-integrity is deterministic. General-knowledge calls keep their original call path.
+a second structured support check requiring quote references resolving to selected
+passages/transcripts. Fabricated evidence fails before state publication.
+Planning, new questions, chat explanations, teaching and hints can answer gaps
+with explicitly labelled general knowledge after at most one grounded repair.
+Grading and diagnosis evaluate the accepted question and recorded learner answer;
+they do not require an applied example to appear in course slides, do not replace
+the stored criteria, and preserve the question's original source references.
+Assessment evaluation never uses a general-knowledge fallback. Semantic support still depends on model judgement,
+while quote/reference integrity is deterministic.
+
+Question generation shares the reasoning-focused policy in `pedagogy.py`: avoid
+copying a target noun out of a scenario, use plausible misconception distractors,
+and require explanation or transfer after a correct choice. Recent prompts and
+the learning goal accompany each new question. A narrow comparison uses one
+integrated Concept rather than repeated definition/encoding lessons. Explicitly
+related asides stay in the discussion without silently starting another roadmap.
+When a grader paraphrases required evidence, one bounded repair selects numbered
+excerpts of the original answer. Invalid indices and unsupported decisive grades
+still fail without recording evidence or mastery.
 `orchestrator.start(..., materials=retrieval_result)` can select materials before
 planning a new session. Selection and private criteria remain backend data.
 
 Grounded activities, assessments, and roadmaps return typed `sources`. Each
 citation copies identifiers, title, URI, page/section or exact supplied video
 start/end times from verified evidence, plus its exact quote. Models select
-source indices and quotes; they cannot generate citation metadata. Question
+source and quote indices from a request-local catalog; the server validates both
+indices and copies the exact original quotation. Source text enters request data,
+never schema enums or constants, so multiline text, Unicode, control characters,
+code and long passages cannot violate provider schema-literal restrictions.
+The catalog includes each full passage and up to 60 sentence excerpts; no source
+content is normalised or discarded from the full-passage option. Existing upload,
+extraction and model-context limits still apply. Verification distinguishes ordinary
+course directions and learning objectives from instructions attempting to override
+the tutor's rules. A reported override still rejects the generated content.
+Models cannot generate citation metadata. Question
 citations are retained with private records for replay and deterministic grading.
 Internal generation provenance is excluded from schemas and serialization.
 
 Source-based generation reports `insufficient_evidence` when selected materials
 cannot support the requested content and `conflicting_sources` when the support
 check identifies conflicting supplied evidence. Conflict reports must resolve exact
-quotes in at least two selected items. These safe, nonretryable errors preserve
-learning state and ask for more relevant materials or source clarification; the
-agent never silently picks a source winner. Retrieval unavailability remains a
+quotes in at least two selected items. Conflicts, contradictions, invalid references
+and instruction overrides never trigger general-knowledge fallback; the agent
+never silently picks a source winner. Retrieval unavailability remains a
 separate `dependency_unavailable` failure and preserves the previous selection.
 
 Activities, assessments, and roadmaps label `knowledge_origin` as `general`,
-`materials`, or `supplement`. Verified citations imply `materials`; supplements
-cannot claim material citations. With no selection, learning uses general knowledge.
+`materials`, or `supplement`. Ordinary chat replies carry verified citations too.
+Mixed chat answers use `supplement`, with server-rendered labels separating
+material-supported parts from general additions and citations only for the former.
+Wholly general answers carry no citations. The UI describes an inability to verify
+against retrieved material, rather than asserting absence from the entire Offering.
 `await teaching.supplement(context, assessment_id)` explicitly requests a bounded
 general-knowledge supplement to selected materials, keeps the selection intact,
-and labels its result without citations. It is never an automatic response to
-insufficient evidence. `await knowledge.use_general_knowledge(context)` explicitly
+and labels its result without citations. Automatic explanatory fallback also keeps
+the selected material intact for later questions. `await knowledge.use_general_knowledge(context)` explicitly
 clears selection when the host chooses to leave source-only learning.
 
 Source commands, role markers, grading requests, and instructions to reveal
@@ -651,8 +689,8 @@ neither media files nor rendering code.
 activity into its complete explanation without model calls, preserving identity,
 source attribution, and text. Rich generation whose parameters remain invalid
 after normal bounded retries gets one separate validated text-generation fallback.
-That fallback still uses selected-source checks; insufficient/conflicting evidence,
-refusals, cancellation, or stale state are not silently bypassed.
+That fallback still checks source support, allowing a labelled general explanation
+for missing coverage. Conflicts, refusals, cancellation and stale state remain errors.
 
 ## FastAPI service shell
 

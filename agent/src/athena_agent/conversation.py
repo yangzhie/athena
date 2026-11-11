@@ -89,6 +89,8 @@ class ConversationSession(Contract):
     history: list[ConversationTurn] = Field(default_factory=list)
     active_topic: TopicContext | None = None
     archived_topics: list[TopicContext] = Field(default_factory=list)
+    # Host operation receipts are private, excluded from conversation/learning exports.
+    operation_results: dict[str, dict] = Field(default_factory=dict)
     revision: int = Field(default=0, ge=0)
 
 
@@ -114,6 +116,10 @@ class InMemoryConversationStore:
             raise ConversationError('Conversation identity cannot change.')
         self._sessions[key] = session
         return session.model_copy(deep=True)
+
+    def delete(self, context: RequestContext) -> None:
+        """Erase a private session; stale CAS writers cannot recreate it."""
+        self._sessions.pop(self._key(context), None)
 
     def read(self, context: RequestContext) -> ConversationSession:
         session = self._sessions.get(self._key(context))

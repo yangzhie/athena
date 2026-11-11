@@ -15,6 +15,7 @@ class LearningSession(Model):
 
     id: NonBlank
     student_id: NonBlank
+    environment_id: str | None = None
     offering_id: NonBlank
     goal: Annotated[str, StringConstraints(min_length=1, max_length=200, pattern=r"\S")]
     title: Annotated[str, StringConstraints(min_length=1, max_length=80, pattern=r"\S")]
@@ -47,6 +48,19 @@ class Message(Model):
     created_at: datetime
 
 
+class AnswerReceipt(Model):
+    """Private retry data, never part of a student or lecturer projection."""
+
+    question_id: NonBlank
+    choice_id: str | None
+    text: str | None
+    hint_used: bool
+    messages: list[Message] = Field(default_factory=list)
+
+    def same_submission(self, other: "AnswerReceipt") -> bool:
+        return self.model_dump(exclude={"messages"}) == other.model_dump(exclude={"messages"})
+
+
 class LearningSessionOut(BaseModel):
     """What the student gets back: no student id."""
 
@@ -62,7 +76,7 @@ class LearningSessionOut(BaseModel):
 
     @classmethod
     def of(cls, s: LearningSession) -> "LearningSessionOut":
-        return cls(**s.model_dump(exclude={"student_id", "share_token"}))
+        return cls(**s.model_dump(exclude={"student_id", "share_token", "environment_id"}))
 
 
 # --- Lecturer-facing (shared sessions): never the student id or the session id ---------

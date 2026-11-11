@@ -1,7 +1,7 @@
 import { LearningCanvas } from '@athena/playground'
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { playgroundSuggestions } from '../../../api/playground'
+import { cancelExecution, playgroundSuggestions } from '../../../api/playground'
 import type { LearningSession } from '../../../types'
 import { openActivityId } from '../chat/activity'
 import { Composer } from '../chat/Composer'
@@ -11,7 +11,7 @@ import { SessionGate } from '../sessions/SessionGate'
 import { sessionPath } from '../sessions/paths'
 import { bumpSession } from '../sessions/sessionStore'
 import { useOffering } from '../useOffering'
-import { openScene, sendFromPlayground, sessionFor, usePlaygroundBusy } from './session'
+import { openScene, sendFromPlayground, sessionFor, usePlaygroundBusy, usePlaygroundDetails, restoreCanvas, retryCanvas, replacementDecision } from './session'
 
 /** The canvas belongs to the learning session in the route, never to a whole offering. */
 export default function PlaygroundView() {
@@ -27,8 +27,14 @@ function SessionPlayground({ session }: { session: LearningSession }) {
   const state = useSyncExternalStore(playground.subscribe, playground.getState)
   const { messages, sending: streaming, error } = useThread(session.id)
   const busy = usePlaygroundBusy(session.id)
+  const detail = usePlaygroundDetails(session.id)
   const thread = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+    void restoreCanvas(offering, session.id)
+    const timer = setInterval(() => { if (!document.hidden) void restoreCanvas(offering, session.id) }, 2000)
+    return () => clearInterval(timer)
+  }, [offering, session.id])
   useEffect(() => {
     if (sceneId) void openScene(offering, session.id, sceneId)
   }, [offering, session.id, sceneId])
@@ -58,6 +64,11 @@ function SessionPlayground({ session }: { session: LearningSession }) {
     <div className="flex flex-1 flex-col gap-4 pb-4 xl:h-[calc(100svh-var(--topbar-h)-3.5rem)] xl:flex-none xl:flex-row">
       <section className="relative h-[65svh] min-h-0 min-w-0 shrink-0 overflow-hidden rounded-2xl border border-line xl:h-auto xl:flex-1">
         <LearningCanvas playground={playground} />
+        {detail.replacements.map((proposal) => <div key={proposal.id} className="absolute top-3 left-3 right-3 rounded-xl border border-line bg-surface p-3 text-sm">
+          <p>The tutor proposes replacing your work with “{proposal.scene.title}”: {proposal.scene.goal}</p>
+          <button className="m-2 text-accent" onClick={() => void replacementDecision(offering, session.id, proposal.id, 'accept')}>Replace my work</button>
+          <button className="m-2" onClick={() => void replacementDecision(offering, session.id, proposal.id, 'reject')}>Keep my work</button>
+        </div>)}
       </section>
 
       <aside className="flex h-[24rem] min-h-0 shrink-0 flex-col overflow-hidden rounded-2xl border border-line bg-surface xl:h-auto xl:w-[24rem] 2xl:w-[28rem]">
@@ -108,12 +119,19 @@ function SessionPlayground({ session }: { session: LearningSession }) {
               </div>
             </div>
           )}
-          {busy && <p className="text-xs text-muted">The demo tutor is thinking…</p>}
+          {busy && <p className="text-xs text-muted">Athena is thinking…</p>}
+          {detail.error && <div role="alert" className="text-sm text-bad">{detail.error} <button className="underline" onClick={() => void retryCanvas(offering, session.id)}>Retry / refresh</button></div>}
+          {detail.executions.slice(-3).map((job) => <div key={job.id} className="rounded border border-line p-2 text-xs">
+            <p>Python: {job.state} {job.result && '· verified execution'}</p>
+            {job.result?.stdout && <pre className="max-h-32 overflow-auto whitespace-pre-wrap">{job.result.stdout}</pre>}
+            {(job.error || job.result?.error) && <p className="text-bad">{job.error || job.result?.error?.message}</p>}
+            {['queued', 'running'].includes(job.state) && <button className="text-accent" onClick={() => void cancelExecution(offering, session.id, job.id).then(() => restoreCanvas(offering, session.id))}>Cancel run</button>}
+          </div>)}
           {error && <p className="text-sm text-bad" role="alert">{error.message}</p>}
         </div>
 
         <div className="space-y-2 border-t border-line p-3">
-          <p className="text-xs text-muted">Demo canvas and messages stay in this browser tab; they are not saved or shared. Activity answers above use your saved learning session.</p>
+          <p className="text-xs text-muted">Your canvas and discussion are saved privately with this session. Sharing includes this discussion. Canvas checks alone do not establish mastery.</p>
           {hasScene && (
             <div className="flex flex-wrap items-center gap-2 text-xs">
               {state.scene && (
@@ -132,7 +150,7 @@ function SessionPlayground({ session }: { session: LearningSession }) {
             </div>
           )}
           <Composer
-            placeholder={selected ? `Ask about “${selected.title}”` : 'Ask the demo tutor'}
+            placeholder={selected ? `Ask about “${selected.title}”` : 'Ask the Playground tutor'}
             streaming={streaming}
             disabled={busy}
             onSend={send}

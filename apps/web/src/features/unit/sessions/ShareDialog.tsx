@@ -1,15 +1,17 @@
+import type { ChatMessage } from '../../../types'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '../../../components/ui'
 
 interface Props {
   open: boolean
   messageCount: number
+  messages: ChatMessage[]
   onConfirm: () => Promise<void>
   onClose: () => void
 }
 
 /** Consent before sharing: exactly what the lecturer will and won't see. */
-export function ShareDialog({ open, messageCount, onConfirm, onClose }: Props) {
+export function ShareDialog({ open, messageCount, messages, onConfirm, onClose }: Props) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -49,7 +51,7 @@ export function ShareDialog({ open, messageCount, onConfirm, onClose }: Props) {
             👁 Your lecturer will see <strong>the whole session</strong>: all {messageCount} message
             {messageCount === 1 ? '' : 's'} so far, and anything added while it stays shared.
           </li>
-          <li>🧪 Demo Playground messages and canvas changes stay in your browser tab; they are not saved or shared.</li>
+          <li>🧪 Saved Playground discussion is included. Canvas snapshots, private grading criteria and internal tool data are excluded.</li>
           <li>💬 They can reply here, and you’ll see their replies in this chat.</li>
           <li>
             🕶 It’s <strong>anonymous</strong>: they won’t see your name. But anything you wrote that identifies you (like
@@ -58,6 +60,12 @@ export function ShareDialog({ open, messageCount, onConfirm, onClose }: Props) {
           <li>🔒 Only lecturers of this unit can see it. Other students never can.</li>
           <li>↩ You can stop sharing at any time, and their access ends immediately.</li>
         </ul>
+        <div aria-label="Shared session preview" className="max-h-64 space-y-3 overflow-y-auto rounded-lg border border-line p-3 text-sm">
+          <p className="font-medium">Preview: the saved conversation</p>
+          {messages.filter((m) => !m.via && !m.id.startsWith('pending-')).map((message) => <div key={message.id}>
+            <p className="text-xs text-muted">{message.role}</p><p className="whitespace-pre-wrap">{message.content}</p>
+          </div>)}
+        </div>
         {error && (
           <p className="text-sm text-bad" role="alert">
             {error}

@@ -144,6 +144,26 @@ describe('API sessions with local Playground messages', () => {
     expect(openActivityId(getThread(session.id).messages)).toBeNull()
   })
 
+  it('removes an unconfirmed chat exchange after a storage failure', async () => {
+    vi.mocked(api.sendSessionMessage).mockRejectedValueOnce(new ApiError(503, 'Storage unavailable'))
+    await sendMessage(offering.id, session.id, 'Question')
+    expect(getThread(session.id).messages).toEqual([message('opening')])
+    expect(getThread(session.id).error?.status).toBe(503)
+  })
+
+  it('merges a replayed answer by its stored message IDs', async () => {
+    const saved: ChatMessage[] = [
+      { ...message('answer'), role: 'learner', answerFor: 'q1' }, message('followup'),
+    ]
+    vi.mocked(api.answerQuestion).mockResolvedValue(saved)
+    const input = { questionId: 'q1', text: 'Reason', shown: 'Reason' }
+    await answer(offering.id, session.id, input)
+    postToThread(session.id, { role: 'tutor', content: 'Local demo' })
+    const before = getThread(session.id).messages
+    await answer(offering.id, session.id, input)
+    expect(getThread(session.id).messages).toEqual(before)
+  })
+
   it('continues agent activities through the session API', async () => {
     vi.mocked(api.continueSession).mockResolvedValue([message('next step')])
     await continueLearning(offering.id, session.id, 'activity-1')

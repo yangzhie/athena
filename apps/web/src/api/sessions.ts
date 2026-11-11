@@ -1,29 +1,10 @@
-import type { AgentActivity, ChatMessage, KnowledgeOrigin, LearningSession, SourceReference } from '../types'
+import type { AgentActivity, ChatMessage, LearningSession, SourceReference } from '../types'
 import { call } from './client'
+import { hasPendingOperation, operationCall, recoverPendingOperation } from './operations'
 
-/** Session as the API returns it (snake_case). */
-interface SessionDto {
-  id: string
-  offering_id: string
-  goal: string
-  title: string
-  created_at: string
-  updated_at: string
-  shared: boolean
-  shared_at: string | null
-  last_lecturer_reply_at: string | null
-}
-
-interface MessageDto {
-  id: string
-  role: 'tutor' | 'learner'
-  content: string
-  sources: Record<string, unknown>[]
-  knowledge_origin: KnowledgeOrigin | null
-  activity: AgentActivity | null
-  answer_for: string | null
-  created_at: string
-}
+import type { components } from '../../../../packages/shared/api'
+type SessionDto = components['schemas']['LearningSessionOut']
+type MessageDto = components['schemas']['Message']
 
 const toSession = (s: SessionDto): LearningSession => ({
   id: s.id,
@@ -72,28 +53,41 @@ const toMessage = (m: MessageDto): ChatMessage => ({
   id: m.id,
   role: m.role,
   content: m.content,
-  sources: toSourceList(m.sources),
+  sources: toSourceList(m.sources ?? []),
   knowledgeOrigin: m.knowledge_origin ?? undefined,
-  activity: m.activity ?? undefined,
+  activity: m.activity && typeof m.activity.activity_id === 'string' && typeof m.activity.kind === 'string' ? m.activity as unknown as AgentActivity : undefined,
   answerFor: m.answer_for ?? undefined,
   createdAt: m.created_at,
 })
 
 const base = (offeringId: string) => `/units/${encodeURIComponent(offeringId)}/sessions`
 
+export async function transcribeAnswer(offeringId: string, sessionId: string, audio: Blob, signal?: AbortSignal): Promise<string> {
+  const result = await call<components['schemas']['TranscriptionOut']>(`${base(offeringId)}/${encodeURIComponent(sessionId)}/transcriptions`, {
+    method: 'POST', body: audio, signal, headers: { 'Content-Type': audio.type || 'audio/webm' },
+  })
+  return result.text
+}
+
+export const hasPendingSession = (offeringId: string) => hasPendingOperation(base(offeringId))
+
+export async function recoverSession(offeringId: string) {
+  const r = await recoverPendingOperation<{ session: SessionDto; messages: MessageDto[] }>(base(offeringId), base(offeringId))
+  return r ? { session: toSession(r.session), messages: r.messages.map(toMessage) } : undefined
+}
+
 export async function listSessions(offeringId: string): Promise<LearningSession[]> {
+  await recoverPendingOperation(base(offeringId), base(offeringId))
   return (await call<SessionDto[]>(base(offeringId))).map(toSession)
 }
 
 export async function createSession(offeringId: string, goal: string) {
-  const r = await call<{ session: SessionDto; messages: MessageDto[] }>(base(offeringId), {
-    method: 'POST',
-    body: JSON.stringify({ goal }),
-  })
+  const r = await operationCall<{ session: SessionDto; messages: MessageDto[] }>(base(offeringId), { goal })
   return { session: toSession(r.session), messages: r.messages.map(toMessage) }
 }
 
 export async function getSession(offeringId: string, sessionId: string) {
+  await recoverPendingOperation(`${base(offeringId)}/${encodeURIComponent(sessionId)}/messages`, base(offeringId))
   const r = await call<{ session: SessionDto; messages: MessageDto[] }>(`${base(offeringId)}/${encodeURIComponent(sessionId)}`)
   return { session: toSession(r.session), messages: r.messages.map(toMessage) }
 }
@@ -113,11 +107,7 @@ export async function deleteSession(offeringId: string, sessionId: string) {
 
 /** Sends the learner's message; returns [learner message, tutor reply] as stored. */
 export async function sendSessionMessage(offeringId: string, sessionId: string, text: string, signal?: AbortSignal) {
-  const r = await call<MessageDto[]>(`${base(offeringId)}/${encodeURIComponent(sessionId)}/messages`, {
-    method: 'POST',
-    body: JSON.stringify({ text }),
-    signal,
-  })
+  const r = await operationCall<MessageDto[]>(`${base(offeringId)}/${encodeURIComponent(sessionId)}/messages`, { text }, signal)
   return r.map(toMessage)
 }
 

@@ -146,11 +146,12 @@ def test_history_selection_does_not_delete_stored_turns():
 
 
 def test_reply_budget_failure_after_routing_rolls_back():
+    from athena_agent.answers import ReplyDraft
     context, store, _, _ = setup([])
 
     class Builder(ContextBuilder):
         def build(self, topic, text, instructions, model):
-            if model is ConversationReply:
+            if model is ReplyDraft:
                 raise ContextBudgetError()
             return super().build(topic, text, instructions, model)
 

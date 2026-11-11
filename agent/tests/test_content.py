@@ -113,7 +113,7 @@ def test_rich_content_attaches_verified_video_times_and_text_excerpt(gap):
     context, store, _ = gap
     select_materials(context, store)
     video = material().items[1]
-    support = {'supported': True, 'evidence': [{'source_index': 1, 'quote': video.transcript}]}
+    support = {'supported': True, 'evidence': [{'source_index': 1, 'quote_index': 0}]}
     mock = MockLLM([{'format': 'diagram', 'rationale': 'Shows comparison.'}, support, {'text': 'Compare adjacent values.', 'parameters': {'kind': 'diagram', 'nodes': [{'node_id': 'a', 'label': 'Compare'}]}}, support])
     service = ContentService(store, mock)
     asyncio.run(service.set_capabilities(context, ClientCapabilities(formats=['diagram'])))

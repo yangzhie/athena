@@ -14,6 +14,23 @@ const render = (m = message, viewer: 'student' | 'lecturer' = 'student') => rend
 )
 
 describe('merged message rendering', () => {
+  it('labels general and mixed answers without claiming the entire offering lacks coverage', () => {
+    const general = render({ ...message, knowledgeOrigin: 'general' })
+    expect(general).toContain('material retrieved for this question')
+    expect(general).not.toContain('Not found in your unit')
+    const mixed = render({ ...message, knowledgeOrigin: 'supplement', sources: [{
+      kind: 'document', sourceId: 'slides', passageId: 'page-28', title: 'Prediction', page: 28,
+      quote: 'Classification predicts labels.',
+    }] })
+    expect(mixed).toContain('labelled general-knowledge additions')
+    expect(mixed).toContain('Prediction · p. 28')
+  })
+
+  it('groups multiple quotations from the same passage into one source chip', () => {
+    const source = { kind: 'document' as const, sourceId: 'slides', passageId: 'page-28', title: 'Prediction', page: 28, quote: 'A class label.' }
+    const html = render({ ...message, sources: [source, { ...source, quote: 'A numerical value.' }] })
+    expect(html.match(/Prediction · p\. 28/g)).toHaveLength(1)
+  })
   it('keeps the session and scene in a Playground recommendation link', () => {
     expect(render()).toContain('href="/units/offering/s/session/playground?scene=scene%20one"')
     expect(render()).toContain('Open Playground')

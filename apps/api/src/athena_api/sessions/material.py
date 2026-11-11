@@ -21,7 +21,10 @@ ABOUT_WEIGHT = 3.0
 
 _STOP = set(
     "a an and are as at be but by do does for from how i in is it its me of on or so that the this to was what when "
-    "which why will with you your about learn understand explain help want know".split()
+    "which why will with you your about learn understand explain help want know "
+    "between difference differ versus vs compare tell give "
+    "lecture lectures material materials note notes slide slides course uploaded covered cover covers related example examples briefly "
+    "not if even only also still can could would should these those they them such any some other both than then into use using".split()
 )
 
 
@@ -37,9 +40,19 @@ def _stem(w: str) -> str:
     return w
 
 
+_STOP_STEMS = {_stem(word) for word in _STOP}
+
+
 def _terms(text: str) -> list[str]:
     words = re.findall(r"[a-z0-9²]+", text.lower())
-    return [_stem(w) for w in words if len(w) > 1 and w not in _STOP]
+    stems = (_stem(w) for w in words if len(w) > 1 and w not in _STOP)
+    return [stem for stem in stems if stem not in _STOP_STEMS]
+
+
+def needs_goal_context(question: str) -> bool:
+    """Use the goal for underspecified follow-ups, not unrelated explicit questions."""
+    generic = set(_terms('another more again detail reason meaning happen case word please simple simply show work can concrete'))
+    return not (set(_terms(question)) - generic)
 
 
 def rank(goal: str, docs: list[str], *, k1: float = 1.2, b: float = 0.75) -> list[float]:
@@ -102,3 +115,55 @@ class LectureMaterial:
             for score, (lecture, clip, transcript) in scored[: self.max_clips]
             if score > 0
         ]
+
+
+class OfferingMaterial:
+    """One offering-scoped ranking interface for immutable passages and approved clips."""
+    def __init__(self, materials, lectures: LectureService, max_results=5):
+        self.materials, self.lectures, self.max_results = materials, lectures, max_results
+
+    def for_goal(self, offering_id: str, goal: str) -> list[dict]:
+        catalog = self.materials.list(offering_id, manager=True)
+        approved = self.lectures.approved_material(offering_id)
+        approved_recordings = {lecture.id for lecture, _, _ in approved}
+        selected = {}
+        for material in catalog:
+            usable = material['status'] == 'ready' and (
+                material['kind'] == 'document' and material['published'] or
+                material['kind'] == 'recording' and material['id'] in approved_recordings)
+            if usable and material['version'] > selected.get(material['source_id'], {}).get('version', 0):
+                selected[material['source_id']] = material
+        active = {m['id'] for m in selected.values()}
+        known = {m['id'] for m in catalog}
+        items = []
+        for material in selected.values():
+            if material['kind'] != 'document':
+                continue
+            for passage in self.materials.passages(offering_id, material['id']):
+                items.append(dict(kind='document', source_id=material['id'], passage_id=passage['id'],
+                                  title=f"{material['filename']} · v{material['version']}", text=passage['text'],
+                                  page=passage['page'], section=passage['section']))
+        for lecture, clip, text in approved:
+            if lecture.id in known and lecture.id not in active:
+                continue
+            items.append(dict(kind='video', source_id=lecture.id, segment_id=clip['id'], title=clip['title'],
+                              transcript=text, start_seconds=clip['start_s'], end_seconds=clip['end_s']))
+        about = _scaled(rank(goal, [i['title'] for i in items]))
+        body = _scaled(rank(goal, [i.get('text', i.get('transcript', '')) for i in items]))
+        # Reward coverage of the question's distinct terms before repetition of
+        # one term. Comparisons need both subjects in the selected passages.
+        terms = set(_terms(goal))
+        scored = sorted(zip([ABOUT_WEIGHT * a + b for a, b in zip(about, body, strict=True)], items, strict=True),
+                        key=lambda pair: (-len(terms.intersection(_terms(pair[1]['title'] + ' ' + pair[1].get('text', pair[1].get('transcript', ''))))), -pair[0]))
+        result = []
+        for score, item in scored[:self.max_results]:
+            if score <= 0:
+                continue
+            if item['kind'] == 'video' and len(item['transcript']) > 6000:
+                text = item['transcript']
+                positions = [text.lower().find(term) for term in re.findall(r'[a-z]{4,}', goal.lower())]
+                at = min((p for p in positions if p >= 0), default=0)
+                start = max(0, min(at - 1000, len(text) - 6000))
+                item = {**item, 'transcript': text[start:start + 6000]}
+            result.append(item)
+        return result

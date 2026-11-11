@@ -4,6 +4,7 @@
  * Answers are graded on the server; questions never include their answers.
  */
 
+import { operationCall, recoverPracticeOperations } from './operations'
 import { call } from './client'
 
 export { ApiError } from './client'
@@ -25,6 +26,7 @@ export type SrsNext =
       is_new: boolean
       question: SrsQuestion
       remaining: { due: number; new: number }
+      restored_attempt?: SrsAttemptResult
     }
   | { done: true; next_due_at: string | null }
 
@@ -57,18 +59,19 @@ export interface SrsSummary {
 
 const base = (offeringId: string) => `/units/${encodeURIComponent(offeringId)}/srs`
 
-export const getSrsSummary = (offeringId: string) => call<SrsSummary>(`${base(offeringId)}/summary`)
+export async function getSrsSummary(offeringId: string) {
+  await recoverPracticeOperations(base(offeringId))
+  return call<SrsSummary>(`${base(offeringId)}/summary`)
+}
 
-export const getNextQuestion = (offeringId: string) => call<SrsNext>(`${base(offeringId)}/next`)
+export async function getNextQuestion(offeringId: string): Promise<SrsNext> {
+  await recoverPracticeOperations(base(offeringId))
+  const pending = await call<SrsNext | null>(`${base(offeringId)}/pending`)
+  return pending ?? call<SrsNext>(`${base(offeringId)}/next`)
+}
 
 export const submitAnswer = (offeringId: string, itemId: string, variantId: string, answer: number | string | null) =>
-  call<SrsAttemptResult>(`${base(offeringId)}/attempts`, {
-    method: 'POST',
-    body: JSON.stringify({ item_id: itemId, variant_id: variantId, answer }),
-  })
+  operationCall<SrsAttemptResult>(`${base(offeringId)}/attempts`, { item_id: itemId, variant_id: variantId, answer })
 
 export const rateAttempt = (offeringId: string, attemptId: string, rating: Rating) =>
-  call<{ next_due_at: string }>(`${base(offeringId)}/attempts/${encodeURIComponent(attemptId)}/rating`, {
-    method: 'POST',
-    body: JSON.stringify({ rating }),
-  })
+  operationCall<{ next_due_at: string }>(`${base(offeringId)}/attempts/${encodeURIComponent(attemptId)}/rating`, { rating })

@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent }
 interface ComposerProps {
   placeholder: string
   streaming: boolean
-  /** The local demo tutor is busy; unlike an API reply, it has no cancellation control. */
+  /** A Playground operation is busy; committed changes finish through the session API. */
   disabled?: boolean
   onSend: (text: string) => void
   onStop: () => void

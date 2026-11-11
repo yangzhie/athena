@@ -25,6 +25,24 @@ def _message_id(token: str, message_id: str) -> str:
     return hashlib.sha256(f"{token}:{message_id}".encode()).hexdigest()[:16]
 
 
+def _remap(token, value):
+    if isinstance(value, list):
+        return [_remap(token, item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    output = {}
+    for key, item in value.items():
+        if key in {'rubric', 'criteria', 'snapshot', 'internal', 'student_id', 'learner_id', 'environment_id', 'session_id'}:
+            continue
+        if key not in {'source_id', 'passage_id', 'segment_id'} and (key == 'id' or key.endswith('_id')) and isinstance(item, str):
+            output[key] = _message_id(token, item)
+        elif key.endswith('_ids') and isinstance(item, list):
+            output[key] = [_message_id(token, v) if isinstance(v, str) else _remap(token, v) for v in item]
+        else:
+            output[key] = _remap(token, item)
+    return output
+
+
 @dataclass
 class SharedSessions:
     store: SessionStore
@@ -54,16 +72,16 @@ class SharedSessions:
         """
         s = self._find(offering_id, share_id)
         m = Message(id=uuid.uuid4().hex, session_id=s.id, role="lecturer", content=text.strip(), created_at=self.clock())
-        self.store.add_message(s.student_id, m)
-        now = self.clock()
-        # Surfaces the session in the student's list, with a "new reply" marker.
-        self.store.put(s.model_copy(update={"updated_at": now, "last_lecturer_reply_at": now}))
+        try:
+            self.store.reply_shared(share_id, m, self.clock())
+        except LookupError:
+            raise NotShared('this session is no longer shared') from None
         return self._shared_message(share_id, m)
 
     def _shared_message(self, share_id: str, m: Message) -> SharedMessage:
         return SharedMessage(
             id=_message_id(share_id, m.id), role=m.role, content=m.content, sources=m.sources,
-            knowledge_origin=m.knowledge_origin, activity=m.activity, answer_for=m.answer_for, created_at=m.created_at,
+            knowledge_origin=m.knowledge_origin, activity=_remap(share_id, m.activity), answer_for=_message_id(share_id, m.answer_for) if m.answer_for else None, created_at=m.created_at,
         )
 
     def view(self, offering_id: str, share_id: str) -> SharedSessionView:
