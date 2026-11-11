@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { Icon } from '../../../components/ui'
 import { cn } from '../../../lib/cn'
 import type { ChatMessage, PlaygroundOffer } from '../../../types'
 import { playgroundPath } from '../sessions/paths'
@@ -17,6 +18,8 @@ export function MessageBubble({
   viewer = 'student',
   onAnswer,
   onContinue,
+  layout = 'stack',
+  number,
 }: {
   message: ChatMessage
   pending?: boolean
@@ -32,14 +35,18 @@ export function MessageBubble({
   onContinue?: () => void
   /** Who is reading: labels change in a lecturer's view of a shared session. */
   viewer?: 'student' | 'lecturer'
+  /** lesson: sources sit in a margin column beside the entry (in a wide @container). stack: sources below. */
+  layout?: 'stack' | 'lesson'
+  /** Question number, for question activities. */
+  number?: number
 }) {
   // These messages exist only in the student's browser, not in the shared API transcript.
   if (viewer === 'lecturer' && message.via === 'playground') return null
 
   if (message.role === 'lecturer') {
     return (
-      <div className="rounded-xl border border-accent/40 bg-accent-soft/50 px-4 py-3 text-[0.9375rem] leading-relaxed">
-        <p className="mb-1 text-xs font-medium text-accent">{viewer === 'lecturer' ? 'You (lecturer)' : 'Your lecturer'}</p>
+      <div className="rounded-md border border-margin/40 bg-surface px-4 py-3 leading-relaxed shadow-[inset_3px_0_0_var(--color-margin)]">
+        <p className="mb-1 text-xs font-semibold tracking-[0.14em] text-margin uppercase">{viewer === 'lecturer' ? 'You (lecturer)' : 'Your lecturer'}</p>
         <p className="whitespace-pre-wrap">{message.content}</p>
       </div>
     )
@@ -50,25 +57,32 @@ export function MessageBubble({
   )
 
   if (message.role === 'learner') {
+    // A pen annotation on the page, not a chat bubble.
+    const who = viewer === 'lecturer' ? 'Student' : message.answerFor ? 'Your answer' : 'You asked'
     return (
-      <div className="flex flex-col items-end">
-        {viewer === 'lecturer' && <p className="mb-1 text-xs text-muted">Student</p>}
+      <div className={cn(layout === 'lesson' && '@2xl:pr-[13rem]')}>
         {localLabel}
-        <p
-          className={cn(
-            'max-w-[85%] rounded-2xl rounded-br-sm bg-accent-soft leading-relaxed whitespace-pre-wrap',
-            compact ? 'px-3 py-2 text-sm' : 'px-4 py-2.5 text-[0.9375rem]',
-          )}
-        >
-          {message.content}
-        </p>
+        <div className="border-l-2 border-accent/60 pl-4">
+          <p className="text-xs font-semibold tracking-[0.14em] text-accent uppercase">{who}</p>
+          <p className={cn('mt-0.5 font-serif text-accent italic whitespace-pre-wrap', compact ? 'text-sm' : 'text-[1.05rem]')}>
+            {message.content}
+          </p>
+        </div>
       </div>
     )
   }
 
-  // Tutor replies are full-width text, like Claude or ChatGPT, not a bubble.
+  const sources = (
+    <SourceList offeringId={offeringId} sources={message.sources} origin={message.knowledgeOrigin}
+      variant={layout === 'lesson' ? 'margin' : 'chips'} />
+  )
+  // Tutor entries read as the lesson itself; in the lesson layout sources sit in the margin.
   return (
-    <div className={compact ? 'text-sm leading-relaxed' : 'text-[0.9375rem] leading-relaxed'}>
+    <div className={cn(
+      compact ? 'text-sm leading-relaxed' : 'leading-relaxed',
+      layout === 'lesson' && 'grid gap-4 @2xl:grid-cols-[minmax(0,1fr)_11rem] @2xl:gap-8',
+    )}>
+      <div className="min-w-0">
       {localLabel}
       {message.activity ? (
         <ActivityCard
@@ -78,6 +92,7 @@ export function MessageBubble({
           busy={busy}
           onAnswer={(a) => onAnswer?.(a)}
           onContinue={() => onContinue?.()}
+          number={number}
           transcribe={sessionId && viewer === 'student'
             ? (audio, signal) => transcribeAnswer(offeringId, sessionId, audio, signal) : undefined}
         />
@@ -86,7 +101,8 @@ export function MessageBubble({
           {message.content}
         </p>
       ) : (
-        <p className="text-muted" aria-label="Athena is thinking">
+        <p className="flex items-center gap-2 text-sm text-muted italic" aria-label="Athena is thinking">
+          Thinking
           <span className="inline-flex gap-1">
             <span className="size-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.2s]" />
             <span className="size-1.5 animate-bounce rounded-full bg-muted [animation-delay:-0.1s]" />
@@ -97,7 +113,9 @@ export function MessageBubble({
       {message.playground && sessionId && viewer === 'student' && (
         <PlaygroundCard offer={message.playground} offeringId={offeringId} sessionId={sessionId} />
       )}
-      <SourceList offeringId={offeringId} sources={message.sources} origin={message.knowledgeOrigin} />
+      {layout === 'stack' && sources}
+      </div>
+      {layout === 'lesson' && <div className="@2xl:pt-1">{sources}</div>}
     </div>
   )
 }
@@ -107,10 +125,10 @@ function PlaygroundCard({ offer, offeringId, sessionId }: { offer: PlaygroundOff
   return (
     <Link
       to={playgroundPath(offeringId, sessionId, offer.sceneId)}
-      className="mt-3 flex items-center gap-3 rounded-xl border border-line bg-surface p-3 transition-colors hover:border-accent"
+      className="mt-3 flex items-center gap-3 rounded-md border border-dashed border-accent/50 bg-surface p-3 transition-colors hover:border-solid hover:border-accent"
     >
-      <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-accent-soft text-lg" aria-hidden>
-        🧪
+      <span className="grid size-10 shrink-0 place-items-center rounded-md bg-accent-soft text-accent" aria-hidden>
+        <Icon name="flask" className="size-5" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{offer.title}</span>

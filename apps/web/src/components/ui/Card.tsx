@@ -9,10 +9,10 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'>
 
 export function Card({ title, action, className, children, ...props }: CardProps) {
   return (
-    <div className={cn('rounded-xl border border-line bg-surface p-5', className)} {...props}>
+    <div className={cn('rounded-lg border border-line bg-surface p-5 shadow-[0_1px_0_var(--color-line),0_8px_24px_-18px_color-mix(in_oklab,var(--color-ink)_35%,transparent)]', className)} {...props}>
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between gap-3">
-          {title && <h2 className="font-semibold">{title}</h2>}
+          {title && <h2 className="text-lg font-semibold">{title}</h2>}
           {action}
         </div>
       )}

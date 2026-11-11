@@ -9,8 +9,8 @@ export default function SessionView() {
   return (
     <SessionGate>
       {(session) => (
-        <div className="flex flex-1 flex-col">
-          <div className="mx-auto w-full max-w-3xl">
+        <div className="@container mx-auto flex w-full max-w-4xl flex-1 flex-col">
+          <div className="w-full pt-2">
             <SessionHeader key={session.id} offering={offering} session={session} />
           </div>
           <UnitChat key={session.id} offering={offering} session={session} />

@@ -1,36 +1,52 @@
+@import "@fontsource-variable/fraunces";
+@import "@fontsource-variable/source-sans-3";
 @import "tailwindcss";
 @import "@athena/playground/styles.css";
 
 /*
- * Design tokens. Tailwind v4 turns each --color-* into utilities
- * (bg-surface, text-muted, border-line, bg-accent ...), so components
- * never hard-code colours and dark mode is handled here in one place.
+ * Design tokens: the "study notebook" look.
+ * Tailwind v4 turns each --color-* into utilities (bg-surface, text-muted,
+ * border-line, bg-accent ...), so components never hard-code colours and
+ * dark mode is handled here in one place.
+ *
+ * Paper and ink: a warm page, fountain-pen blue for actions, a highlighter
+ * yellow for emphasis, and a serif (Fraunces) for headings over a clean
+ * sans (Source Sans 3) for reading.
  */
 @theme {
-  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, Consolas, monospace;
+  --font-sans: "Source Sans 3 Variable", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Fraunces Variable", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
 
-  --color-bg: #fafaf9;
-  --color-surface: #ffffff;
-  --color-line: #e7e5e4;
-  --color-ink: #1c1917;
-  --color-muted: #78716c;
-  --color-accent: #4f46e5;
-  --color-accent-soft: #eef2ff;
-  --color-good: #16a34a;
-  --color-warn: #d97706;
-  --color-bad: #dc2626;
+  --color-bg: #f5f0e6;
+  --color-surface: #fffcf6;
+  --color-line: #e2d9c7;
+  --color-ink: #1d2733;
+  --color-muted: #6b6253;
+  --color-accent: #1f4f8f;
+  --color-accent-soft: #e5ecf6;
+  --color-highlight: #f6dd6c;
+  --color-margin: #c9584a;
+  --color-good: #2e7a4d;
+  --color-warn: #a86a12;
+  --color-bad: #b23d2e;
 }
 
+/* Dark: the same notebook under a desk lamp. Light can be forced with data-theme="light". */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #0c0a09;
-    --color-surface: #1c1917;
-    --color-line: #292524;
-    --color-ink: #f5f5f4;
-    --color-muted: #a8a29e;
-    --color-accent: #818cf8;
-    --color-accent-soft: #1e1b4b;
+  :root:not([data-theme="light"]) {
+    --color-bg: #15130f;
+    --color-surface: #1e1b16;
+    --color-line: #353027;
+    --color-ink: #ece5d6;
+    --color-muted: #a59c8a;
+    --color-accent: #8fb4ea;
+    --color-accent-soft: #1c2738;
+    --color-highlight: #8a7420;
+    --color-margin: #e07a6b;
+    --color-good: #6cc08b;
+    --color-warn: #e0a54a;
+    --color-bad: #ef7f6f;
   }
 }
 
@@ -40,5 +56,36 @@
   }
   body {
     @apply bg-bg text-ink font-sans antialiased;
+    font-size: 1.0625rem;
+    /* A faint dot grid, like a notebook page. */
+    background-image: radial-gradient(color-mix(in oklab, var(--color-line) 70%, transparent) 1px, transparent 1.2px);
+    background-size: 22px 22px;
+    background-attachment: fixed;
   }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    font-optical-sizing: auto;
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--color-highlight) 70%, transparent);
+    color: var(--color-ink);
+  }
+}
+
+/* A highlighter stroke behind text: for the current item or a key phrase. */
+@utility highlight {
+    background-image: linear-gradient(
+      100deg,
+      transparent 0.2em,
+      color-mix(in oklab, var(--color-highlight) 65%, transparent) 0.3em,
+      color-mix(in oklab, var(--color-highlight) 55%, transparent) calc(100% - 0.3em),
+      transparent calc(100% - 0.2em)
+    );
+    background-size: 100% 0.62em;
+    background-position: 0 88%;
+    background-repeat: no-repeat;
+    box-decoration-break: clone;
 }

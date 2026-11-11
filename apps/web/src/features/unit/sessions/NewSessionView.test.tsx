@@ -11,6 +11,7 @@ vi.mock('../../../api/sessions')
 vi.mock('../../../app/role')
 vi.mock('../useOffering')
 vi.mock('./sessionStore')
+vi.mock('../practice/summaryStore')
 
 beforeEach(() => {
   vi.mocked(useRole).mockReturnValue('student')
@@ -26,7 +27,8 @@ it('offers recovery and prevents alternative goals while a session start is unre
   const html = render()
   expect(html).toContain('Recover previous session')
   expect(html).toContain('avoid duplicates')
-  expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Topic<\/button>/)
+  // The topic starter is disabled while the earlier start is unresolved.
+  expect(html).toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*>Topic<(?:(?!<\/button>).)*<\/button>/)
 })
 
 it('does not offer recovery for a fresh request or lecturer view', () => {

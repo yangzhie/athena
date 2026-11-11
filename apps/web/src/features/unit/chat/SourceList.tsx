@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Icon } from '../../../components/ui'
 import { listLectures } from '../../../api/lectures'
 import { formatTimestamp } from '../../../lib/format'
 import type { KnowledgeOrigin, SourceReference } from '../../../types'
@@ -28,10 +29,13 @@ export function SourceList({
   offeringId,
   sources = [],
   origin,
+  variant = 'chips',
 }: {
   offeringId: string
   sources?: SourceReference[]
   origin?: KnowledgeOrigin
+  /** chips: a row of buttons under the text. margin: notes written in the page's margin. */
+  variant?: 'chips' | 'margin'
 }) {
   const [error, setError] = useState<string | null>(null)
   const note = origin ? originNote[origin] : null
@@ -40,6 +44,34 @@ export function SourceList({
   const keyFor = (s: SourceReference) => `${s.kind}:${s.sourceId}:${s.kind === 'video' ? s.segmentId : s.passageId}`
   const unique = sources.filter((s, index) => sources.findIndex(other => keyFor(other) === keyFor(s)) === index)
   if (sources.length === 0 && !note) return null
+  const openSource = (s: SourceReference) => {
+    setError(null)
+    void open(offeringId, s).catch(e => setError(e instanceof Error ? e.message : 'Source unavailable.'))
+  }
+
+  if (variant === 'margin') {
+    return (
+      <aside className="space-y-3" aria-label="Sources">
+        {error && <p role="alert" className="text-xs text-bad">{error}</p>}
+        {note && <p className="border-l-2 border-warn/60 pl-3 text-xs text-muted italic">{note}</p>}
+        {unique.map((s) => (
+          <button
+            key={keyFor(s)}
+            type="button"
+            onClick={() => openSource(s)}
+            className="group block w-full border-l-2 border-margin/50 pl-3 text-left transition-colors hover:border-margin"
+          >
+            <span className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-margin">
+              <Icon name={s.kind === 'video' ? 'film' : 'page'} className="size-3.5" />
+              {s.kind === 'video' ? formatTimestamp(s.startS) : s.page ? `p. ${s.page}` : 'Source'}
+            </span>
+            <span className="mt-0.5 block font-serif text-sm leading-snug text-ink group-hover:underline">{s.title}</span>
+            {s.quote && <span className="mt-1 line-clamp-3 text-xs text-muted italic">“{s.quote}”</span>}
+          </button>
+        ))}
+      </aside>
+    )
+  }
 
   return (
     <div className="mt-3 space-y-2">
@@ -51,11 +83,11 @@ export function SourceList({
             <li key={keyFor(s)}>
               <button
                 type="button"
-                onClick={() => { setError(null); void open(offeringId, s).catch(e => setError(e instanceof Error ? e.message : 'Source unavailable.')) }}
+                onClick={() => openSource(s)}
                 title={s.quote}
-                className="inline-flex max-w-72 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-muted transition-colors hover:border-accent hover:text-ink"
+                className="inline-flex max-w-72 items-center gap-1.5 rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-muted transition-colors hover:border-margin hover:text-ink"
               >
-                <span aria-hidden>{s.kind === 'video' ? '🎬' : '📄'}</span>
+                <Icon name={s.kind === 'video' ? 'film' : 'page'} className="size-3.5 text-margin" />
                 <span className="truncate">{label(s)}</span>
               </button>
             </li>

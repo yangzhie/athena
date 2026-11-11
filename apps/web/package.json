@@ -11,10 +11,12 @@
     "test": "vitest run src"
   },
   "dependencies": {
+    "@athena/playground": "*",
+    "@fontsource-variable/fraunces": "^5.2.8",
+    "@fontsource-variable/source-sans-3": "^5.2.8",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-router": "^8.5.1",
-    "@athena/playground": "*"
+    "react-router": "^8.5.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
