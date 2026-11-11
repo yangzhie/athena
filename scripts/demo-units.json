@@ -1,0 +1,224 @@
+{
+  "note": "Demo units for Athena. Materials are MIT OpenCourseWare content under Creative Commons BY-NC-SA, downloaded at seed time and never committed. See docs/demo-units.md for attribution. sample_data is invented demo data for the Progress and Insights views; it is labelled as sample data in the app.",
+  "units": [
+    {
+      "code": "CHEM1001",
+      "title": "Principles of Chemical Science",
+      "year": 2026,
+      "semester": "Semester 2",
+      "topics": [
+        "Oxidation states",
+        "Balancing redox reactions",
+        "Galvanic cells",
+        "Standard reduction potentials",
+        "Electrolytic cells"
+      ],
+      "materials": [
+        {
+          "filename": "Lecture 25 notes - Oxidation-Reduction and Electrochemical Cells.pdf",
+          "url": "https://ocw.mit.edu/courses/5-111sc-principles-of-chemical-science-fall-2014/7bfbd766cbfe78a2cf6b9a92b7e9b882_MIT5_111F14_Lecture25.pdf",
+          "source": "https://ocw.mit.edu/courses/5-111sc-principles-of-chemical-science-fall-2014/resources/lecture-25-oxidation-reduction-and-electrochemical-cells",
+          "attribution": "Catherine Drennan and Elizabeth Vogel Taylor. 5.111SC Principles of Chemical Science, Fall 2014. MIT OpenCourseWare.",
+          "license": "CC BY-NC-SA 4.0"
+        },
+        {
+          "filename": "Lecture 25 - Oxidation-Reduction and Electrochemical Cells.mp4",
+          "url": "https://archive.org/download/MIT5.111F14/MIT5_111F14_L25_300k.mp4",
+          "source": "https://archive.org/details/MIT5.111F14",
+          "attribution": "Catherine Drennan and Elizabeth Vogel Taylor. 5.111SC Principles of Chemical Science, Fall 2014. MIT OpenCourseWare.",
+          "license": "CC BY-NC-SA 3.0"
+        }
+      ],
+      "sample_data": {
+        "cohort_environments": 26,
+        "topics": {
+          "Oxidation states": {
+            "student": [
+              11,
+              12
+            ],
+            "cohort_difficulty": 0.18
+          },
+          "Balancing redox reactions": {
+            "student": [
+              6,
+              10
+            ],
+            "cohort_difficulty": 0.47
+          },
+          "Galvanic cells": {
+            "student": [
+              5,
+              8
+            ],
+            "cohort_difficulty": 0.39
+          },
+          "Standard reduction potentials": {
+            "student": [
+              2,
+              6
+            ],
+            "cohort_difficulty": 0.55
+          },
+          "Electrolytic cells": {
+            "student": [
+              0,
+              0
+            ],
+            "cohort_difficulty": 0.33
+          }
+        }
+      },
+      "session_goals": [
+        "What is electrochemistry?",
+        "What is a redox reaction?"
+      ]
+    },
+    {
+      "code": "PHYS1001",
+      "title": "Classical Mechanics",
+      "year": 2026,
+      "semester": "Semester 2",
+      "topics": [
+        "Newton's first law and inertia",
+        "Newton's second law",
+        "Newton's third law",
+        "Mass and weight",
+        "Free-body diagrams"
+      ],
+      "materials": [
+        {
+          "filename": "Chapter 7 - Newton's Laws of Motion.pdf",
+          "url": "https://ocw.mit.edu/courses/8-01sc-classical-mechanics-fall-2016/mit8_01scs22_chapter7.pdf",
+          "source": "https://ocw.mit.edu/courses/8-01sc-classical-mechanics-fall-2016/pages/online-textbook",
+          "attribution": "Deepto Chakrabarty, Peter Dourmashkin, Michelle Tomasik, Anna Frebel and Vladan Vuletic. 8.01SC Classical Mechanics, Fall 2016. MIT OpenCourseWare.",
+          "license": "CC BY-NC-SA 4.0"
+        },
+        {
+          "filename": "Lecture 6 - Newton's Laws.mp4",
+          "url": "https://archive.org/download/MIT8.01F99/06.mp4",
+          "source": "https://archive.org/details/MIT8.01F99",
+          "attribution": "Walter Lewin. 8.01 Physics I: Classical Mechanics, Fall 1999. MIT OpenCourseWare.",
+          "license": "CC BY-NC-SA 3.0 US"
+        }
+      ],
+      "sample_data": {
+        "cohort_environments": 31,
+        "topics": {
+          "Newton's first law and inertia": {
+            "student": [
+              9,
+              10
+            ],
+            "cohort_difficulty": 0.21
+          },
+          "Newton's second law": {
+            "student": [
+              7,
+              11
+            ],
+            "cohort_difficulty": 0.36
+          },
+          "Newton's third law": {
+            "student": [
+              3,
+              7
+            ],
+            "cohort_difficulty": 0.52
+          },
+          "Mass and weight": {
+            "student": [
+              5,
+              6
+            ],
+            "cohort_difficulty": 0.28
+          },
+          "Free-body diagrams": {
+            "student": [
+              2,
+              5
+            ],
+            "cohort_difficulty": 0.44
+          }
+        }
+      },
+      "session_goals": [
+        "Centrifugal force",
+        "Potential energy vs kinetic energy"
+      ]
+    },
+    {
+      "code": "COMP1001",
+      "title": "Introduction to Programming in Python",
+      "year": 2026,
+      "semester": "Semester 2",
+      "topics": [
+        "What is computation",
+        "Python objects and types",
+        "Expressions and operators",
+        "Variables and binding",
+        "Strings and input/output"
+      ],
+      "materials": [
+        {
+          "filename": "Lecture 1 slides - What is computation.pdf",
+          "url": "https://ocw.mit.edu/courses/6-0001-introduction-to-computer-science-and-programming-in-python-fall-2016/e921a690079369751bcce3e34da6c6ee_MIT6_0001F16_Lec1.pdf",
+          "source": "https://ocw.mit.edu/courses/6-0001-introduction-to-computer-science-and-programming-in-python-fall-2016/resources/mit6_0001f16_lec1",
+          "attribution": "Ana Bell, Eric Grimson and John Guttag. 6.0001 Introduction to Computer Science and Programming in Python, Fall 2016. MIT OpenCourseWare.",
+          "license": "CC BY-NC-SA 4.0"
+        },
+        {
+          "filename": "Lecture 1 - What is computation.mp4",
+          "url": "https://archive.org/download/MIT6.0001F16/MIT6_0001F16_Lecture_01_300k.mp4",
+          "source": "https://archive.org/details/MIT6.0001F16",
+          "attribution": "Ana Bell, Eric Grimson and John Guttag. 6.0001 Introduction to Computer Science and Programming in Python, Fall 2016. MIT OpenCourseWare.",
+          "license": "CC BY-NC-SA 3.0"
+        }
+      ],
+      "sample_data": {
+        "cohort_environments": 22,
+        "topics": {
+          "What is computation": {
+            "student": [
+              6,
+              6
+            ],
+            "cohort_difficulty": 0.12
+          },
+          "Python objects and types": {
+            "student": [
+              8,
+              10
+            ],
+            "cohort_difficulty": 0.31
+          },
+          "Expressions and operators": {
+            "student": [
+              6,
+              9
+            ],
+            "cohort_difficulty": 0.38
+          },
+          "Variables and binding": {
+            "student": [
+              3,
+              7
+            ],
+            "cohort_difficulty": 0.49
+          },
+          "Strings and input/output": {
+            "student": [
+              0,
+              0
+            ],
+            "cohort_difficulty": 0.27
+          }
+        }
+      },
+      "session_goals": [
+        "Testing bubble sort",
+        "Linked lists"
+      ]
+    }
+  ]
+}

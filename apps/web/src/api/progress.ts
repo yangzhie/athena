@@ -8,6 +8,14 @@ export interface ConceptProgress {
   evidence_count: number
   updated_at: number
   next_action: string
+  /** Decisive assessments in this scope (partial answers count half). */
+  assessed: number
+  /** Share answered correctly, with its 95% Wilson interval; null when not assessed. */
+  accuracy: number | null
+  ci_low: number | null
+  ci_high: number | null
+  /** Includes invented demo data seeded by scripts/seed-demo.py. */
+  sample: boolean
 }
 export interface OfferingInsights {
   sufficient_data: boolean
@@ -18,7 +26,7 @@ export interface OfferingInsights {
   completed_sessions?: number
   practice_reviews?: number
   population_label?: string
-  concepts: { id: string; name: string; assessments: number; environments: number; difficulty_rate: number }[]
+  concepts: { id: string; name: string; assessments: number; environments: number; difficulty_rate: number; ci_low: number; ci_high: number }[]
   gaps: { category: string; environments: number }[]
 }
 export interface CourseTopic { id: string; title: string; concept_id: string }

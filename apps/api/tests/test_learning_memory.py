@@ -158,3 +158,29 @@ def test_replay_repairs_projection_after_host_commit_without_duplicate_evidence(
     assert client.post(url, json=body).status_code == 200
     assert client.post(url, json=body).status_code == 200
     assert len(client.get(f'/units/{offering}/progress/evidence').json()) == 1
+
+
+def test_wilson_interval_matches_reference_values():
+    from athena_api.learning.service import wilson
+    assert wilson(0, 0) == (None, None)
+    low, high = wilson(5, 8)  # Reference: 0.3057–0.8632.
+    assert abs(low - .3057) < 1e-3 and abs(high - .8632) < 1e-3
+    assert wilson(6, 6)[1] == 1.0 and wilson(0, 6)[0] == 0.0
+
+
+def test_progress_and_insights_report_intervals_and_flag_sample_rows(tmp_path):
+    owner, spaces, memory, tutor, _, _ = browser(tmp_path)
+    offering = owner.post('/offerings', json=BODY).json()['id']
+    owner.post(f'/offerings/{offering}/publish')
+    student, _ = journey(owner, spaces, tutor, offering)
+    concept = owner.get(f'/units/{offering}/progress').json()[0]
+    assert concept['assessed'] == 3 and not concept['sample']
+    assert 0 <= concept['ci_low'] <= concept['accuracy'] <= concept['ci_high'] <= 1
+    with memory.lock, memory.db:
+        for e in range(5):
+            memory.db.execute('INSERT INTO aggregate_events VALUES (?,?,?,?,?,?,?,?)',
+                              (f'sample:{e}', offering, f'sample:env:{e}', f'sample:s:{e}', 'bubble-sort', 'incorrect', 'needs_practice', 1e10))
+    insights = owner.get(f'/units/{offering}/insights').json()
+    assert insights['sample_data'] and insights['sufficient_data']
+    row = insights['concepts'][0]
+    assert row['ci_low'] <= row['difficulty_rate'] <= row['ci_high']

@@ -1,4 +1,3 @@
-import ProgressView from './progress/ProgressView'
 import InsightsView from './progress/InsightsView'
 import LibraryView from './library/LibraryView'
 import StudySpaceView from '../spaces/StudySpaceView'
@@ -29,7 +28,6 @@ export const unitFeature: Feature = {
         { index: true, element: <NewSessionView /> },
         { path: 'manage', element: <StudySpaceView /> },
         { path: 'library', element: <LibraryView /> },
-        { path: 'progress', element: <ProgressView /> },
         { path: 'insights', element: <InsightsView /> },
         { path: 's/:sessionId', element: <SessionView /> },
         { path: 'clips', element: <ClipsView />, loader: clipsLoader },

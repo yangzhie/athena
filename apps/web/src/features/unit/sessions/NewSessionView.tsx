@@ -7,6 +7,7 @@ import { Button, Card } from '../../../components/ui'
 import { formatDate } from '../../../lib/format'
 import { UnitHeader } from '../UnitHeader'
 import { useOffering } from '../useOffering'
+import { useGoalPlaceholder } from './goalExample'
 import { createSession, recoverSession, refreshSessions, useSessionList } from './sessionStore'
 
 /** The unit's landing page: start a new learning session, or reopen one. */
@@ -19,6 +20,7 @@ export default function NewSessionView() {
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
   const pending = hasPendingSession(offering.id)
+  const placeholder = useGoalPlaceholder(offering.id, offering.unit.title)
 
   useEffect(() => {
     if (role === 'student') void refreshSessions(offering.id)
@@ -86,7 +88,7 @@ export default function NewSessionView() {
           <input
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
-            placeholder="e.g. k-fold cross-validation"
+            placeholder={placeholder}
             aria-label="What do you want to learn?"
             maxLength={200}
             className="h-11 flex-1 rounded-xl border border-line bg-surface px-4 text-sm outline-none focus:border-accent"

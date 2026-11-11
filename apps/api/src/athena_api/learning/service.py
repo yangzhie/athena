@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import re
 import time
 
@@ -54,6 +55,19 @@ CREATE TABLE IF NOT EXISTS aggregate_events (
  concept_id TEXT, outcome TEXT NOT NULL, category TEXT NOT NULL, created_at REAL NOT NULL
 );
 '''
+
+
+SAMPLE_PREFIX = 'sample:'  # Seeded demo rows (scripts/seed-demo.py); always labelled in the UI.
+
+
+def wilson(successes, n, z=1.96):
+    """95% Wilson score interval for a proportion; (None, None) without data."""
+    if n <= 0:
+        return None, None
+    p = successes / n
+    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+    return round(max(0.0, centre - half), 4), round(min(1.0, centre + half), 4)
 
 
 def normalise(title):
@@ -206,17 +220,31 @@ class LearningMemory:
         if offering:
             sql += ' AND EXISTS (SELECT 1 FROM learner_concept_offerings o WHERE o.student_id=l.student_id AND o.concept_id=l.concept_id AND o.offering_id=?)'
             args.append(offering)
+        # Observed accuracy per Concept (partial = half credit; uncertain excluded), in this Offering when scoped.
+        evidence_sql = ("SELECT concept_id,SUM(outcome='correct')+0.5*SUM(outcome='partial'),SUM(outcome IN ('correct','partial','incorrect')),"
+                        f"MAX(id LIKE '{SAMPLE_PREFIX}%') FROM learner_evidence WHERE student_id=?" + (' AND offering_id=?' if offering else '') + ' GROUP BY concept_id')
         with self.lock:
             rows = self.db.execute(sql + ' ORDER BY l.updated_at DESC,c.title', args).fetchall()
-        return [dict(id=r[0], name=r[1], status=r[2], note=r[3], evidence_count=r[4], updated_at=r[5],
-                     next_action='Review with Practice to retain this Concept.' if r[2] == 'mastered' else 'Try an independent application question.' if r[2] == 'developing' else 'Start a diagnostic learning session.') for r in rows]
+            accuracy = {r[0]: r[1:] for r in self.db.execute(evidence_sql, args)}
+        out = []
+        for r in rows:
+            score, assessed, sample = accuracy.get(r[0], (0, 0, 0))
+            low, high = wilson(score or 0, assessed or 0)
+            out.append(dict(id=r[0], name=r[1], status=r[2], note=r[3], evidence_count=r[4], updated_at=r[5],
+                            assessed=assessed or 0, accuracy=round(score / assessed, 4) if assessed else None,
+                            ci_low=low, ci_high=high, sample=bool(sample),
+                            next_action='Review with Practice to retain this Concept.' if r[2] == 'mastered' else 'Try an independent application question.' if r[2] == 'developing' else 'Start a diagnostic learning session.'))
+        return out
 
     def aggregates(self, offering):
         with self.lock:
             count = self.db.execute('SELECT COUNT(DISTINCT environment_id) FROM aggregate_events WHERE offering_id=?', (offering,)).fetchone()[0]
+            sample = bool(self.db.execute(f"SELECT 1 FROM aggregate_events WHERE offering_id=? AND id LIKE '{SAMPLE_PREFIX}%' LIMIT 1", (offering,)).fetchone())
             if count < 5:
-                return dict(sufficient_data=False, minimum_environments=5, sample_data=False, concepts=[], gaps=[])
-            concepts = [dict(id=r[0], name=r[1], assessments=r[2], environments=r[3], difficulty_rate=r[4] / r[2]) for r in self.db.execute(
+                return dict(sufficient_data=False, minimum_environments=5, sample_data=sample, concepts=[], gaps=[])
+            # The interval treats assessments as independent; repeated answers by one Environment make it optimistic.
+            concepts = [dict(id=r[0], name=r[1], assessments=r[2], environments=r[3], difficulty_rate=r[4] / r[2],
+                             ci_low=wilson(r[4], r[2])[0], ci_high=wilson(r[4], r[2])[1]) for r in self.db.execute(
                 "SELECT e.concept_id,c.title,COUNT(*),COUNT(DISTINCT environment_id),SUM(CASE WHEN outcome IN ('incorrect','partial') THEN 1 ELSE 0 END) "
                 "FROM aggregate_events e JOIN concepts c ON c.id=e.concept_id WHERE offering_id=? AND category!='uncertain_evidence' AND outcome IN ('correct','partial','incorrect') "
                 'GROUP BY e.concept_id HAVING COUNT(DISTINCT environment_id)>=5', (offering,))]
@@ -225,7 +253,7 @@ class LearningMemory:
             sessions, complete, practice = self.db.execute(
                 "SELECT COUNT(DISTINCT CASE WHEN outcome='started' THEN session_id END),COUNT(DISTINCT CASE WHEN outcome='complete' THEN session_id END),"
                 "SUM(CASE WHEN outcome LIKE 'practice_%' THEN 1 ELSE 0 END) FROM aggregate_events WHERE offering_id=?", (offering,)).fetchone()
-        return dict(sufficient_data=True, sample_data=False, contributing_environments=count, sessions=sessions,
+        return dict(sufficient_data=True, sample_data=sample, contributing_environments=count, sessions=sessions,
                     completed_sessions=complete, practice_reviews=practice or 0, concepts=concepts, gaps=gaps,
                     population_label='Anonymous learning Environments; not verified individual students.')
 
