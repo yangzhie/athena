@@ -23,6 +23,25 @@ export const actionSchemas = {
   refill: empty,
   recordReading: empty,
   swapPlugs: s.object({ plugs: s.array(text, undefined, 2, 2) }),
+  // Sort bench
+  swap: s.object({ index: s.integer(undefined, 0, 64) }),
+  keep: s.object({ index: s.integer(undefined, 0, 64) }),
+  finish: empty,
+  resetSort: empty,
+  // Photoelectric rig and its log
+  selectLine: s.object({ index: s.integer(undefined, 0, 16) }),
+  setIntensity: s.object({ level: s.number(undefined, 0, 1) }),
+  setVoltage: s.object({ volts: s.number(undefined, 0, 100) }),
+  recordStop: empty,
+  fitLine: empty,
+  // Pendulum and its log
+  setLength: s.object({ metres: s.number(undefined, 0, 100) }),
+  setMass: s.object({ grams: s.number(undefined, 0, 100000) }),
+  setAmplitude: s.object({ degrees: s.number(undefined, 0, 90) }),
+  recordPeriod: empty,
+  fitG: empty,
+  // Prediction
+  choose: s.object({ option: s.integer(undefined, 0, 16) }),
   // connect has a nullable port reference, checked against the actual port catalogue below.
   connect: s.object({ plug: text }),
 }

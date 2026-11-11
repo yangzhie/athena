@@ -112,6 +112,72 @@ export type VoltmeterConfig = Record<string, never>
 /** Records readings from whatever instrument is plugged into it. */
 export type PotentialLogConfig = Record<string, never>
 
+// ─── Photoelectric effect ──────────────────────────────────────────────────
+
+/**
+ * A phototube lit by one line of a lamp at a time, with a retarding voltage
+ * and a nanoammeter. Its `data` cable carries the reading to a photo log.
+ */
+export interface PhotoelectricConfig {
+  cathode: { label: string; workFunction: number } // eV
+  lines: { label: string; wavelength: number }[] // nm
+  maxCurrent: number // nA at full intensity with no retarding voltage
+}
+
+/** Records stopping voltages from the phototube plugged into it, and fits V₀ against frequency. */
+export type PhotoLogConfig = Record<string, never>
+
+// ─── Pendulum ──────────────────────────────────────────────────────────────
+
+/**
+ * A simple pendulum on a stand. Its lowest point is a `gate` socket where a
+ * photogate clips on. `g` is what the student is meant to find.
+ */
+export interface PendulumConfig {
+  g: number // m/s²
+}
+
+/** Times the pendulum its `gate` plug is clipped onto; the `data` cable carries the period. */
+export type PhotogateConfig = Record<string, never>
+
+/** Records periods from the photogate plugged into it, and fits T² against L for g. */
+export type PendulumLogConfig = Record<string, never>
+
+// ─── Questions ─────────────────────────────────────────────────────────────
+
+/** A question the student answers before trying something, so the tutor knows what they expect. */
+export interface PredictConfig {
+  question: string
+  options: string[]
+}
+
+// ─── Algorithms ────────────────────────────────────────────────────────────
+
+/**
+ * A row of values the student sorts by hand, one comparison at a time. Each
+ * pass walks the pairs that aren't in their final place yet.
+ */
+export interface SortBenchConfig {
+  algorithm: 'bubble'
+  values: number[]
+}
+
+/**
+ * The algorithm's source next to a sort bench in the same experiment. It
+ * highlights the line the hand trace has reached and shows the variables.
+ * `lines` are 1-based line numbers in `source`.
+ */
+export interface SortCodeConfig {
+  language: 'python'
+  source: string
+  lines: {
+    compare: number // if a[j] > a[j + 1]
+    swap: number // a[j], a[j + 1] = a[j + 1], a[j]
+    passEnd: number // if not swapped
+    stop: number // break
+  }
+}
+
 export interface ObjectConfigs {
   note: NoteConfig
   'code-graph': CodeGraphConfig
@@ -124,6 +190,14 @@ export interface ObjectConfigs {
   'salt-bridge': SaltBridgeConfig
   voltmeter: VoltmeterConfig
   'potential-log': PotentialLogConfig
+  'sort-bench': SortBenchConfig
+  'sort-code': SortCodeConfig
+  photoelectric: PhotoelectricConfig
+  'photo-log': PhotoLogConfig
+  predict: PredictConfig
+  pendulum: PendulumConfig
+  photogate: PhotogateConfig
+  'pendulum-log': PendulumLogConfig
 }
 
 export type ObjectType = keyof ObjectConfigs
@@ -166,7 +240,7 @@ export interface Link {
  * the same kind on another object. Values are read through the connection;
  * nothing is scheduled or executed.
  */
-export type PortKind = 'lead' | 'bridge' | 'data'
+export type PortKind = 'lead' | 'bridge' | 'data' | 'sensor'
 
 export interface PortRef {
   objectId: ObjectId
@@ -217,7 +291,46 @@ export type GalvanicAction =
   | { type: 'refill' } // half-cell: back to the starting concentration
   | { type: 'recordReading' } // potential log: record what the connected meter shows
 
-export type ObjectAction = CodeGraphAction | ForceLabAction | TitrationAction | GalvanicAction | WiringAction
+/**
+ * Actions on a sort bench. `swap` and `keep` decide the pair at `index` and
+ * `index + 1`, which must be the pair the pass has reached; `finish` says the
+ * algorithm can stop now.
+ */
+export type SortAction =
+  | { type: 'swap'; index: number }
+  | { type: 'keep'; index: number }
+  | { type: 'finish' }
+  | { type: 'resetSort' }
+
+/** Actions on the photoelectric rig and its log. */
+export type PhotoAction =
+  | { type: 'selectLine'; index: number } // rig: which lamp line lights the tube
+  | { type: 'setIntensity'; level: number } // rig: 0.25 … 1
+  | { type: 'setVoltage'; volts: number } // rig: retarding voltage, V
+  | { type: 'recordStop' } // log: record the rig's voltage as V₀ for its line
+  | { type: 'fitLine' } // log: least-squares line through V₀ against frequency
+
+/** Actions on the pendulum and its log. */
+export type PendulumAction =
+  | { type: 'setLength'; metres: number } // pendulum
+  | { type: 'setMass'; grams: number } // pendulum
+  | { type: 'setAmplitude'; degrees: number } // pendulum
+  | { type: 'recordPeriod' } // log: record what the photogate shows
+  | { type: 'fitG' } // log: fit T² against L
+
+/** Answering a prediction. */
+export type PredictAction = { type: 'choose'; option: number }
+
+export type ObjectAction =
+  | CodeGraphAction
+  | ForceLabAction
+  | TitrationAction
+  | GalvanicAction
+  | SortAction
+  | PhotoAction
+  | PendulumAction
+  | PredictAction
+  | WiringAction
 
 /** An action for a demonstration step; `objectId` targets another object than the demonstration's own. */
 export type DemoAction = ObjectAction & { objectId?: ObjectId }

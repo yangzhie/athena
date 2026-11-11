@@ -137,7 +137,7 @@ def test_execution_is_enqueued_atomically_and_only_worker_result_applies(tmp_pat
 def test_contract_and_malformed_scenes_are_explicit():
     data = catalog()
     assert data['catalog_version'] == '1.0.0' and not data['capabilities']['traces']
-    assert len(data['components']) == 11 and len(data['tools']) == 8
+    assert len(data['components']) == 19 and len(data['tools']) == 8
     with pytest.raises(HTTPException) as error:
         transition(None, {'kind': 'open', 'scene': {'objects': 'oops'}})
     assert error.value.status_code == 422
