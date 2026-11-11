@@ -1,6 +1,7 @@
 import { createPlayground, presetModules, type Playground } from '@athena/playground'
 import { ApiError } from '../../../api/client'
-import { commitCanvas, decideReplacement, getCanvas, interpretExecution, playgroundTurn, type CanvasView } from '../../../api/playground'
+import { commitCanvas, decideReplacement, getCanvas, interpretExecution, openPreparedScene, playgroundTurn, type CanvasView } from '../../../api/playground'
+import { isPrepared } from './preparedScenes'
 import { createKeyedStore } from '../../../lib/keyedStore'
 import type { Offering } from '../../../types'
 import { getThread, loadThread } from '../chat/chatStore'
@@ -51,10 +52,14 @@ function apply(sessionId: string, view: CanvasView) {
   const session = sessions.get(sessionId)
   if (!session?.active || view.revision < session.revision) return
   session.revision = view.revision
-  session.sceneId = view.snapshot?.scene?.id ?? null
+  const sceneId = view.snapshot?.scene?.id ?? null
+  const newScene = sceneId !== null && sceneId !== session.sceneId
+  session.sceneId = sceneId
   if (view.checkpoint) {
     view.checkpoint.state.viewport = session.playground.getState().viewport
     session.playground.restore(view.checkpoint)
+    // Keep the student's pan/zoom within a scene, but show all of a newly opened one.
+    if (newScene) session.playground.fitView()
   }
   const previous = details.get(sessionId)
   details.set(sessionId, { executions: view.executions ?? previous.executions, replacements: view.replacements ?? previous.replacements })
@@ -101,9 +106,19 @@ export function forgetPlayground(sessionId: string) {
   sessions.delete(sessionId)
   details.set(sessionId, { executions: [], replacements: [] })
 }
-export async function openScene(offering: Offering, sessionId: string, _sceneId: string) {
-  void _sceneId
-  return restoreCanvas(offering, sessionId)
+/** `?scene=<id>`: show the canvas, and open that prepared scene if the canvas is still empty. */
+export async function openScene(offering: Offering, sessionId: string, sceneId: string) {
+  await restoreCanvas(offering, sessionId)
+  const session = sessionFor(offering, sessionId)
+  if (!session.sceneId && isPrepared(sceneId)) return openPrepared(offering, sessionId, sceneId)
+}
+/** Opens a prepared scene, replacing what's on the canvas (callers confirm first if there is something). */
+export async function openPrepared(offering: Offering, sessionId: string, sceneId: string) {
+  const session = sessionFor(offering, sessionId)
+  return serial(sessionId, async () => {
+    if (session.sceneId === sceneId) return
+    apply(sessionId, await openPreparedScene(offering, sessionId, sceneId, session.revision))
+  })
 }
 export async function sendFromPlayground(offering: Offering, sessionId: string, text: string) {
   const session = sessionFor(offering, sessionId)

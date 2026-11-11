@@ -15,6 +15,14 @@ env.setdefault('ATHENA_DB', str(data / 'athena.db'))
 env.setdefault('ATHENA_AGENT_DB', str(data / 'agent.db'))
 env.setdefault('ATHENA_MATERIAL_ROOT', str(data / 'materials'))
 python = str(ROOT / 'apps/api/.venv/bin/python')
+
+# The API runs the Playground engine from a built bundle; rebuild it when the package is newer
+# (e.g. after pulling new scenes or components), or the server rejects them.
+bundle = ROOT / 'packages/playground/dist/headless.mjs'
+sources = (ROOT / 'packages/playground/src').rglob('*.ts*')
+if not bundle.exists() or max(p.stat().st_mtime for p in sources) > bundle.stat().st_mtime:
+    print('Building the Playground engine bundle…', flush=True)
+    subprocess.run(['npm', 'run', 'build:headless', '-w', '@athena/playground'], cwd=ROOT, check=True)
 commands = [
     [python, '-m', 'uvicorn', 'athena_api.app:create_app', '--factory', '--host', '127.0.0.1', '--port', '8000', '--no-access-log'],
     [python, '-m', 'athena_api.materials.worker'],

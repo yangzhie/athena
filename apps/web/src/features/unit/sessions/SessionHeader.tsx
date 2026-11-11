@@ -4,6 +4,7 @@ import { Button, Icon } from '../../../components/ui'
 import { unitColor } from '../../../lib/unitColor'
 import { lessonProgress } from '../chat/lessonProgress'
 import { StepRail } from './StepRail'
+import { preparedFor } from '../playground/preparedScenes'
 import type { LearningSession, Offering } from '../../../types'
 import { formatDate } from '../../../lib/format'
 import { loadThread, updateThreadSession, useThread } from '../chat/chatStore'
@@ -55,6 +56,8 @@ export function SessionHeader({ offering, session }: { offering: Offering; sessi
   }
 
   const progress = lessonProgress(messages)
+  // Demo units open a hand-built experiment that fits this lesson.
+  const experiment = preparedFor(offering.unit.code, session.goal)[0]
   const tool = 'inline-flex items-center gap-1 text-sm text-muted transition-colors hover:text-ink'
 
   return (
@@ -98,8 +101,8 @@ export function SessionHeader({ offering, session }: { offering: Offering; sessi
       )}
       <StepRail progress={progress} />
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-        <Link to={playgroundPath(offering.id, session.id)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline">
-          <Icon name="flask" className="size-4" /> Open Playground
+        <Link to={playgroundPath(offering.id, session.id, experiment?.id)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline">
+          <Icon name="flask" className="size-4" /> {experiment ? `Try it: ${experiment.title}` : 'Open Playground'}
         </Link>
       {session.shared ? (
         <p className="flex flex-wrap items-center gap-x-2 text-xs">

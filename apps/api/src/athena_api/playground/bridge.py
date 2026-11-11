@@ -42,5 +42,11 @@ def catalog():
     return runtime
 
 
+@lru_cache(maxsize=1)
+def prepared_scenes():
+    """Hand-built scenes from the Playground package, keyed by id. Opening one needs no model."""
+    return {scene['id']: scene for scene in invoke({'kind': 'prepared-scenes'})}
+
+
 def transition(checkpoint, command=None):
     return invoke({'checkpoint': checkpoint, 'command': command})

@@ -4,11 +4,15 @@ Three units for demonstrating Athena end to end: uploaded lecture notes, lecture
 indexing (transcription and topic clips), grounded tutor sessions with citations,
 Practice and the Playground.
 
-| Unit | Lecture PDF | Lecture recording | Fits Playground objects |
+| Unit | Lecture PDF | Lecture recording | Playground experiments |
 | --- | --- | --- | --- |
-| CHEM1001 Principles of Chemical Science | Lecture 25 notes: Oxidation-Reduction and Electrochemical Cells | Lecture 25 (53 min) | half-cell, salt bridge, voltmeter |
-| PHYS1001 Classical Mechanics | Chapter 7: Newton's Laws of Motion | Lecture 6: Newton's Laws (49 min) | force lab |
-| COMP1001 Introduction to Programming in Python | Lecture 1 slides: What is computation | Lecture 1 (43 min) | code graph |
+| CHEM1001 Principles of Chemical Science | Lecture 25 notes: Oxidation-Reduction and Electrochemical Cells | Lecture 25 (53 min) | Galvanic cells, acid–base titration, intermolecular forces |
+| PHYS1001 Classical Mechanics | Chapter 7: Newton's Laws of Motion | Lecture 6: Newton's Laws (49 min) | Simple pendulum, photoelectric effect |
+| COMP1001 Introduction to Programming in Python | Lecture 1 slides: What is computation | Lecture 1 (43 min) | Bubble sort, data cleaning |
+
+The Playground experiments are hand-built scenes from `packages/playground` (no model
+needed to open them). Each lesson's "Try it" link opens the one that fits its goal; the
+mapping is in `apps/web/src/features/unit/playground/preparedScenes.ts`.
 
 The units and files are defined in [`scripts/demo-units.json`](../scripts/demo-units.json).
 

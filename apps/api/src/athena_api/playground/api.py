@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from .bridge import catalog
+from .bridge import catalog, prepared_scenes
 from .service import Playgrounds
 from .tutor import PlaygroundTutor
 from ..request_types import OperationId
@@ -43,6 +43,20 @@ def playground_router(service: Playgrounds):
     @router.get('')
     def snapshot(offering_id: str, session_id: str, request: Request):
         return call(service.get, request.state.student_id, offering_id, session_id)
+
+    @router.get('/prepared')
+    def prepared(offering_id: str, session_id: str, request: Request):
+        service.authorize(request.state.student_id, offering_id, session_id)
+        return [{'id': s['id'], 'title': s['title'], 'goal': s['goal']} for s in prepared_scenes().values()]
+
+    @router.post('/prepared/{scene_id}')
+    def open_prepared(offering_id: str, session_id: str, scene_id: str, body: CommandBody, request: Request):
+        # Only the package's own scenes: the student picks one, but never supplies scene content.
+        scene = prepared_scenes().get(scene_id)
+        if scene is None:
+            raise HTTPException(404, 'No prepared scene with that id')
+        return call(lambda: service.command(request.state.student_id, offering_id, session_id, body.operation_id,
+                                            body.revision, {'kind': 'open', 'scene': scene}, trusted=True))
 
     @router.post('/commands')
     def command(offering_id: str, session_id: str, body: CommandBody, request: Request):

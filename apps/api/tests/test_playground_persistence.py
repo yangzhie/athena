@@ -144,3 +144,23 @@ def test_contract_and_malformed_scenes_are_explicit():
     source = json.loads(json.dumps(CODE)); source['objects'][0]['provenance'] = 'real-run'
     with pytest.raises(HTTPException):
         transition(None, {'kind': 'open', 'scene': source})
+
+
+def test_prepared_scenes_open_without_a_model_and_accept_student_actions(tmp_path):
+    from athena_api.playground.bridge import prepared_scenes
+    prepared_scenes.cache_clear()
+    client, service, student, offering, session, base = setup(tmp_path)
+    listed = {s['id'] for s in client.get(base + '/prepared').json()}
+    assert {'bubble-sort', 'pendulum-g', 'galvanic-cells'} <= listed
+    body = {'operation_id': 'open-bubble', 'revision': 0, 'catalog_version': '1.0.0', 'command': {}}
+    opened = client.post(base + '/prepared/bubble-sort', json=body)
+    assert opened.status_code == 200, opened.text
+    assert opened.json()['snapshot']['scene']['id'] == 'bubble-sort' and opened.json()['revision'] == 1
+    assert client.post(base + '/prepared/bubble-sort', json=body).json() == opened.json()  # Idempotent replay.
+    swap = command(client, base, 'first-swap', 1, {'kind': 'action', 'action': {'objectId': 'bench', 'type': 'swap', 'index': 0}})
+    assert swap.status_code == 200, swap.text
+    assert client.post(base + '/prepared/not-a-scene', json={**body, 'operation_id': 'open-missing'}).status_code == 404
+    # Students choose a prepared scene by id; they still can't open scene content of their own.
+    assert command(client, base, 'own-scene', 2, {'kind': 'open', 'scene': SCENE}).status_code == 422
+    stranger, _ = browser(tmp_path / 'host.db')
+    assert stranger.post(base + '/prepared/bubble-sort', json={**body, 'operation_id': 'open-other'}).status_code == 404

@@ -28,6 +28,12 @@ export async function getCanvas(offering: Offering, sessionId: string): Promise<
 export function commitCanvas(offering: Offering, sessionId: string, revision: number, command: object, operationId: string = crypto.randomUUID()) {
   return call<CanvasView>(`${playgroundBase(offering, sessionId)}/commands`, { method: 'POST', body: JSON.stringify({ operation_id: operationId, revision, command, catalog_version: '1.0.0' }) })
 }
+/** Opens one of the Playground package's hand-built scenes by id (no model involved). */
+export function openPreparedScene(offering: Offering, sessionId: string, sceneId: string, revision: number, operationId: string = crypto.randomUUID()) {
+  return call<CanvasView>(`${playgroundBase(offering, sessionId)}/prepared/${encodeURIComponent(sceneId)}`, {
+    method: 'POST', body: JSON.stringify({ operation_id: operationId, revision, command: {}, catalog_version: '1.0.0' }),
+  })
+}
 export function playgroundTurn(offering: Offering, sessionId: string, text: string, kind: 'question' | 'scene' | 'event' | 'execution' = 'question') {
   return operationCall(`${playgroundBase(offering, sessionId)}/turns`, { text, kind })
 }

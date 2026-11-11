@@ -11,7 +11,8 @@ import { SessionGate } from '../sessions/SessionGate'
 import { sessionPath } from '../sessions/paths'
 import { bumpSession } from '../sessions/sessionStore'
 import { useOffering } from '../useOffering'
-import { openScene, sendFromPlayground, sessionFor, usePlaygroundBusy, usePlaygroundDetails, restoreCanvas, retryCanvas, replacementDecision } from './session'
+import { preparedFor } from './preparedScenes'
+import { openPrepared, openScene, sendFromPlayground, sessionFor, usePlaygroundBusy, usePlaygroundDetails, restoreCanvas, retryCanvas, replacementDecision } from './session'
 
 /** The canvas belongs to the learning session in the route, never to a whole offering. */
 export default function PlaygroundView() {
@@ -59,26 +60,33 @@ function SessionPlayground({ session }: { session: LearningSession }) {
   const send = (text: string) => void sendFromPlayground(offering, session.id, text)
   const hasScene = Boolean(state.scene)
   const openId = openActivityId(messages)
+  const prepared = preparedFor(offering.unit.code, session.goal)
+  const others = prepared.filter((p) => p.id !== state.scene?.id)
+  const switchTo = (id: string) => {
+    // Opening another experiment replaces the canvas, including the student's work on it.
+    if (hasScene && !window.confirm('Open this experiment instead? Your work on the current canvas will be replaced.')) return
+    void openPrepared(offering, session.id, id)
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 pb-4 xl:h-[calc(100svh-var(--topbar-h)-3.5rem)] xl:flex-none xl:flex-row">
-      <section className="relative h-[65svh] min-h-0 min-w-0 shrink-0 overflow-hidden rounded-2xl border border-line xl:h-auto xl:flex-1">
+      <section className="relative h-[65svh] min-h-0 min-w-0 shrink-0 overflow-hidden rounded-lg border border-line bg-surface xl:h-auto xl:flex-1">
         <LearningCanvas playground={playground} />
-        {detail.replacements.map((proposal) => <div key={proposal.id} className="absolute top-3 left-3 right-3 rounded-xl border border-line bg-surface p-3 text-sm">
+        {detail.replacements.map((proposal) => <div key={proposal.id} className="absolute top-3 left-3 right-3 rounded-md border border-line bg-surface p-3 text-sm shadow-lg">
           <p>The tutor proposes replacing your work with “{proposal.scene.title}”: {proposal.scene.goal}</p>
           <button className="m-2 text-accent" onClick={() => void replacementDecision(offering, session.id, proposal.id, 'accept')}>Replace my work</button>
           <button className="m-2" onClick={() => void replacementDecision(offering, session.id, proposal.id, 'reject')}>Keep my work</button>
         </div>)}
       </section>
 
-      <aside className="flex h-[24rem] min-h-0 shrink-0 flex-col overflow-hidden rounded-2xl border border-line bg-surface xl:h-auto xl:w-[24rem] 2xl:w-[28rem]">
+      <aside className="flex h-[24rem] min-h-0 shrink-0 flex-col overflow-hidden rounded-lg border border-line bg-surface xl:h-auto xl:w-[24rem] 2xl:w-[28rem]">
         <header className="flex items-center gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted">{offering.unit.code} · Playground</p>
-            <h1 className="truncate font-semibold">{state.scene?.title ?? session.title}</h1>
+            <p className="text-xs font-semibold tracking-[0.14em] text-muted uppercase">{offering.unit.code} · Playground</p>
+            <h1 className="truncate text-lg font-semibold">{state.scene?.title ?? session.title}</h1>
           </div>
           <Link to={sessionPath(offering.id, session.id)} className="shrink-0 text-sm text-accent hover:underline">
-            Back to chat
+            ← Back to lesson
           </Link>
         </header>
 
@@ -101,9 +109,29 @@ function SessionPlayground({ session }: { session: LearningSession }) {
               onContinue={() => m.activity && void continueLearning(offering.id, session.id, m.activity.activity_id)}
             />
           ))}
+          {!hasScene && prepared.length > 0 && (
+            <div className="space-y-2 pt-1">
+              <p className="text-xs font-semibold tracking-[0.14em] text-muted uppercase">Experiments for {offering.unit.code}</p>
+              {prepared.map((p, i) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => switchTo(p.id)}
+                  disabled={streaming || busy}
+                  className="block w-full rounded-md border border-line bg-bg/40 p-3 text-left transition-colors hover:border-accent disabled:opacity-60"
+                >
+                  <span className="flex items-baseline gap-2">
+                    <span className="font-serif font-semibold">{p.title}</span>
+                    {i === 0 && <span className="text-xs font-semibold text-accent">Fits this lesson</span>}
+                  </span>
+                  <span className="mt-0.5 block text-sm text-muted">{p.goal}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {!hasScene && (
             <div className="space-y-2 pt-2">
-              <p className="text-sm text-muted">Ask something that's easier to try than to read, and the tutor will set up an experiment here.</p>
+              <p className="text-sm text-muted">{prepared.length > 0 ? 'Or ask' : 'Ask'} something that's easier to try than to read, and the tutor will set up an experiment here.</p>
               <div className="flex flex-wrap gap-2">
                 {playgroundSuggestions().map((s) => (
                   <button
@@ -139,6 +167,12 @@ function SessionPlayground({ session }: { session: LearningSession }) {
                   Show me how
                 </button>
               )}
+              {others.length > 0 && others.map((p) => (
+                <button key={p.id} type="button" disabled={streaming || busy} onClick={() => switchTo(p.id)}
+                  className="rounded-full border border-dashed border-line px-3 py-1 hover:border-accent hover:text-accent">
+                  Try: {p.title}
+                </button>
+              ))}
               {selected && (
                 <span className="rounded-full bg-accent-soft px-2.5 py-1 text-accent">
                   About: {selected.title}
