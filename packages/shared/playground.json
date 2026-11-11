@@ -1,5 +1,18 @@
 {
   "actions": {
+    "choose": {
+      "properties": {
+        "option": {
+          "maximum": 16,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "option"
+      ],
+      "type": "object"
+    },
     "connect": {
       "properties": {
         "plug": {
@@ -52,6 +65,34 @@
       ],
       "type": "object"
     },
+    "finish": {
+      "properties": {},
+      "required": [],
+      "type": "object"
+    },
+    "fitG": {
+      "properties": {},
+      "required": [],
+      "type": "object"
+    },
+    "fitLine": {
+      "properties": {},
+      "required": [],
+      "type": "object"
+    },
+    "keep": {
+      "properties": {
+        "index": {
+          "maximum": 64,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index"
+      ],
+      "type": "object"
+    },
     "moveParticle": {
       "properties": {
         "index": {
@@ -98,7 +139,17 @@
       "required": [],
       "type": "object"
     },
+    "recordPeriod": {
+      "properties": {},
+      "required": [],
+      "type": "object"
+    },
     "recordReading": {
+      "properties": {},
+      "required": [],
+      "type": "object"
+    },
+    "recordStop": {
       "properties": {},
       "required": [],
       "type": "object"
@@ -108,9 +159,40 @@
       "required": [],
       "type": "object"
     },
+    "resetSort": {
+      "properties": {},
+      "required": [],
+      "type": "object"
+    },
     "run": {
       "properties": {},
       "required": [],
+      "type": "object"
+    },
+    "selectLine": {
+      "properties": {
+        "index": {
+          "maximum": 16,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index"
+      ],
+      "type": "object"
+    },
+    "setAmplitude": {
+      "properties": {
+        "degrees": {
+          "maximum": 90,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "degrees"
+      ],
       "type": "object"
     },
     "setDistance": {
@@ -126,6 +208,45 @@
       ],
       "type": "object"
     },
+    "setIntensity": {
+      "properties": {
+        "level": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "type": "object"
+    },
+    "setLength": {
+      "properties": {
+        "metres": {
+          "maximum": 100,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "metres"
+      ],
+      "type": "object"
+    },
+    "setMass": {
+      "properties": {
+        "grams": {
+          "maximum": 100000,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "grams"
+      ],
+      "type": "object"
+    },
     "setTap": {
       "properties": {
         "opening": {
@@ -136,6 +257,32 @@
       },
       "required": [
         "opening"
+      ],
+      "type": "object"
+    },
+    "setVoltage": {
+      "properties": {
+        "volts": {
+          "maximum": 100,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "volts"
+      ],
+      "type": "object"
+    },
+    "swap": {
+      "properties": {
+        "index": {
+          "maximum": 64,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index"
       ],
       "type": "object"
     },
@@ -718,6 +865,393 @@
       },
       "summary": "A lab notebook that records the reading of the meter whose data cable is plugged into its `in` socket. Pre-plug the cable with the scene's `wiring`.",
       "type": "potential-log"
+    },
+    {
+      "actions": {
+        "finish": "{}: say the algorithm can stop now",
+        "keep": "{index}: leave that pair as it is",
+        "resetSort": "{}: back to the starting order (throws the attempt away; the student is asked first)",
+        "swap": "{index}: swap the pair at index and index + 1 (must be the pair the pass has reached)"
+      },
+      "checkable": {
+        "fields": {
+          "comparisons": "finish: comparisons made so far",
+          "equal": "swap/keep: the two values are equal (swapping them breaks stability)",
+          "index": "swap/keep: left index of the pair",
+          "left": "swap/keep: left value before the decision",
+          "outOfOrder": "swap/keep: left > right, so bubble sort swaps",
+          "pass": "swap/keep: the pass the decision belongs to",
+          "passEnded": "swap/keep: this decision finished the pass",
+          "passSwaps": "swap/keep: swaps so far in that pass",
+          "passes": "finish: passes completed",
+          "right": "swap/keep: right value before the decision",
+          "sorted": "finish: the values are in order",
+          "verified": "finish: the algorithm can know it is done (the last pass made no swaps, or every pass has run)"
+        },
+        "on": [
+          "swap",
+          "keep",
+          "finish"
+        ]
+      },
+      "config": {
+        "properties": {
+          "algorithm": {
+            "description": "The algorithm being traced",
+            "enum": [
+              "bubble"
+            ],
+            "type": "string"
+          },
+          "values": {
+            "description": "The starting order; repeat a value to discuss stability",
+            "items": {
+              "description": "A value",
+              "maximum": 99,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "maxItems": 10,
+            "minItems": 2,
+            "type": "array"
+          }
+        },
+        "required": [
+          "algorithm",
+          "values"
+        ],
+        "type": "object"
+      },
+      "drawnAs": "card",
+      "label": "Sort bench",
+      "summary": "A row of values drawn as bars that the student sorts by hand with bubble sort: in the highlighted pair they drag one bar past the other to swap them, or drag the arrow under the pair on (or tap it) to keep them. A pass ends by itself at the values already in their final place (shown in green). Done says the algorithm can stop. The table lists each pass with its comparisons and swaps.",
+      "type": "sort-bench"
+    },
+    {
+      "config": {
+        "properties": {
+          "language": {
+            "description": "Always \"python\"",
+            "enum": [
+              "python"
+            ],
+            "type": "string"
+          },
+          "lines": {
+            "properties": {
+              "compare": {
+                "description": "Line of `if a[j] > a[j + 1]`",
+                "maximum": 60,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "passEnd": {
+                "description": "Line of `if not swapped`",
+                "maximum": 60,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "stop": {
+                "description": "Line of `break`",
+                "maximum": 60,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "swap": {
+                "description": "Line of the swap",
+                "maximum": 60,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "compare",
+              "swap",
+              "passEnd",
+              "stop"
+            ],
+            "type": "object"
+          },
+          "source": {
+            "description": "The program",
+            "type": "string"
+          }
+        },
+        "required": [
+          "language",
+          "source",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "drawnAs": "card",
+      "label": "Code",
+      "summary": "The sorting code, shown next to the sort bench with the same experimentId. As the student decides pairs on the bench it highlights the line that ran (compare, swap, the end-of-pass check or break) and shows i, j, swapped and the list.",
+      "type": "sort-code"
+    },
+    {
+      "actions": {
+        "selectLine": "{index}: light the tube with this lamp line",
+        "setIntensity": "{level}: 0.25 \u2026 1 (moves the lamp to the matching distance)",
+        "setVoltage": "{volts}: retarding voltage, 0 \u2026 2.5 V"
+      },
+      "checkable": {
+        "fields": {
+          "belowThreshold": "this light frees no electrons at any intensity",
+          "current": "nA on the meter at the present voltage",
+          "intensity": "0.25 \u2026 1",
+          "line": "label of the lamp line",
+          "wavelength": "nm"
+        },
+        "on": [
+          "selectLine",
+          "setIntensity"
+        ]
+      },
+      "config": {
+        "properties": {
+          "cathode": {
+            "properties": {
+              "label": {
+                "description": "e.g. \"Potassium\"",
+                "type": "string"
+              },
+              "workFunction": {
+                "description": "eV",
+                "maximum": 6,
+                "minimum": 1,
+                "type": "number"
+              }
+            },
+            "required": [
+              "label",
+              "workFunction"
+            ],
+            "type": "object"
+          },
+          "lines": {
+            "description": "Lamp lines the student can pick",
+            "items": {
+              "properties": {
+                "label": {
+                  "description": "e.g. \"UV\"",
+                  "type": "string"
+                },
+                "wavelength": {
+                  "description": "nm",
+                  "maximum": 800,
+                  "minimum": 200,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "label",
+                "wavelength"
+              ],
+              "type": "object"
+            },
+            "maxItems": 8,
+            "minItems": 2,
+            "type": "array"
+          },
+          "maxCurrent": {
+            "description": "nA at full intensity and no retarding voltage",
+            "maximum": 500,
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": [
+          "cathode",
+          "lines",
+          "maxCurrent"
+        ],
+        "type": "object"
+      },
+      "drawnAs": "card",
+      "label": "Photoelectric rig",
+      "ports": {
+        "data": {
+          "kind": "data",
+          "role": "plug"
+        }
+      },
+      "summary": "A phototube lit by one line of a mercury lamp at a time, worked by hand: the student slides a selector along the spectrum to pick the line, slides the lamp along its rail (intensity goes as 1/d\u00b2, from 1 at 10 cm to 0.25 at 20 cm), and turns a knob for the retarding voltage, reading the photocurrent on a nanoammeter. Its `data` plug carries the reading to a photo log `in` socket (pre-plug it with the scene `wiring`). Ideal model: V\u2080 = (hf \u2212 \u03c6)/e, current falling linearly to zero at V\u2080, no current below the threshold frequency.",
+      "type": "photoelectric"
+    },
+    {
+      "actions": {
+        "fitLine": "{}: fit V\u2080 against frequency",
+        "recordStop": "{}: record the voltage as V\u2080 for the lit line"
+      },
+      "checkable": {
+        "fields": {
+          "belowThreshold": "recordStop: the light frees no electrons, so there is no V\u2080",
+          "connected": "recordStop: a rig is plugged in",
+          "current": "recordStop: nA on the meter (V\u2080 needs 0.0)",
+          "errorPct": "fitLine: |h \u2212 6.626e-34| as a percentage",
+          "intensity": "recordStop: 0.25 \u2026 1",
+          "line": "recordStop: lamp line label",
+          "overshoot": "recordStop: recorded voltage minus the true V\u2080, V (large means the current was already zero lower down)",
+          "points": "fitLine: distinct frequencies in the fit",
+          "repeatSame": "recordStop: this line was already recorded at another intensity with the same V\u2080 (within 0.03 V)",
+          "workFunction": "fitLine: \u03c6 from the intercept, eV"
+        },
+        "on": [
+          "recordStop",
+          "fitLine"
+        ]
+      },
+      "config": {
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "drawnAs": "card",
+      "label": "Photo log",
+      "ports": {
+        "in": {
+          "kind": "data",
+          "role": "socket"
+        }
+      },
+      "summary": "A lab notebook for the photoelectric rig whose data cable is plugged into its `in` socket. Record V\u2080 stores the rig's present voltage as the stopping voltage of its line (only once the current reads 0.0 nA; recording the same line and intensity again replaces it). Fit line draws the least-squares line of V\u2080 against frequency and reports h = e \u00d7 slope and the work function.",
+      "type": "photo-log"
+    },
+    {
+      "actions": {
+        "choose": "{option}: pick an answer by its index"
+      },
+      "checkable": {
+        "fields": {
+          "choice": "index of the answer",
+          "option": "text of the answer"
+        },
+        "on": [
+          "choose"
+        ]
+      },
+      "config": {
+        "properties": {
+          "options": {
+            "description": "Two to four short answers",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4,
+            "minItems": 2,
+            "type": "array"
+          },
+          "question": {
+            "description": "One sentence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question",
+          "options"
+        ],
+        "type": "object"
+      },
+      "drawnAs": "card",
+      "label": "Prediction",
+      "summary": "A short multiple-choice question the student answers before experimenting, so a misconception shows up before it is tested. Write checks on `choose` for each option; the student can change their answer.",
+      "type": "predict"
+    },
+    {
+      "actions": {
+        "setAmplitude": "{degrees}: release angle, 2\u201360",
+        "setLength": "{metres}: string length, 0.20\u20131.50 m",
+        "setMass": "{grams}: 50, 100 or 200"
+      },
+      "config": {
+        "properties": {
+          "g": {
+            "description": "m/s\u00b2, what the student is meant to find",
+            "maximum": 30,
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": [
+          "g"
+        ],
+        "type": "object"
+      },
+      "drawnAs": "apparatus drawn on the canvas",
+      "label": "Pendulum",
+      "ports": {
+        "gate": {
+          "about": "The lowest point of the swing, where a photogate clips on",
+          "kind": "sensor",
+          "role": "socket"
+        }
+      },
+      "summary": "A simple pendulum on a stand, drawn as apparatus and always swinging. Everything is direct manipulation: the student pulls the bob sideways to set the release angle (2\u201360\u00b0), drags the pivot up or down to set the string length (0.20\u20131.50 m), and drags a 50, 100 or 200 g bob from the tray onto the string. Its `gate` socket (kind sensor) is the lowest point of the swing, where a photogate clips on. The period includes the large-amplitude correction, so readings above about 15\u00b0 come out noticeably long.",
+      "type": "pendulum"
+    },
+    {
+      "actions": {
+        "connect": "{plug: \"gate\" | \"data\", to: {objectId, port} | null}"
+      },
+      "config": {
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "drawnAs": "card",
+      "label": "Photogate timer",
+      "ports": {
+        "data": {
+          "kind": "data",
+          "role": "plug"
+        },
+        "gate": {
+          "kind": "sensor",
+          "role": "plug"
+        }
+      },
+      "summary": "A photogate timer. Its `gate` plug (kind sensor) clips onto a pendulum's `gate` socket at the bottom of the swing, and it then shows the period to the millisecond. Its `data` cable carries the reading to a pendulum log `in` socket (pre-plug it with the scene `wiring`).",
+      "type": "photogate"
+    },
+    {
+      "actions": {
+        "fitG": "{}: fit T\u00b2 against L",
+        "recordPeriod": "{}: record the period the photogate shows"
+      },
+      "checkable": {
+        "fields": {
+          "amplitude": "recordPeriod: release angle, degrees",
+          "connected": "recordPeriod: a photogate is plugged in",
+          "gErrorPct": "fitG: |g \u2212 9.81| as a percentage",
+          "gated": "recordPeriod: its sensor is clipped onto a pendulum",
+          "largeAngle": "fitG: some points were released above 15\u00b0",
+          "length": "recordPeriod: m",
+          "mass": "recordPeriod: g",
+          "period": "recordPeriod: s",
+          "points": "fitG: distinct lengths",
+          "sameOtherMass": "recordPeriod: same length and angle already recorded with another mass, same period"
+        },
+        "on": [
+          "recordPeriod",
+          "fitG"
+        ]
+      },
+      "config": {
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "drawnAs": "card",
+      "label": "Pendulum log",
+      "ports": {
+        "in": {
+          "kind": "data",
+          "role": "socket"
+        }
+      },
+      "summary": "A lab notebook for the photogate whose data cable is plugged into its `in` socket. Record T stores the period with the length, mass and release angle (recording the same length and mass again replaces the row, so a reading can be retaken at a smaller angle). Fit g draws T\u00b2 against L and gives g = 4\u03c0\u00b2 / slope.",
+      "type": "pendulum-log"
     }
   ],
   "limits": {
@@ -1076,6 +1610,297 @@
               },
               "required": [
                 "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "swap",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "keep",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "finish",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "resetSort",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "selectLine",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "level": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setIntensity",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "level",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setVoltage",
+                  "type": "string"
+                },
+                "volts": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "objectId",
+                "type",
+                "volts"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "recordStop",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "fitLine",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "metres": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setLength",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "metres",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "grams": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setMass",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "grams",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "degrees": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setAmplitude",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "degrees",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "recordPeriod",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "fitG",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "option": {
+                  "type": "number"
+                },
+                "type": {
+                  "const": "choose",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "option",
                 "type"
               ],
               "type": "object"
@@ -1678,6 +2503,297 @@
             {
               "additionalProperties": false,
               "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "swap",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "keep",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "finish",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "resetSort",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "selectLine",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "level": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setIntensity",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "level",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setVoltage",
+                  "type": "string"
+                },
+                "volts": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "objectId",
+                "type",
+                "volts"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "recordStop",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "fitLine",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "metres": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setLength",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "metres",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "grams": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setMass",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "grams",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "degrees": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setAmplitude",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "degrees",
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "recordPeriod",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "fitG",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "option": {
+                  "type": "number"
+                },
+                "type": {
+                  "const": "choose",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objectId",
+                "option",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
                 "objectId": {
                   "$ref": "#/definitions/ObjectId"
                 },
@@ -2002,7 +3118,15 @@
             "half-cell",
             "salt-bridge",
             "voltmeter",
-            "potential-log"
+            "potential-log",
+            "sort-bench",
+            "sort-code",
+            "photoelectric",
+            "photo-log",
+            "predict",
+            "pendulum",
+            "photogate",
+            "pendulum-log"
           ],
           "type": "string"
         },
@@ -2629,6 +3753,21 @@
                   "dilute",
                   "refill",
                   "recordReading",
+                  "swap",
+                  "keep",
+                  "finish",
+                  "resetSort",
+                  "selectLine",
+                  "setIntensity",
+                  "setVoltage",
+                  "recordStop",
+                  "fitLine",
+                  "setLength",
+                  "setMass",
+                  "setAmplitude",
+                  "recordPeriod",
+                  "fitG",
+                  "choose",
                   "connect",
                   "dragPlug",
                   "swapPlugs"
@@ -3154,6 +4293,282 @@
                 }
               },
               "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "swap",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "keep",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "finish",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "resetSort",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "selectLine",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "level": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setIntensity",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "level",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setVoltage",
+                  "type": "string"
+                },
+                "volts": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type",
+                "volts"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "recordStop",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "fitLine",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "metres": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setLength",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "metres",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "grams": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setMass",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "grams",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "degrees": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setAmplitude",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "degrees",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "recordPeriod",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "fitG",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "option": {
+                  "type": "number"
+                },
+                "type": {
+                  "const": "choose",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "option",
                 "type"
               ],
               "type": "object"
@@ -3923,6 +5338,414 @@
                 "provenance"
               ],
               "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/SortBenchConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "sort-bench",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/SortCodeConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "sort-code",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PhotoelectricConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "photoelectric",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PhotoLogConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "photo-log",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PredictConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "predict",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PendulumConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "pendulum",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PhotogateConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "photogate",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PendulumLogConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "pendulum-log",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
             }
           ],
           "description": "An object as a scene or the agent describes it. The Canvas decides its position."
@@ -3947,6 +5770,90 @@
           ],
           "type": "object"
         },
+        "PendulumConfig": {
+          "additionalProperties": false,
+          "description": "A simple pendulum on a stand. Its lowest point is a `gate` socket where a photogate clips on. `g` is what the student is meant to find.",
+          "properties": {
+            "g": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "g"
+          ],
+          "type": "object"
+        },
+        "PendulumLogConfig": {
+          "additionalProperties": {
+            "not": {}
+          },
+          "description": "Records periods from the photogate plugged into it, and fits T\u00b2 against L for g.",
+          "type": "object"
+        },
+        "PhotoLogConfig": {
+          "additionalProperties": {
+            "not": {}
+          },
+          "description": "Records stopping voltages from the phototube plugged into it, and fits V\u2080 against frequency.",
+          "type": "object"
+        },
+        "PhotoelectricConfig": {
+          "additionalProperties": false,
+          "description": "A phototube lit by one line of a lamp at a time, with a retarding voltage and a nanoammeter. Its `data` cable carries the reading to a photo log.",
+          "properties": {
+            "cathode": {
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "workFunction": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "label",
+                "workFunction"
+              ],
+              "type": "object"
+            },
+            "lines": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "wavelength": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "label",
+                  "wavelength"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "maxCurrent": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "cathode",
+            "lines",
+            "maxCurrent"
+          ],
+          "type": "object"
+        },
+        "PhotogateConfig": {
+          "additionalProperties": {
+            "not": {}
+          },
+          "description": "Times the pendulum its `gate` plug is clipped onto; the `data` cable carries the period.",
+          "type": "object"
+        },
         "PortRef": {
           "additionalProperties": false,
           "properties": {
@@ -3968,6 +5875,26 @@
             "not": {}
           },
           "description": "Records readings from whatever instrument is plugged into it.",
+          "type": "object"
+        },
+        "PredictConfig": {
+          "additionalProperties": false,
+          "description": "A question the student answers before trying something, so the tutor knows what they expect.",
+          "properties": {
+            "options": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "question": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "question",
+            "options"
+          ],
           "type": "object"
         },
         "Provenance": {
@@ -4190,6 +6117,70 @@
             "goal",
             "objects",
             "checks"
+          ],
+          "type": "object"
+        },
+        "SortBenchConfig": {
+          "additionalProperties": false,
+          "description": "A row of values the student sorts by hand, one comparison at a time. Each pass walks the pairs that aren't in their final place yet.",
+          "properties": {
+            "algorithm": {
+              "const": "bubble",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "algorithm",
+            "values"
+          ],
+          "type": "object"
+        },
+        "SortCodeConfig": {
+          "additionalProperties": false,
+          "description": "The algorithm's source next to a sort bench in the same experiment. It highlights the line the hand trace has reached and shows the variables. `lines` are 1-based line numbers in `source`.",
+          "properties": {
+            "language": {
+              "const": "python",
+              "type": "string"
+            },
+            "lines": {
+              "additionalProperties": false,
+              "properties": {
+                "compare": {
+                  "type": "number"
+                },
+                "passEnd": {
+                  "type": "number"
+                },
+                "stop": {
+                  "type": "number"
+                },
+                "swap": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "compare",
+                "swap",
+                "passEnd",
+                "stop"
+              ],
+              "type": "object"
+            },
+            "source": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "language",
+            "source",
+            "lines"
           ],
           "type": "object"
         },
@@ -4884,6 +6875,21 @@
                   "dilute",
                   "refill",
                   "recordReading",
+                  "swap",
+                  "keep",
+                  "finish",
+                  "resetSort",
+                  "selectLine",
+                  "setIntensity",
+                  "setVoltage",
+                  "recordStop",
+                  "fitLine",
+                  "setLength",
+                  "setMass",
+                  "setAmplitude",
+                  "recordPeriod",
+                  "fitG",
+                  "choose",
                   "connect",
                   "dragPlug",
                   "swapPlugs"
@@ -5409,6 +7415,282 @@
                 }
               },
               "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "swap",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "keep",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "finish",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "resetSort",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "selectLine",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "level": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setIntensity",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "level",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setVoltage",
+                  "type": "string"
+                },
+                "volts": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type",
+                "volts"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "recordStop",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "fitLine",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "metres": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setLength",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "metres",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "grams": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setMass",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "grams",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "degrees": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setAmplitude",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "degrees",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "recordPeriod",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "fitG",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "option": {
+                  "type": "number"
+                },
+                "type": {
+                  "const": "choose",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "option",
                 "type"
               ],
               "type": "object"
@@ -6178,6 +8460,414 @@
                 "provenance"
               ],
               "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/SortBenchConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "sort-bench",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/SortCodeConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "sort-code",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PhotoelectricConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "photoelectric",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PhotoLogConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "photo-log",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PredictConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "predict",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PendulumConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "pendulum",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PhotogateConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "photogate",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PendulumLogConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "pendulum-log",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
             }
           ],
           "description": "An object as a scene or the agent describes it. The Canvas decides its position."
@@ -6202,6 +8892,90 @@
           ],
           "type": "object"
         },
+        "PendulumConfig": {
+          "additionalProperties": false,
+          "description": "A simple pendulum on a stand. Its lowest point is a `gate` socket where a photogate clips on. `g` is what the student is meant to find.",
+          "properties": {
+            "g": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "g"
+          ],
+          "type": "object"
+        },
+        "PendulumLogConfig": {
+          "additionalProperties": {
+            "not": {}
+          },
+          "description": "Records periods from the photogate plugged into it, and fits T\u00b2 against L for g.",
+          "type": "object"
+        },
+        "PhotoLogConfig": {
+          "additionalProperties": {
+            "not": {}
+          },
+          "description": "Records stopping voltages from the phototube plugged into it, and fits V\u2080 against frequency.",
+          "type": "object"
+        },
+        "PhotoelectricConfig": {
+          "additionalProperties": false,
+          "description": "A phototube lit by one line of a lamp at a time, with a retarding voltage and a nanoammeter. Its `data` cable carries the reading to a photo log.",
+          "properties": {
+            "cathode": {
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "workFunction": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "label",
+                "workFunction"
+              ],
+              "type": "object"
+            },
+            "lines": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "wavelength": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "label",
+                  "wavelength"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "maxCurrent": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "cathode",
+            "lines",
+            "maxCurrent"
+          ],
+          "type": "object"
+        },
+        "PhotogateConfig": {
+          "additionalProperties": {
+            "not": {}
+          },
+          "description": "Times the pendulum its `gate` plug is clipped onto; the `data` cable carries the period.",
+          "type": "object"
+        },
         "PortRef": {
           "additionalProperties": false,
           "properties": {
@@ -6223,6 +8997,26 @@
             "not": {}
           },
           "description": "Records readings from whatever instrument is plugged into it.",
+          "type": "object"
+        },
+        "PredictConfig": {
+          "additionalProperties": false,
+          "description": "A question the student answers before trying something, so the tutor knows what they expect.",
+          "properties": {
+            "options": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "question": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "question",
+            "options"
+          ],
           "type": "object"
         },
         "Provenance": {
@@ -6445,6 +9239,70 @@
             "goal",
             "objects",
             "checks"
+          ],
+          "type": "object"
+        },
+        "SortBenchConfig": {
+          "additionalProperties": false,
+          "description": "A row of values the student sorts by hand, one comparison at a time. Each pass walks the pairs that aren't in their final place yet.",
+          "properties": {
+            "algorithm": {
+              "const": "bubble",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "algorithm",
+            "values"
+          ],
+          "type": "object"
+        },
+        "SortCodeConfig": {
+          "additionalProperties": false,
+          "description": "The algorithm's source next to a sort bench in the same experiment. It highlights the line the hand trace has reached and shows the variables. `lines` are 1-based line numbers in `source`.",
+          "properties": {
+            "language": {
+              "const": "python",
+              "type": "string"
+            },
+            "lines": {
+              "additionalProperties": false,
+              "properties": {
+                "compare": {
+                  "type": "number"
+                },
+                "passEnd": {
+                  "type": "number"
+                },
+                "stop": {
+                  "type": "number"
+                },
+                "swap": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "compare",
+                "swap",
+                "passEnd",
+                "stop"
+              ],
+              "type": "object"
+            },
+            "source": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "language",
+            "source",
+            "lines"
           ],
           "type": "object"
         },
@@ -6978,6 +9836,21 @@
                   "dilute",
                   "refill",
                   "recordReading",
+                  "swap",
+                  "keep",
+                  "finish",
+                  "resetSort",
+                  "selectLine",
+                  "setIntensity",
+                  "setVoltage",
+                  "recordStop",
+                  "fitLine",
+                  "setLength",
+                  "setMass",
+                  "setAmplitude",
+                  "recordPeriod",
+                  "fitG",
+                  "choose",
                   "connect",
                   "dragPlug",
                   "swapPlugs"
@@ -7503,6 +10376,282 @@
                 }
               },
               "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "swap",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "keep",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "finish",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "resetSort",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "selectLine",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "level": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setIntensity",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "level",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setVoltage",
+                  "type": "string"
+                },
+                "volts": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type",
+                "volts"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "recordStop",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "fitLine",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "metres": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setLength",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "metres",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "grams": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setMass",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "grams",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "degrees": {
+                  "type": "number"
+                },
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "setAmplitude",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "degrees",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "recordPeriod",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "type": {
+                  "const": "fitG",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "objectId": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "option": {
+                  "type": "number"
+                },
+                "type": {
+                  "const": "choose",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "option",
                 "type"
               ],
               "type": "object"
@@ -8272,6 +11421,414 @@
                 "provenance"
               ],
               "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/SortBenchConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "sort-bench",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/SortCodeConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "sort-code",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PhotoelectricConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "photoelectric",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PhotoLogConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "photo-log",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PredictConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "predict",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PendulumConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "pendulum",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PhotogateConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "photogate",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "config": {
+                  "$ref": "#/definitions/PendulumLogConfig"
+                },
+                "experimentId": {
+                  "description": "Objects with the same experiment id share state (e.g. a run and its result).",
+                  "type": "string"
+                },
+                "id": {
+                  "$ref": "#/definitions/ObjectId"
+                },
+                "near": {
+                  "$ref": "#/definitions/ObjectId",
+                  "description": "Place the new object next to this one."
+                },
+                "provenance": {
+                  "$ref": "#/definitions/Provenance"
+                },
+                "side": {
+                  "description": "Which side of `near` (default right).",
+                  "enum": [
+                    "right",
+                    "below"
+                  ],
+                  "type": "string"
+                },
+                "sources": {
+                  "items": {
+                    "$ref": "#/definitions/SourceRef"
+                  },
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "pendulum-log",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "title",
+                "config",
+                "provenance"
+              ],
+              "type": "object"
             }
           ],
           "description": "An object as a scene or the agent describes it. The Canvas decides its position."
@@ -8296,6 +11853,90 @@
           ],
           "type": "object"
         },
+        "PendulumConfig": {
+          "additionalProperties": false,
+          "description": "A simple pendulum on a stand. Its lowest point is a `gate` socket where a photogate clips on. `g` is what the student is meant to find.",
+          "properties": {
+            "g": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "g"
+          ],
+          "type": "object"
+        },
+        "PendulumLogConfig": {
+          "additionalProperties": {
+            "not": {}
+          },
+          "description": "Records periods from the photogate plugged into it, and fits T\u00b2 against L for g.",
+          "type": "object"
+        },
+        "PhotoLogConfig": {
+          "additionalProperties": {
+            "not": {}
+          },
+          "description": "Records stopping voltages from the phototube plugged into it, and fits V\u2080 against frequency.",
+          "type": "object"
+        },
+        "PhotoelectricConfig": {
+          "additionalProperties": false,
+          "description": "A phototube lit by one line of a lamp at a time, with a retarding voltage and a nanoammeter. Its `data` cable carries the reading to a photo log.",
+          "properties": {
+            "cathode": {
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "workFunction": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "label",
+                "workFunction"
+              ],
+              "type": "object"
+            },
+            "lines": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "wavelength": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "label",
+                  "wavelength"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "maxCurrent": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "cathode",
+            "lines",
+            "maxCurrent"
+          ],
+          "type": "object"
+        },
+        "PhotogateConfig": {
+          "additionalProperties": {
+            "not": {}
+          },
+          "description": "Times the pendulum its `gate` plug is clipped onto; the `data` cable carries the period.",
+          "type": "object"
+        },
         "PortRef": {
           "additionalProperties": false,
           "properties": {
@@ -8317,6 +11958,26 @@
             "not": {}
           },
           "description": "Records readings from whatever instrument is plugged into it.",
+          "type": "object"
+        },
+        "PredictConfig": {
+          "additionalProperties": false,
+          "description": "A question the student answers before trying something, so the tutor knows what they expect.",
+          "properties": {
+            "options": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "question": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "question",
+            "options"
+          ],
           "type": "object"
         },
         "Provenance": {
@@ -8539,6 +12200,70 @@
             "goal",
             "objects",
             "checks"
+          ],
+          "type": "object"
+        },
+        "SortBenchConfig": {
+          "additionalProperties": false,
+          "description": "A row of values the student sorts by hand, one comparison at a time. Each pass walks the pairs that aren't in their final place yet.",
+          "properties": {
+            "algorithm": {
+              "const": "bubble",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "algorithm",
+            "values"
+          ],
+          "type": "object"
+        },
+        "SortCodeConfig": {
+          "additionalProperties": false,
+          "description": "The algorithm's source next to a sort bench in the same experiment. It highlights the line the hand trace has reached and shows the variables. `lines` are 1-based line numbers in `source`.",
+          "properties": {
+            "language": {
+              "const": "python",
+              "type": "string"
+            },
+            "lines": {
+              "additionalProperties": false,
+              "properties": {
+                "compare": {
+                  "type": "number"
+                },
+                "passEnd": {
+                  "type": "number"
+                },
+                "stop": {
+                  "type": "number"
+                },
+                "swap": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "compare",
+                "swap",
+                "passEnd",
+                "stop"
+              ],
+              "type": "object"
+            },
+            "source": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "language",
+            "source",
+            "lines"
           ],
           "type": "object"
         },
